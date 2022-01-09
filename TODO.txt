@@ -1,0 +1,5 @@
+
+
+- Parametrize everything (graticule, glow colors...)
+- Two layers: "land" (outside) and adm(inside, hover possible, action on hover)
+- Colorize background (see) ?

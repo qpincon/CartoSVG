@@ -1,0 +1,267 @@
+<!-- https://observablehq.com/@jjhembd/tilting-the-satellite -->
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<body>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://d3js.org/d3-geo-projection.v4.min.js"></script>
+<script src="https://unpkg.com/topojson@3"></script>
+<script src="https://unpkg.com/dat.gui/build/dat.gui.min.js"></script>
+<div id="container"></div>
+
+<script>
+    const params = {
+        longitude: 15,
+        latitude: 36,
+        altitude: 1000,
+        rotation: 0,
+        tilt: 25,
+        fieldOfView: 50,
+        useCanvas: false,
+    };
+    let width = 1800;
+    const numPixelsY = width * 0.6;
+    const earthRadius = 6371;
+    const degrees = 180 / Math.PI;
+    dat.GUI.TEXT_CLOSED = '🏇';
+    dat.GUI.TEXT_OPEN = '💡';
+    function gui(opts, redraw, config) {
+        var gui = new dat.GUI(config.options || {});
+        gui.close();
+        for (var i in opts) {
+            add(gui, opts, i);
+        }
+
+        function add(src, o, t) {
+            if (typeof o[t] == 'object') {
+                var group = src.addFolder(t);
+                for (var j in o[t]) {
+                    add(group, o[t], j);
+                }
+            } else {
+                var control = (t.match(/color/i))
+                    ? src.addColor(o, t)
+                    : src.add(o, t);
+                if (config.listen) control.listen();
+                if (redraw) control.onChange(redraw);
+
+            }
+        }
+    }
+    if (typeof gui == 'function') {
+        gui(params, draw, {
+            listen: true,
+            options: { width: 300 },
+        });
+    }
+    
+
+    function appendGlow(id="glows", 
+                        innerParams = {blur: 4, strength: 1, rgb: "#945C1B"},
+                        outerParams = {blur: 4, strength: 1, rgb: '#998'}) {
+        const colorInner = d3.rgb(innerParams.rgb);
+        const colorOuter = d3.rgb(outerParams.rgb);
+        const defs = d3.select('body')
+            .append('svg')
+                .attr('width', 0)
+                .attr('height', 0)
+                .append('defs');
+        const filter = defs.append('filter').attr('id', id);
+
+            
+        // OUTER GLOW
+        filter.append('feMorphology')
+            .attr('in', 'SourceGraphic')
+            .attr('radius', outerParams.strength)
+            .attr('operator', 'dilate')
+            .attr('result', 'MASK_OUTER');
+        filter.append('feColorMatrix')
+            .attr('in', 'MASK_OUTER')
+            .attr('type', 'matrix')
+            .attr('values', `0 0 0 0 ${colorOuter.r / 255} 0 0 0 0 ${colorOuter.g / 255} 0 0 0 0 ${colorOuter.b / 255} 0 0 0 1 0`) // apply color
+            .attr('result', 'OUTER_COLORED');
+        filter.append('feGaussianBlur')
+            .attr('in', 'OUTER_COLORED')
+            .attr('stdDeviation', outerParams.blur)
+            .attr('result', 'OUTER_BLUR');
+        filter.append('feComposite')
+            .attr('in', 'OUTER_BLUR')
+            .attr('in2', 'SourceGraphic')
+            .attr('operator', 'out')
+            .attr('result', 'OUTGLOW');
+        // INNER GLOW
+        filter.append('feMorphology')
+            .attr('in', 'SourceAlpha')
+            .attr('radius', innerParams.strength)
+            .attr('operator', 'erode')
+            .attr('result', 'INNER_ERODED');
+
+        filter.append('feGaussianBlur')
+            .attr('in', 'INNER_ERODED')
+            .attr('stdDeviation', innerParams.blur)
+            .attr('result', 'INNER_BLURRED');
+
+        filter.append('feColorMatrix')
+            .attr('in', 'INNER_BLURRED')
+            .attr('type', 'matrix')
+            .attr('values', `1 0 0 0 ${colorInner.r / 255} 0 1 0 0 ${colorInner.g / 255} 0 0 1 0 ${colorInner.b / 255} 0 0 0 -1 1`) // apply color
+            .attr('result', 'INNER_COLOR');
+
+        filter.append('feComposite')
+            .attr('in', 'INNER_COLOR')
+            .attr('in2', 'INNER_BLURRED')
+            .attr('operator', 'in')
+            .attr('result', 'INGLOW');
+
+        // Merge
+        const merge = filter.append('feMerge');
+        merge.append('feMergeNode').attr('in', 'OUTGLOW');
+        merge.append('feMergeNode').attr('in', 'SourceGraphic');
+        merge.append('feMergeNode').attr('in', 'INGLOW');
+        filter.append(() => merge.node());
+        defs.append(() => filter.node());
+    }
+
+    appendGlow();
+    let land = null;
+
+    const graticule = d3.geoGraticule().step([3, 3]);
+    fetch("https://cdn.jsdelivr.net/npm/world-atlas@1/world/50m.json")
+    // fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-10m.json")
+    // fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json")
+        .then(response => response.json())
+        // .then(world => topojson.feature(world, world.objects.countries))
+        .then(world => topojson.feature(world, world.objects.land))
+        .then(world => {
+            world.features = world.features.filter(feat => feat.id !== '462'); // remove buggy maldives
+            land = world;
+            console.log(land);
+            draw();
+        });
+
+    function draw() {
+        const snyderP = 1.0 + params.altitude / earthRadius;
+        const dY = params.altitude * Math.sin(params.tilt / degrees);
+        const dZ = params.altitude * Math.cos(params.tilt / degrees);
+        const visibleYextent = 2 * dZ * Math.tan(0.5 * params.fieldOfView / degrees);
+        const yShift = dY * numPixelsY / visibleYextent;
+        const scale = earthRadius * numPixelsY / visibleYextent;
+        const tilt = params.tilt / degrees;
+        const alpha = Math.acos(snyderP * Math.cos(tilt) * 0.999);
+        const clipDistance = d3.geoClipCircle(Math.acos(1 / snyderP) - 1e-6);
+        const preclip = alpha ? geoPipeline(
+            clipDistance,
+            geoRotatePhi(Math.PI + tilt),
+            d3.geoClipCircle(Math.PI - alpha - 1e-4), // Extra safety factor needed for large tilt values
+            geoRotatePhi(-Math.PI - tilt)
+        ) : clipDistance;
+
+        function geoRotatePhi(deltaPhi) {
+            const cosDeltaPhi = Math.cos(deltaPhi);
+            const sinDeltaPhi = Math.sin(deltaPhi);
+            return sink => ({
+                point(lambda, phi) {
+                    const cosPhi = Math.cos(phi);
+                    const x = Math.cos(lambda) * cosPhi;
+                    const y = Math.sin(lambda) * cosPhi;
+                    const z = Math.sin(phi);
+                    const k = z * cosDeltaPhi + x * sinDeltaPhi;
+                    sink.point(Math.atan2(y, x * cosDeltaPhi - z * sinDeltaPhi), Math.asin(k));
+                },
+                lineStart() { sink.lineStart(); },
+                lineEnd() { sink.lineEnd(); },
+                polygonStart() { sink.polygonStart(); },
+                polygonEnd() { sink.polygonEnd(); },
+                sphere() { sink.sphere(); }
+            });
+        }
+
+        function geoPipeline(...transforms) {
+            return sink => {
+                for (let i = transforms.length - 1; i >= 0; --i) {
+                    sink = transforms[i](sink);
+                }
+                return sink;
+            };
+        }
+
+
+        const projection = d3.geoSatellite()
+            .scale(scale)
+            .translate([width / 2, yShift + numPixelsY / 2])
+            .rotate([-params.longitude, -params.latitude, params.rotation])
+            .tilt(params.tilt)
+            .distance(snyderP)
+            .preclip(preclip)
+            .precision(0.1);
+
+        const container = d3.select('#container');
+        container.html('');
+        if (params.useCanvas) {
+            let canvas = container.select('#canvas');
+            if (canvas.empty()) canvas = container.append('canvas').attr('id', 'canvas').attr('width', width).attr('height', numPixelsY);
+            const context = canvas.node().getContext('2d');
+            context.clearRect(0, 0, width, numPixelsY);
+            const path = d3.geoPath(projection, context);
+            context.fillStyle = "#88d";
+            context.beginPath(), path(land), context.fill();
+            context.beginPath(),
+                path(grid.major),
+                (context.strokeStyle = "#ddf"),
+                (context.globalAlpha = 0.8),
+                context.stroke();
+            // context.beginPath(),
+            //     path(grid.horizon),
+            //     (context.strokeStyle = "#000"),
+            //     context.stroke();
+            return context.canvas;
+        }
+        let svg = container.select('svg');
+        if (svg.empty()) svg = container.append('svg').attr('width', width).attr('height', numPixelsY).attr('id', 'map');
+        const path = d3.geoPath(projection);
+        svg.html('');
+        const groupData = [
+            // { name: 'countries', data: land, id: { prefix: 'iso-3166-1-', field: 'id' }, props: ['name'], class: 'country', filters: ['oglow'] },
+            { name: 'graticule', data: [graticule()], id: null, props: [], class: 'graticule', filters:[] },
+            { name: 'countries', data: land, id: { prefix: 'iso-3166-1-', field: 'id' }, props: ['name'], class: 'country', filters: ['glows'] },
+        ];
+
+        const groups = svg.selectAll('g').data(groupData).join('g').attr('id', d => d.name);
+
+        function drawPaths(data) {
+            const pathElem = d3.select(this).selectAll('path')
+                .data(data.data.features ? data.data.features : data.data)
+                .join('path')
+                .attr('d', (d) => path(d));
+            if (data.id) pathElem.attr('id', (d) => data.id.prefix + d[data.id.field]);
+            if (data.class) pathElem.attr('class', data.class);
+            if (data.filters.length) {
+                const filters = data.filters.map(f => `url(#${f})`).join(' ');
+                pathElem.attr('filter', filters);
+            }
+            data.props.forEach((prop) => pathElem.attr(prop, (d) => d.properties[prop]))
+        }
+
+        groups.each(drawPaths);
+    }
+
+</script>
+
+<style>
+    #map {
+        background: url('./bg.png') repeat;
+        background-color: #ddfdff66;
+    }
+    .graticule {
+        fill: none;
+        stroke: #777;
+        stroke-width: .5px;
+        stroke-opacity: .5;
+    }
+    .country {
+        stroke: #D1BEB0;
+        stroke-opacity: .3;
+        fill: #ffffff;
+        fill-opacity: 1;
+    }
+</style>
