@@ -1,0 +1,30 @@
+{
+  "name": "d3-viz-webpack",
+  "version": "1.0.0",
+  "description": "Create easily some visuals ",
+  "main": "index.js",
+  "scripts": {},
+  "author": "Masae Analytics",
+  "license": "ISC",
+  "devDependencies": {
+    "sass": "^1.47.0",
+    "svelte": "^3.44.1",
+    "svelte-loader": "^3.1.2",
+    "svelte-preprocess": "^4.10.1",
+    "svelte-preprocess-sass": "^2.0.1",
+    "webpack": "^5.64.0",
+    "webpack-cli": "^4.9.1"
+  },
+  "dependencies": {
+    "bulma": "^0.9.3",
+    "css-loader": "^6.5.1",
+    "d3": "^7.3.0",
+    "d3-geo-projection": "^4.0.0",
+    "node-sass": "^6.0.1",
+    "sass-loader": "^12.3.0",
+    "style-loader": "^3.3.1",
+    "topojson-client": "^3.1.0",
+    "topojson-simplify": "^3.0.3",
+    "tweakpane": "^3.0.7"
+  }
+}

@@ -1,5 +1,8 @@
-
-
-- Parametrize everything (graticule, glow colors...)
 - Two layers: "land" (outside) and adm(inside, hover possible, action on hover)
-- Colorize background (see) ?
+- add "Context": countries
+- Add geopath : draw with geoman possible ?(do the PR...)
+- Add labels (from geojson properties) : give choice to select font + marker
+- "Save current geo params" -> localstorage. If defined, to moving on import new file
+- Support import geojson
+- Create tooltips on hover
+- Export all into a custom format, and create a svelte component that can rebuild the map (with all it contains) based on this format
