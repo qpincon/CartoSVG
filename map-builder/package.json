@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "Create easily some visuals ",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "serve": "npx webpack --mode=development --watch",
+    "build": "npx webpack --mode=production"
+  },
   "author": "Masae Analytics",
   "license": "ISC",
   "devDependencies": {

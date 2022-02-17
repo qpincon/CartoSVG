@@ -6,10 +6,12 @@
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="https://d3js.org/d3-geo-projection.v4.min.js"></script>
 <script src="https://unpkg.com/topojson@3"></script>
-<script src="https://unpkg.com/dat.gui/build/dat.gui.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tweakpane@3.0.7/dist/tweakpane.min.js"></script>
 <div id="container"></div>
 
+
 <script>
+    const pane = new Tweakpane.Pane();
     const params = {
         longitude: 15,
         latitude: 36,
@@ -18,57 +20,76 @@
         tilt: 25,
         fieldOfView: 50,
         useCanvas: false,
+        innerGlowParams: {blur: 4, strength: 1.4, color: "#7c490eff"},
+        outerGlowParams: {blur: 4, strength: 3, color: '#ffffffff'},
+        useGraticule: true,
+        graticuleStep: 3,
+        bgColor: "#ddfdff66",
+        hoverColor: "#fbbc0023",
+        bgNoise: true,
     };
+    const bounds = {
+        longitude: [-180, 180],
+        latitude: [-90, 90],
+        rotation: [-180, 180],
+        tilt: [0, 90],
+        altitude: [8, 32000],
+        fieldOfView: [1, 180],
+        blur: [0.5, 10],
+        strength: [0.1, 10],
+        graticuleStep: [0.1, 10]
+    }
     let width = 1800;
     const numPixelsY = width * 0.6;
     const earthRadius = 6371;
     const degrees = 180 / Math.PI;
-    dat.GUI.TEXT_CLOSED = '🏇';
-    dat.GUI.TEXT_OPEN = '💡';
-    function gui(opts, redraw, config) {
-        var gui = new dat.GUI(config.options || {});
-        gui.close();
-        for (var i in opts) {
-            add(gui, opts, i);
-        }
+    let timeoutId;
+    function gui(opts, redraw) {
+        const pane = new Tweakpane.Pane({title: 'Options', expanded: false});
+        Object.entries(params).forEach(([key, value]) => {
+            add(opts, key, value);
+        })
 
-        function add(src, o, t) {
-            if (typeof o[t] == 'object') {
-                var group = src.addFolder(t);
-                for (var j in o[t]) {
-                    add(group, o[t], j);
-                }
+        function add(opts, key, value, folder = pane) {
+            if (typeof value == 'object') {
+                const group = pane.addFolder({title: key, expanded: false});
+                Object.entries(value).forEach(([innerKey, innerValue]) => {
+                    add(value, innerKey, innerValue, group);
+                });
             } else {
-                var control = (t.match(/color/i))
-                    ? src.addColor(o, t)
-                    : src.add(o, t);
-                if (config.listen) control.listen();
-                if (redraw) control.onChange(redraw);
-
+                let params = {};
+                const boundsDef = bounds[key];
+                if (boundsDef) {
+                    params = {min: boundsDef[0], max:boundsDef[1]}
+                }
+                folder.addInput(opts, key, params);
             }
         }
-    }
-    if (typeof gui == 'function') {
-        gui(params, draw, {
-            listen: true,
-            options: { width: 300 },
+        pane.on('change', () => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                redraw();
+            }, 300);
         });
     }
-    
+    if (typeof gui == 'function') {
+        gui(params, draw);
+    }
 
     function appendGlow(id="glows", 
-                        innerParams = {blur: 4, strength: 1, rgb: "#945C1B"},
-                        outerParams = {blur: 4, strength: 1, rgb: '#998'}) {
-        const colorInner = d3.rgb(innerParams.rgb);
-        const colorOuter = d3.rgb(outerParams.rgb);
-        const defs = d3.select('body')
+                        innerParams = {blur: 2, strength: 1, color: "#7c490e"},
+                        outerParams = {blur: 4, strength: 1, color: '#998'}) {
+        const colorInner = d3.rgb(innerParams.color);
+        const colorOuter = d3.rgb(outerParams.color);
+        const existing = d3.select(`#${id}`);
+        const defs = !existing.empty() ? existing.select(function() { return this.parentNode} ) : d3.select('body')
             .append('svg')
                 .attr('width', 0)
                 .attr('height', 0)
                 .append('defs');
+        if (!existing.empty()) existing.remove();
         const filter = defs.append('filter').attr('id', id);
 
-            
         // OUTER GLOW
         filter.append('feMorphology')
             .attr('in', 'SourceGraphic')
@@ -78,7 +99,7 @@
         filter.append('feColorMatrix')
             .attr('in', 'MASK_OUTER')
             .attr('type', 'matrix')
-            .attr('values', `0 0 0 0 ${colorOuter.r / 255} 0 0 0 0 ${colorOuter.g / 255} 0 0 0 0 ${colorOuter.b / 255} 0 0 0 1 0`) // apply color
+            .attr('values', `0 0 0 0 ${colorOuter.r / 255} 0 0 0 0 ${colorOuter.g / 255} 0 0 0 0 ${colorOuter.b / 255} 0 0 0 ${colorOuter.opacity} 0`) // apply color
             .attr('result', 'OUTER_COLORED');
         filter.append('feGaussianBlur')
             .attr('in', 'OUTER_COLORED')
@@ -89,6 +110,7 @@
             .attr('in2', 'SourceGraphic')
             .attr('operator', 'out')
             .attr('result', 'OUTGLOW');
+
         // INNER GLOW
         filter.append('feMorphology')
             .attr('in', 'SourceAlpha')
@@ -104,12 +126,12 @@
         filter.append('feColorMatrix')
             .attr('in', 'INNER_BLURRED')
             .attr('type', 'matrix')
-            .attr('values', `1 0 0 0 ${colorInner.r / 255} 0 1 0 0 ${colorInner.g / 255} 0 0 1 0 ${colorInner.b / 255} 0 0 0 -1 1`) // apply color
+            .attr('values', `0 0 0 0 ${colorInner.r / 255} 0 0 0 0 ${colorInner.g / 255} 0 0 0 0 ${colorInner.b / 255} 0 0 0 -1 1`) // inverse color
             .attr('result', 'INNER_COLOR');
 
         filter.append('feComposite')
             .attr('in', 'INNER_COLOR')
-            .attr('in2', 'INNER_BLURRED')
+            .attr('in2', 'SourceGraphic')
             .attr('operator', 'in')
             .attr('result', 'INGLOW');
 
@@ -122,19 +144,20 @@
         defs.append(() => filter.node());
     }
 
-    appendGlow();
-    let land = null;
-
-    const graticule = d3.geoGraticule().step([3, 3]);
-    fetch("https://cdn.jsdelivr.net/npm/world-atlas@1/world/50m.json")
+    let countries = null;
+    let land = null
+    // fetch("https://cdn.jsdelivr.net/npm/world-atlas@1/world/50m.json")
     // fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-10m.json")
-    // fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json")
+    fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json")
         .then(response => response.json())
+        // .then(world => topojson.merge(world, world.objects.countries.geometries.filter(feat => feat.id !== '462'))) // remove buggy maldives
         // .then(world => topojson.feature(world, world.objects.countries))
-        .then(world => topojson.feature(world, world.objects.land))
+        // .then(world => topojson.feature(world, world.objects.land))
         .then(world => {
-            world.features = world.features.filter(feat => feat.id !== '462'); // remove buggy maldives
-            land = world;
+            world.objects.countries.geometries = world.objects.countries.geometries.filter(feat => feat.id !== '462');
+            const merged = topojson.merge(world, world.objects.countries.geometries);
+            land = merged;
+            countries = topojson.feature(world, world.objects.countries);
             console.log(land);
             draw();
         });
@@ -185,7 +208,6 @@
             };
         }
 
-
         const projection = d3.geoSatellite()
             .scale(scale)
             .translate([width / 2, yShift + numPixelsY / 2])
@@ -197,6 +219,7 @@
 
         const container = d3.select('#container');
         container.html('');
+        const graticule = d3.geoGraticule().step([params.graticuleStep, params.graticuleStep]);
         if (params.useCanvas) {
             let canvas = container.select('#canvas');
             if (canvas.empty()) canvas = container.append('canvas').attr('id', 'canvas').attr('width', width).attr('height', numPixelsY);
@@ -206,30 +229,35 @@
             context.fillStyle = "#88d";
             context.beginPath(), path(land), context.fill();
             context.beginPath(),
-                path(grid.major),
+                path(graticule),
                 (context.strokeStyle = "#ddf"),
                 (context.globalAlpha = 0.8),
                 context.stroke();
-            // context.beginPath(),
-            //     path(grid.horizon),
-            //     (context.strokeStyle = "#000"),
-            //     context.stroke();
             return context.canvas;
         }
         let svg = container.select('svg');
-        if (svg.empty()) svg = container.append('svg').attr('width', width).attr('height', numPixelsY).attr('id', 'map');
+        if (svg.empty()) svg = container.append('svg')
+            .attr('viewBox', `0 0 ${width} ${numPixelsY}`)
+            .attr('id', 'map');
         const path = d3.geoPath(projection);
         svg.html('');
+        svg.on("click", function(e) {
+            console.log(projection.invert(d3.pointer(e)));
+        });
+        
         const groupData = [
-            // { name: 'countries', data: land, id: { prefix: 'iso-3166-1-', field: 'id' }, props: ['name'], class: 'country', filters: ['oglow'] },
-            { name: 'graticule', data: [graticule()], id: null, props: [], class: 'graticule', filters:[] },
-            { name: 'countries', data: land, id: { prefix: 'iso-3166-1-', field: 'id' }, props: ['name'], class: 'country', filters: ['glows'] },
+            { name: 'land', data: [land], id: null, props: [], class: 'land', filters: ['glows'] },
+            { name: 'countries', data: countries, id: { prefix: 'iso-3166-1-', field: 'id' }, props: ['name'], class: 'country', filters: [] },
         ];
+        if (params.useGraticule) {
+            groupData.splice(0, 0, { name: 'graticule', data: [graticule()], id: null, props: [], class: 'graticule', filters:[] });
+        }
 
         const groups = svg.selectAll('g').data(groupData).join('g').attr('id', d => d.name);
 
         function drawPaths(data) {
             const pathElem = d3.select(this).selectAll('path')
+                // .data(data.data)
                 .data(data.data.features ? data.data.features : data.data)
                 .join('path')
                 .attr('d', (d) => path(d));
@@ -243,14 +271,39 @@
         }
 
         groups.each(drawPaths);
+        // removeNotVisible();
+        appendGlow('glows', params.innerGlowParams, params.outerGlowParams);
+        const map = d3.select('#map')
+            .style('--bg-color', params.bgColor)
+            .style('--country-hover-color', params.hoverColor)
+            .style('background-image', params.bgNoise ? "url('./bg.png')" : 'none');
+    }
+
+    function removeNotVisible() {
+        const countries = document.getElementById('countries');
+        const paths = Array.from(countries.children);
+        const map = document.getElementById('map');
+        const svgBounds = map.getBoundingClientRect();
+        console.log('Number of paths before:', paths.length);
+        paths.forEach(p => {
+            const rect = p.getBoundingClientRect();
+            if (rect.width == 0 && rect.height == 0) p.remove();
+        });
+        console.log('Number of paths after:', Array.from(countries.children).length);
     }
 
 </script>
 
 <style>
+    :root {
+        --bg-color: #ddfdff66; 
+        --country-hover-color: #ffe1cc8e;
+    }
+
     #map {
-        background: url('./bg.png') repeat;
-        background-color: #ddfdff66;
+        background-image: url('./bg.png');
+        background-repeat: repeat;
+        background-color: var(--bg-color);
     }
     .graticule {
         fill: none;
@@ -258,10 +311,19 @@
         stroke-width: .5px;
         stroke-opacity: .5;
     }
-    .country {
-        stroke: #D1BEB0;
-        stroke-opacity: .3;
+    .land {
+        stroke-opacity: 0;
         fill: #ffffff;
         fill-opacity: 1;
     }
+    .country {
+        stroke: #D1BEB0;
+        stroke-opacity: .3;
+        fill: #ffffff67;
+        fill-opacity: 1;
+    }
+    .country:hover {
+        fill: var(--country-hover-color);
+    }
+
 </style>

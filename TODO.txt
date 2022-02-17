@@ -6,3 +6,4 @@
 - Support import geojson
 - Create tooltips on hover
 - Export all into a custom format, and create a svelte component that can rebuild the map (with all it contains) based on this format
+- Style defaults (masae style, pirate map style, ...)

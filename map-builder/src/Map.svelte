@@ -25,7 +25,7 @@ const params = {
     },
     useGraticule: true,
     graticuleStep: 3,
-    seaColor: "#ddfdff66",
+    seaColor: "#b4d0ff8d",
     land: {
         show: true,
         fillColor: "#ffffffff",
@@ -195,9 +195,9 @@ let countries = null;
 let land = null;
 let providedBorders = null;
 let provided = null;
-// fetch("https://cdn.jsdelivr.net/npm/world-atlas@1/world/50m.json")
+fetch("https://cdn.jsdelivr.net/npm/world-atlas@1/world/50m.json")
 // fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-10m.json")
-fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json")
+// fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json")
     .then(response => response.json())
     // .then(world => topojson.merge(world, world.objects.countries.geometries.filter(feat => feat.id !== '462'))) // remove buggy maldives
     // .then(world => topojson.feature(world, world.objects.countries))
@@ -261,6 +261,25 @@ function draw() {
         };
     }
 
+    // const projection = geoSatellite()
+    //     .scale(scale)
+    //     .translate([width / 2, yShift + numPixelsY / 2])
+    //     .rotate([-params.longitude, -params.latitude, params.rotation])
+    //     .tilt(params.tilt)
+    //     .distance(snyderP)
+    //     // .preclip(preclip)
+    //     .precision(0.1);
+    
+    const simpleProj = geoSatellite()
+        .scale(scale)
+        .translate([width / 2, yShift + numPixelsY / 2])
+        .rotate([-params.longitude, -params.latitude, params.rotation])
+        .tilt(params.tilt);
+        // .distance(snyderP)
+        // .preclip(preclip)
+        // .precision(0.1);
+
+    // const projection = simpleProj;
     const projection = geoSatellite()
         .scale(scale)
         .translate([width / 2, yShift + numPixelsY / 2])
@@ -272,8 +291,8 @@ function draw() {
 
     const container = d3.select('#map-container');
     container.html('');
+    const outline = {type: "Sphere"};
     const graticule = d3.geoGraticule().step([params.graticuleStep, params.graticuleStep])();
-    // TODO : compute merged graticule (using mapshaper) to add sphere to the map, to use fill color to fill the sphere
     if (!params.useGraticule) graticule.coordinates = [];
     if (params.useCanvas) {
         let canvas = container.select('#canvas');
@@ -295,13 +314,16 @@ function draw() {
         .attr('viewBox', `0 0 ${width} ${numPixelsY}`)
         .attr('id', 'map');
     path = d3.geoPath(projection);
+    const noClipPath = d3.geoPath(simpleProj);
     svg.html('');
     svg.on("click", function(e) {
         console.log(projection.invert(d3.pointer(e)));
     });
     
+
     const groupData = [];
 
+    groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
     groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
     if (params.land.show)
         groupData.push({ name: 'land', data: [land], id: null, props: [], class: 'land', filter: params.land.filter });
@@ -318,7 +340,7 @@ function draw() {
         const pathElem = d3.select(this).selectAll('path')
             .data(data.data.features ? data.data.features : data.data)
             .join('path')
-            .attr('d', (d) => path(d));
+            .attr('d', (d) => {console.log(d); return path(d)});
         if (data.id) pathElem.attr('id', (d) => data.id.prefix + d[data.id.field]);
         if (data.class) pathElem.attr('class', data.class);
         if (data.filter) pathElem.attr('filter', `url(#${data.filter})`);
@@ -327,6 +349,7 @@ function draw() {
 
     groups.each(drawPaths);
     // removeNotVisible();
+
     appendGlow('firstGlow', params.firstGlow.innerGlow, params.firstGlow.outerGlow);
     appendGlow('secondGlow', params.secondGlow.innerGlow, params.secondGlow.outerGlow);
     
@@ -399,7 +422,7 @@ function handleInput(e) {
 
 <style global>
 :root {
-    --sea-color: #ddfdff66; 
+    --sea-color: #dde9ff66; 
     --country-hover-color: #ffe1cc8e;
     --country-stroke-color: #ffe1cc8e;
     --country-stroke-width: 1;
@@ -422,8 +445,11 @@ function handleInput(e) {
 #map {
     background-repeat: repeat;
 }
-.graticule {
+.outline {
     fill: var(--sea-color);
+}
+.graticule {
+    fill: none;
     stroke: #777;
     stroke-width: .5px;
     stroke-opacity: .5;
