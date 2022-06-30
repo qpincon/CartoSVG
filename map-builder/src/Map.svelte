@@ -5,7 +5,7 @@ import * as topojson from 'topojson-client';
 import * as topojsonSimplify from 'topojson-simplify';
 import * as d3 from "d3";
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
-import MotionPathHelper from "./util/MotionPathHelper.min.js";
+import MotionPathHelper from "./util/MotionPathHelper.js";
 console.log(MotionPathHelper);
 const params = {
     longitude: 15,
