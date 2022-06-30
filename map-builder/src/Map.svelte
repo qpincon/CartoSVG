@@ -115,6 +115,7 @@ function gui(opts, redraw) {
 const pane = gui(params, draw);
 
 import bg from './assets/img/bg.png';
+// import bg from './assets/img/connection-signal.svg';
 import uploadIcon from './assets/img/icon-upload.svg';
 
 function appendGlow(id="glows", 
@@ -191,6 +192,35 @@ function appendGlow(id="glows",
     defsElem.append(() => filter.node());
 }
 
+function appendBgPattern(id, imageSize=500) {
+    let defsElem = d3.select('#map-defs');
+    if (defsElem.empty()) {
+        defsElem = d3.select('body')
+        .append('svg')
+            .attr('width', 0)
+            .attr('height', 0)
+        .append('defs')
+            .attr('id', 'map-defs');
+    }
+    const existing = d3.select(`#${id}`);
+    if (!existing.empty()) existing.remove();
+    const filter = defsElem.append('pattern')
+        .attr('id', id)
+        .attr('patternUnits', 'userSpaceOnUse')
+        .attr('width', imageSize)
+        .attr('height', imageSize);
+
+    filter.append('image')
+        .attr('href', bg)
+        .attr('x', 0).attr('y', 0)
+        .attr('width', imageSize).attr('height', imageSize);
+
+    filter.append('rect')
+        .attr('width', imageSize).attr('height', imageSize)
+        .attr('fill', params.seaColor);
+    defsElem.append(() => filter.node());
+}
+
 let countries = null;
 let land = null;
 let providedBorders = null;
@@ -261,25 +291,6 @@ function draw() {
         };
     }
 
-    // const projection = geoSatellite()
-    //     .scale(scale)
-    //     .translate([width / 2, yShift + numPixelsY / 2])
-    //     .rotate([-params.longitude, -params.latitude, params.rotation])
-    //     .tilt(params.tilt)
-    //     .distance(snyderP)
-    //     // .preclip(preclip)
-    //     .precision(0.1);
-    
-    const simpleProj = geoSatellite()
-        .scale(scale)
-        .translate([width / 2, yShift + numPixelsY / 2])
-        .rotate([-params.longitude, -params.latitude, params.rotation])
-        .tilt(params.tilt);
-        // .distance(snyderP)
-        // .preclip(preclip)
-        // .precision(0.1);
-
-    // const projection = simpleProj;
     const projection = geoSatellite()
         .scale(scale)
         .translate([width / 2, yShift + numPixelsY / 2])
@@ -314,7 +325,6 @@ function draw() {
         .attr('viewBox', `0 0 ${width} ${numPixelsY}`)
         .attr('id', 'map');
     path = d3.geoPath(projection);
-    const noClipPath = d3.geoPath(simpleProj);
     svg.html('');
     svg.on("click", function(e) {
         console.log(projection.invert(d3.pointer(e)));
@@ -322,7 +332,6 @@ function draw() {
     
 
     const groupData = [];
-
     groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
     groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
     if (params.land.show)
@@ -340,7 +349,7 @@ function draw() {
         const pathElem = d3.select(this).selectAll('path')
             .data(data.data.features ? data.data.features : data.data)
             .join('path')
-            .attr('d', (d) => {console.log(d); return path(d)});
+            .attr('d', (d) => {return path(d)});
         if (data.id) pathElem.attr('id', (d) => data.id.prefix + d[data.id.field]);
         if (data.class) pathElem.attr('class', data.class);
         if (data.filter) pathElem.attr('filter', `url(#${data.filter})`);
@@ -352,10 +361,11 @@ function draw() {
 
     appendGlow('firstGlow', params.firstGlow.innerGlow, params.firstGlow.outerGlow);
     appendGlow('secondGlow', params.secondGlow.innerGlow, params.secondGlow.outerGlow);
-    
-   d3.select('#map')
-        .style('--sea-color', params.seaColor)
-        .style('background-image', params.bgNoise ? `url(${bg})` : 'none');
+    appendBgPattern('noise');
+    if (params.bgNoise)
+        d3.select('#outline').style('fill', "url(#noise)");
+    else d3.select('#outline').style('fill', "var(--sea-color)");
+
     styleLayer(params.countries, 'country');
     styleLayer(params.land, 'land');
     styleLayer(params.provided, 'provided');
@@ -377,6 +387,7 @@ function styleLayer(styleParams, prefix) {
 }
 
 function removeNotVisible() {
+    // TODO: trim SVG definitions to a given precision to reduce size
     const countries = document.getElementById('countries');
     const paths = Array.from(countries.children);
     const map = document.getElementById('map');
@@ -444,9 +455,6 @@ function handleInput(e) {
 
 #map {
     background-repeat: repeat;
-}
-.outline {
-    fill: var(--sea-color);
 }
 .graticule {
     fill: none;
