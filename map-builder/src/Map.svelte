@@ -6,7 +6,7 @@ import * as topojsonSimplify from 'topojson-simplify';
 import * as d3 from "d3";
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
 import MotionPathHelper from "./util/MotionPathHelper.js";
-console.log(MotionPathHelper);
+// console.log(MotionPathHelper);
 const params = {
     longitude: 15,
     latitude: 36,
@@ -75,10 +75,11 @@ const filterOptions = {
     none: '',
     firstGlow: 'firstGlow',
     secondGlow: 'secondGlow',
-}
+};
 
+const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView'];
 let width = 1800;
-const numPixelsY = width * 0.6;
+const numPixelsY = width * 0.4;
 const earthRadius = 6371;
 const degrees = 180 / Math.PI;
 let timeoutId;
@@ -104,10 +105,14 @@ function gui(opts, redraw) {
             folder.addInput(opts, key, params);
         }
     }
-    pane.on('change', () => {
+    pane.on('change', (e) => {
+        const prop = e.presetKey;
+        if (positionVars.includes(prop)) {
+            redraw(true);
+        }
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
-            redraw();
+            redraw(false);
         }, 300);
     });
     return pane;
@@ -225,6 +230,8 @@ let countries = null;
 let land = null;
 let providedBorders = null;
 let provided = null;
+let simpleLand = null;
+
 fetch("https://cdn.jsdelivr.net/npm/world-atlas@1/world/50m.json")
 // fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-10m.json")
 // fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json")
@@ -237,6 +244,8 @@ fetch("https://cdn.jsdelivr.net/npm/world-atlas@1/world/50m.json")
         const copy = {...world};
         const presimplified = topojsonSimplify.simplify(topojsonSimplify.presimplify(copy), 0.0005);
         const merged = topojson.merge(presimplified, presimplified.objects.countries.geometries);
+        simpleLand = topojsonSimplify.simplify(topojsonSimplify.presimplify(copy), 0.001);
+        simpleLand = topojson.merge(simpleLand, simpleLand.objects.countries.geometries);
         land = merged;
         countries = topojson.feature(world, world.objects.countries);
         console.log('land', land);
@@ -244,8 +253,37 @@ fetch("https://cdn.jsdelivr.net/npm/world-atlas@1/world/50m.json")
         draw();
     });
 
+
+const container = d3.select('#container');
+// console.log(container)
+container.call(d3.drag()
+    .on("drag", dragged)
+);
+container.call(d3.zoom()
+    // .scaleExtent([...bounds.altitude].reverse())
+    .scaleExtent([...bounds.altitude])
+    .on("zoom", zoomed)
+);
+    // .scaleExtent(scaleExtent.map(x => x * scale))
+
+
+function zoomed(event) {
+    params.altitude += event.sourceEvent.deltaY;
+    draw(true);
+    pane.refresh();
+}
+
+function dragged(event) {
+    // console.log(event);
+    params.longitude += event.dx / 3;
+    params.latitude -= event.dy / 3;
+    draw(true);
+    pane.refresh();
+
+}
+
 let path = null;
-function draw() {
+function draw(simplified = false) {
     const snyderP = 1.0 + params.altitude / earthRadius;
     const dY = params.altitude * Math.sin(params.tilt / degrees);
     const dZ = params.altitude * Math.cos(params.tilt / degrees);
@@ -305,14 +343,14 @@ function draw() {
     const outline = {type: "Sphere"};
     const graticule = d3.geoGraticule().step([params.graticuleStep, params.graticuleStep])();
     if (!params.useGraticule) graticule.coordinates = [];
-    if (params.useCanvas) {
+    if (params.useCanvas || simplified) {
         let canvas = container.select('#canvas');
         if (canvas.empty()) canvas = container.append('canvas').attr('id', 'canvas').attr('width', width).attr('height', numPixelsY);
         const context = canvas.node().getContext('2d');
         context.clearRect(0, 0, width, numPixelsY);
         path = d3.geoPath(projection, context);
         context.fillStyle = "#88d";
-        context.beginPath(), path(land), context.fill();
+        context.beginPath(), path(simplified ? simpleLand : land), context.fill();
         context.beginPath(),
             path(graticule),
             (context.strokeStyle = "#ddf"),

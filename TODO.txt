@@ -3,10 +3,11 @@
 - Add labels (from geojson properties) : give choice to select font + marker
 - "Save current geo params" -> localstorage. If defined, to moving on import new file
 - Support import geojson
-- Create tooltips on hover
+- Create tooltips on hover: have a builder to chose properties on geometries
 - Export all into a custom format, and create a svelte component that can rebuild the map (with all it contains) based on this format
 - Style defaults (masae style, pirate map style, ...)
 - Add clip path (rectangle, circle...)
-- Add possibility to change background
+- Add possibility to change background image (noise for now)
 - Import geojson instead of topojson
 - Draw on canvas on move, using simplified geometries
+- Export with a level of precision

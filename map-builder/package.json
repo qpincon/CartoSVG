@@ -23,11 +23,13 @@
     "css-loader": "^6.5.1",
     "d3": "^7.3.0",
     "d3-geo-projection": "^4.0.0",
+    "d3-zoom": "^3.0.0",
     "node-sass": "^6.0.1",
     "sass-loader": "^12.3.0",
     "style-loader": "^3.3.1",
     "topojson-client": "^3.1.0",
     "topojson-simplify": "^3.0.3",
-    "tweakpane": "^3.0.7"
+    "tweakpane": "^3.0.7",
+    "versor": "^0.2.0"
   }
 }
