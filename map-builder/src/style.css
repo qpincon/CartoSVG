@@ -1,0 +1,72 @@
+:root {
+    --sea-color: #dde9ff66; 
+    --country-hover-color: #ffe1cc8e;
+    --country-stroke-color: #ffe1cc8e;
+    --country-stroke-width: 1;
+    --country-fill-color: #fff;
+
+    --land-fill-color: #fff;
+    --land-stroke-color: #D1BEB0;
+    --land-stroke-width: 1;
+
+    --provided-borders-fill-color: #fff;
+    --provided-borders-stroke-color: #D1BEB0;
+    --provided-borders-stroke-width: 1;
+
+    --provided-fill-color: #ffe1cc8e;
+    --provided-hover-color: #ffe1cc8e;
+    --provided-stroke-color: #D1BEB0;
+    --provided-stroke-width: 1;
+}
+
+#map-container {
+   width: 60%;
+   margin: 0 auto; 
+   border: 2px solid #b8b8b8;
+   border-radius: 5px;
+}
+
+#map {
+    background-repeat: repeat;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%); 
+}
+#paths {
+    stroke: black;
+    stroke-width: 5;
+    fill: none;
+}
+.graticule {
+    fill: none;
+    stroke: #777;
+    stroke-width: .5px;
+    stroke-opacity: .5;
+}
+.land {
+    stroke: var(--land-stroke-color);
+    stroke-width: var(--land-stroke-width);
+    fill: var(--land-fill-color);
+}
+.provided-borders {
+    stroke: var(--provided-borders-stroke-color);
+    stroke-width: var(--provided-borders-stroke-width);
+    fill: var(--provided-borders-fill-color);
+}
+.country {
+    stroke: var(--country-stroke-color);
+    stroke-width: var(--country-stroke-width);
+    fill: var(--country-fill-color);
+}
+.provided {
+    stroke: var(--provided-stroke-color);
+    stroke-width: var(--provided-stroke-width);
+    fill: var(--provided-fill-color);
+}
+.country:hover {
+    fill: var(--country-hover-color);
+}
+.provided:hover {
+    fill: var(--provided-hover-color);
+}
+.tp-dfwv {
+  min-width: 360px;
+}

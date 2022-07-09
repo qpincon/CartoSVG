@@ -1,9 +1,20 @@
 <script>
+import { drawCustomPaths, parseAndUnprojectPath } from './paths';
+import './style.css';
+// import style from './style.css';
+// console.log(style)
 import {Pane} from 'tweakpane';
 import {geoSatellite} from 'd3-geo-projection';
 import * as topojson from 'topojson-client';
 import * as topojsonSimplify from 'topojson-simplify';
 import * as d3 from "d3";
+import bbox from 'geojson-bbox';
+import union from '@turf/union';
+import rewind from '@turf/rewind';
+import SVGO from 'svgo/dist/svgo.browser';
+import svgoConfig from './svgo.config';
+
+
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
 import MotionPathHelper from "./util/MotionPathHelper.js";
 // console.log(MotionPathHelper);
@@ -45,7 +56,7 @@ const params = {
         show: true,
         hover: true,
         hoverColor: "#fbbc0023",
-        fillColor: "#ffffffff",
+        fillColor: "#ffffff00",
         strokeColor: "#D1BEB038",
         strokeWidth: 1,
     },
@@ -82,6 +93,7 @@ let width = 1800;
 const numPixelsY = width * 0.4;
 const earthRadius = 6371;
 const degrees = 180 / Math.PI;
+const offCanvasPx = 5;
 let timeoutId;
 function gui(opts, redraw) {
     const pane = new Pane({title: 'Options', expanded: false});
@@ -123,45 +135,52 @@ import bg from './assets/img/bg.png';
 // import bg from './assets/img/connection-signal.svg';
 import uploadIcon from './assets/img/icon-upload.svg';
 
-function appendGlow(id="glows", 
+function appendGlow(selection, id="glows",
                     innerParams = {blur: 2, strength: 1, color: "#7c490e"},
                     outerParams = {blur: 4, strength: 1, color: '#998'}) {
     const colorInner = d3.rgb(innerParams.color);
     const colorOuter = d3.rgb(outerParams.color);
-    let defsElem = d3.select('#map-defs');
-    if (defsElem.empty()) {
-        defsElem = d3.select('body')
-        .append('svg')
-            .attr('width', 0)
-            .attr('height', 0)
-        .append('defs')
-            .attr('id', 'map-defs');
-    }
+    // let defsElem = d3.select('#map-defs');
+    // if (defsElem.empty()) {
+    //     defsElem = d3.select('body')
+    //     .append('svg')
+    //         .attr('width', 0)
+    //         .attr('height', 0)
+    //     .append('defs')
+    //         .attr('id', 'map-defs');
+    // }
     const existing = d3.select(`#${id}`);
     // const defs = !existing.empty() ? existing.select(function() { return this.parentNode} ) : 
     //         .append('defs');
     if (!existing.empty()) existing.remove();
-    const filter = defsElem.append('filter').attr('id', id);
+    let defs = selection.select('defs');
+    if (defs.empty()) defs = selection.append('defs')
+    const filter = defs.append('filter').attr('id', id);
 
     // OUTER GLOW
-    filter.append('feMorphology')
-        .attr('in', 'SourceGraphic')
-        .attr('radius', outerParams.strength)
-        .attr('operator', 'dilate')
-        .attr('result', 'MASK_OUTER');
-    filter.append('feColorMatrix')
-        .attr('in', 'MASK_OUTER')
-        .attr('type', 'matrix')
-        .attr('values', `0 0 0 0 ${colorOuter.r / 255} 0 0 0 0 ${colorOuter.g / 255} 0 0 0 0 ${colorOuter.b / 255} 0 0 0 ${colorOuter.opacity} 0`) // apply color
-        .attr('result', 'OUTER_COLORED');
-    filter.append('feGaussianBlur')
-        .attr('in', 'OUTER_COLORED')
-        .attr('stdDeviation', outerParams.blur)
-        .attr('result', 'OUTER_BLUR');
-    filter.append('feComposite')
-        .attr('in', 'OUTER_BLUR')
-        .attr('in2', 'SourceGraphic')
-        .attr('operator', 'out')
+    // filter.append('feMorphology')
+    //     .attr('in', 'SourceGraphic')
+    //     .attr('radius', outerParams.strength)
+    //     .attr('operator', 'dilate')
+    //     .attr('result', 'MASK_OUTER');
+    // filter.append('feColorMatrix')
+    //     .attr('in', 'MASK_OUTER')
+    //     .attr('type', 'matrix')
+    //     .attr('values', `0 0 0 0 ${colorOuter.r / 255} 0 0 0 0 ${colorOuter.g / 255} 0 0 0 0 ${colorOuter.b / 255} 0 0 0 ${colorOuter.opacity} 0`) // apply color
+    //     .attr('result', 'OUTER_COLORED');
+    // filter.append('feGaussianBlur')
+    //     .attr('in', 'OUTER_COLORED')
+    //     .attr('stdDeviation', outerParams.blur)
+    //     .attr('result', 'OUTER_BLUR');
+    // filter.append('feComposite')
+    //     .attr('in', 'OUTER_BLUR')
+    //     .attr('in2', 'SourceGraphic')
+    //     .attr('operator', 'out')
+    //     .attr('result', 'OUTGLOW');
+    filter.append('feDropShadow')
+        .attr('flood-color', `${colorOuter}`)
+        // .attr('flood-opacity', `${colorOuter.opacity}`)
+        .attr('stdDeviation', `${outerParams.strength}`)
         .attr('result', 'OUTGLOW');
 
     // INNER GLOW
@@ -194,36 +213,45 @@ function appendGlow(id="glows",
     merge.append('feMergeNode').attr('in', 'SourceGraphic');
     merge.append('feMergeNode').attr('in', 'INGLOW');
     filter.append(() => merge.node());
-    defsElem.append(() => filter.node());
+
+    defs.append(() => filter.node());
 }
 
-function appendBgPattern(id, imageSize=500) {
-    let defsElem = d3.select('#map-defs');
-    if (defsElem.empty()) {
-        defsElem = d3.select('body')
-        .append('svg')
-            .attr('width', 0)
-            .attr('height', 0)
-        .append('defs')
-            .attr('id', 'map-defs');
-    }
+function appendBgPattern(selection, id, imageSize=500) {
+    // let defsElem = d3.select('#map-defs');
+    // if (defsElem.empty()) {
+    //     defsElem = d3.select('body')
+    //     .append('svg')
+    //         .attr('width', 0)
+    //         .attr('height', 0)
+    //     .append('defs')
+    //         .attr('id', 'map-defs');
+    // }
+    let defs = selection.select('defs');
+    if (defs.empty()) defs = selection.append('defs')
     const existing = d3.select(`#${id}`);
     if (!existing.empty()) existing.remove();
-    const filter = defsElem.append('pattern')
+    const pattern = defs.append('pattern')
         .attr('id', id)
         .attr('patternUnits', 'userSpaceOnUse')
         .attr('width', imageSize)
         .attr('height', imageSize);
 
-    filter.append('image')
+    pattern.append('image')
         .attr('href', bg)
         .attr('x', 0).attr('y', 0)
         .attr('width', imageSize).attr('height', imageSize);
 
-    filter.append('rect')
+    pattern.append('rect')
         .attr('width', imageSize).attr('height', imageSize)
         .attr('fill', params.seaColor);
-    defsElem.append(() => filter.node());
+    defs.append(() => pattern.node());
+    const clipPath = selection.append('clipPath').attr('id', 'clip');
+    clipPath.append('rectangle')
+        .attr('x', 0).attr('y', 0)
+        .attr('width', 300).attr('height', 300)
+        .attr('rx', 15)
+    selection.append(() => clipPath.node());
 }
 
 let countries = null;
@@ -231,8 +259,7 @@ let land = null;
 let providedBorders = null;
 let provided = null;
 let simpleLand = null;
-
-fetch("https://cdn.jsdelivr.net/npm/world-atlas@1/world/50m.json")
+fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json")
 // fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-10m.json")
 // fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json")
     .then(response => response.json())
@@ -240,14 +267,13 @@ fetch("https://cdn.jsdelivr.net/npm/world-atlas@1/world/50m.json")
     // .then(world => topojson.feature(world, world.objects.countries))
     // .then(world => topojson.feature(world, world.objects.land))
     .then(world => {
-        world.objects.countries.geometries = world.objects.countries.geometries.filter(feat => feat.id !== '462');
-        const copy = {...world};
-        const presimplified = topojsonSimplify.simplify(topojsonSimplify.presimplify(copy), 0.0005);
-        const merged = topojson.merge(presimplified, presimplified.objects.countries.geometries);
-        simpleLand = topojsonSimplify.simplify(topojsonSimplify.presimplify(copy), 0.001);
+        simpleLand = topojsonSimplify.simplify(topojsonSimplify.presimplify(world), 0.001);
         simpleLand = topojson.merge(simpleLand, simpleLand.objects.countries.geometries);
-        land = merged;
+        land = topojson.feature(world, world.objects.land);
         countries = topojson.feature(world, world.objects.countries);
+        // console.log('land', land);
+        // const newLand = splitMultiPolygons(land);
+        land = splitMultiPolygons(land);
         console.log('land', land);
         console.log('countries', countries);
         draw();
@@ -255,17 +281,13 @@ fetch("https://cdn.jsdelivr.net/npm/world-atlas@1/world/50m.json")
 
 
 const container = d3.select('#container');
-// console.log(container)
 container.call(d3.drag()
     .on("drag", dragged)
 );
 container.call(d3.zoom()
-    // .scaleExtent([...bounds.altitude].reverse())
     .scaleExtent([...bounds.altitude])
     .on("zoom", zoomed)
 );
-    // .scaleExtent(scaleExtent.map(x => x * scale))
-
 
 function zoomed(event) {
     params.altitude += event.sourceEvent.deltaY;
@@ -274,7 +296,6 @@ function zoomed(event) {
 }
 
 function dragged(event) {
-    // console.log(event);
     params.longitude += event.dx / 3;
     params.latitude -= event.dy / 3;
     draw(true);
@@ -283,6 +304,12 @@ function dragged(event) {
 }
 
 let path = null;
+let projection = null;
+let svg = null;
+let addingPath = false;
+let currentPath = [];
+let providedPaths = [];
+
 function draw(simplified = false) {
     const snyderP = 1.0 + params.altitude / earthRadius;
     const dY = params.altitude * Math.sin(params.tilt / degrees);
@@ -329,15 +356,16 @@ function draw(simplified = false) {
         };
     }
 
-    const projection = geoSatellite()
+    projection = geoSatellite()
         .scale(scale)
-        .translate([width / 2, yShift + numPixelsY / 2])
+        .translate([(width / 2), (yShift + numPixelsY / 2)])
         .rotate([-params.longitude, -params.latitude, params.rotation])
         .tilt(params.tilt)
         .distance(snyderP)
         .preclip(preclip)
-        .precision(0.1);
-
+        .postclip(d3.geoClipRectangle(0, 0, width, numPixelsY))
+        .precision(0.1)
+    
     const container = d3.select('#map-container');
     container.html('');
     const outline = {type: "Sphere"};
@@ -358,14 +386,38 @@ function draw(simplified = false) {
             context.stroke();
         return context.canvas;
     }
-    let svg = container.select('svg');
+    svg = container.select('svg');
     if (svg.empty()) svg = container.append('svg')
-        .attr('viewBox', `0 0 ${width} ${numPixelsY}`)
+        .attr('viewBox', `${offCanvasPx} ${offCanvasPx} ${width - offCanvasPx * 2} ${numPixelsY  - offCanvasPx*2}`)
+        .attr('xmlns', "http://www.w3.org/2000/svg")
+        .attr('xmlns:xlink', "http://www.w3.org/1999/xlink")
         .attr('id', 'map');
+        
     path = d3.geoPath(projection);
     svg.html('');
     svg.on("click", function(e) {
-        console.log(projection.invert(d3.pointer(e)));
+        const pos = projection.invert(d3.pointer(e));
+        if (!addingPath) return;
+        let elem = svg.select('#paths');
+        if (elem.empty()) elem = svg.append('g').attr('id', 'paths');
+        currentPath.push(pos);
+        if (currentPath.length === 2) {
+            const pathIndex = providedPaths.length;
+            const id = `path-${pathIndex}`;
+            const initialPath = `M${projection(currentPath[0])}L${projection(currentPath[1])}`;
+            elem.append('path')
+                .attr('id', id)
+                .attr('d', initialPath);
+            providedPaths.push(parseAndUnprojectPath(initialPath, projection));
+            currentPath = [];
+            addingPath = false;
+            MotionPathHelper.editPath(`#${id}`, {
+                onRelease: function() {
+                    const parsed = parseAndUnprojectPath(this.path.getAttribute('d'), projection);
+                    providedPaths[pathIndex] = parsed;
+                }
+            });
+        }
     });
     
 
@@ -373,33 +425,35 @@ function draw(simplified = false) {
     groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
     groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
     if (params.land.show)
-        groupData.push({ name: 'land', data: [land], id: null, props: [], class: 'land', filter: params.land.filter });
+        groupData.push({ name: 'land', data: land, id: null, props: [], class: 'land', filter: params.land.filter });
     if (params.countries.show && countries)
         groupData.push({ name: 'countries', data: countries, id: { prefix: 'iso-3166-1-', field: 'id' }, props: ['name'], class: 'country', filter: null });
     if (providedBorders && params.providedBorders.show)
         groupData.push({ name: 'provided-borders', data: [providedBorders], id: null, props: [], class: 'provided-borders', filter: params.providedBorders.filter });
     if (provided && params.provided.show)
         groupData.push({ name: 'provided', data: provided, id: null, props: [], class: 'provided', filter: null });
-
+        
     const groups = svg.selectAll('g').data(groupData).join('g').attr('id', d => d.name);
-
+    
     function drawPaths(data) {
         const pathElem = d3.select(this).selectAll('path')
-            .data(data.data.features ? data.data.features : data.data)
-            .join('path')
-            .attr('d', (d) => {return path(d)});
+        .data(data.data.features ? data.data.features : data.data)
+        .join('path')
+        .attr('d', (d) => {return path(d)});
         if (data.id) pathElem.attr('id', (d) => data.id.prefix + d[data.id.field]);
         if (data.class) pathElem.attr('class', data.class);
         if (data.filter) pathElem.attr('filter', `url(#${data.filter})`);
         data.props.forEach((prop) => pathElem.attr(prop, (d) => d.properties[prop]))
     }
-
+        
     groups.each(drawPaths);
+
+    drawCustomPaths(providedPaths, svg, projection);
     // removeNotVisible();
 
-    appendGlow('firstGlow', params.firstGlow.innerGlow, params.firstGlow.outerGlow);
-    appendGlow('secondGlow', params.secondGlow.innerGlow, params.secondGlow.outerGlow);
-    appendBgPattern('noise');
+    appendGlow(svg, 'firstGlow', params.firstGlow.innerGlow, params.firstGlow.outerGlow);
+    appendGlow(svg, 'secondGlow', params.secondGlow.innerGlow, params.secondGlow.outerGlow);
+    appendBgPattern(svg, 'noise');
     if (params.bgNoise)
         d3.select('#outline').style('fill', "url(#noise)");
     else d3.select('#outline').style('fill', "var(--sea-color)");
@@ -424,53 +478,95 @@ function styleLayer(styleParams, prefix) {
     else map.style(`--${prefix}-hover-color`, styleParams.fillColor);
 }
 
-function removeNotVisible() {
-    // TODO: trim SVG definitions to a given precision to reduce size
-    const countries = document.getElementById('countries');
-    const paths = Array.from(countries.children);
-    const map = document.getElementById('map');
-    console.log('Number of paths before:', paths.length);
-    paths.forEach(p => {
-        const rect = p.getBoundingClientRect();
-        if (rect.width == 0 && rect.height == 0) p.remove();
-    });
-    console.log('Number of paths after:', Array.from(countries.children).length);
+function fixOrder(geojson) {
+    if (geojson.features) {
+        const fixed = {...geojson};
+        fixed.features = fixed.features.map(f =>
+            rewind(f, { reverse: true })
+        );
+        return fixed;
+    }
+    return rewind(geojson);
 }
 
+function splitMultiPolygons(geojson) {
+    const newGeojson = {type: 'FeatureCollection', features: []};
+    geojson.features.forEach(feat => {
+        if (feat.geometry.type == 'MultiPolygon') {
+            feat.geometry.coordinates.map(coords => {
+                newGeojson.features.push(
+                {
+                    type: 'Feature', 
+                    properties: feat.properties, 
+                    geometry: {
+                        type: 'Polygon', coordinates: coords
+                    }
+                });
+            });
+        }
+        else newGeojson.features.push(feat);
+    });
+    return newGeojson;
+}
+
+let providedProps = null;
 function handleInput(e) {
     const file = e.target.files[0];
     const reader = new FileReader();
     reader.addEventListener('load', () => {
-        const topo = JSON.parse(reader.result); 
-        const bbox = topojson.bbox(topo);
-        providedBorders = topojson.merge(topo, topo.objects['COD-ADM2-63176286'].geometries);
-        provided = topojson.feature(topo, topo.objects['COD-ADM2-63176286']);
-        params.longitude = (bbox[2] + bbox[0]) / 2;
-        params.latitude = (bbox[3] + bbox[1]) / 2;
+        // winding order matters !!!
+        provided = fixOrder(JSON.parse(reader.result));
+        providedBorders = provided.features.length > 1 ? provided.features.reduce((acc, cur)  => {
+            return union(acc, cur);
+        }, provided.features[0]) : provided.features[0];
+        // const simpOptions = {tolerance: 0.005, highQuality: false};
+        // providedBorders = simplify(buffer(providedBorders, 2), simpOptions); // buffer 1km and simplify
+        const boundingBox = bbox(providedBorders);
+
+        providedBorders = fixOrder({ type: "FeatureCollection", features: [{...providedBorders}] });
+        
+        params.longitude = (boundingBox[2] + boundingBox[0]) / 2;
+        params.latitude = (boundingBox[3] + boundingBox[1]) / 2;
         params.tilt = 0;
         pane.refresh();
         draw();
     });
     reader.readAsText(file);
 }
+
+function addPath() {
+    addingPath = true;
+}
+
+function exportSvg() {
+    console.log(svg.node().outerHTML)
+    const out = SVGO.optimize(svg.node().outerHTML, svgoConfig);
+    console.log(out.data);
+}
+
 </script>
 
-
+<h1 class="has-text-centered is-size-2"> Map builder </h1>
 <div id="map-container"></div>
 
-<div class="file m-4">
-    <label class="file-label">
-        <input class="file-input" type="file" accept=".topojson,.json" on:change={handleInput}>
-        <span class="file-cta">
-            <span class="file-icon"> <img src={uploadIcon} > </span>
-            <span class="file-label"> Select topojson </span>
-        </span>
-    </label>
+<div>
+    <div class="file m-4">
+        <label class="file-label">
+            <input class="file-input" type="file" accept=".geojson,.json" on:change={handleInput}>
+            <span class="file-cta">
+                <span class="file-icon"> <img src={uploadIcon} alt="upload-geojson"> </span>
+                <span class="file-label"> Select geojson </span>
+            </span>
+        </label>
+    </div>
+    <div class="button" on:click={addPath}> Add path </div>
+    <div class="button" on:click={exportSvg}> Export </div>
 </div>
 
 
-<style global>
-:root {
+
+<style>
+/* :root {
     --sea-color: #dde9ff66; 
     --country-hover-color: #ffe1cc8e;
     --country-stroke-color: #ffe1cc8e;
@@ -493,6 +589,11 @@ function handleInput(e) {
 
 #map {
     background-repeat: repeat;
+}
+#paths {
+    stroke: black;
+    stroke-width: 5;
+    fill: none;
 }
 .graticule {
     fill: none;
@@ -528,5 +629,5 @@ function handleInput(e) {
 }
 .tp-dfwv {
   min-width: 360px;
-}
+} */
 </style>
