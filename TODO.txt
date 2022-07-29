@@ -1,13 +1,21 @@
-- Two layers: "land" (outside) and adm(inside, hover possible, action on hover)
-- add "Context": countries
-- Add labels (from geojson properties) : give choice to select font + marker
-- "Save current geo params" -> localstorage. If defined, to moving on import new file
-- Support import geojson
-- Create tooltips on hover: have a builder to chose properties on geometries
-- Export all into a custom format, and create a svelte component that can rebuild the map (with all it contains) based on this format
-- Style defaults (masae style, pirate map style, ...)
-- Add clip path (rectangle, circle...)
-- Add possibility to change background image (noise for now)
-- Import geojson instead of topojson
-- Draw on canvas on move, using simplified geometries
-- Export with a level of precision
+[ ] Two layers: "land" (outside) and adm(inside, hover possible, action on hover)
+[ ] add "Context": countries
+[ ] Add labels (from geojson properties) : give choice to select font + marker
+[ ] "Save current geo params" -> localstorage. If defined, to moving on import new file
+[x] Support import geojson
+[ ] Create tooltips on hover: have a builder to chose properties on geometries
+[ ] Default themes (pirate map style, brand style...)
+[ ] Add possibility to change background image (noise for now)
+[x] Import geojson instead of topojson
+[x] Draw on canvas on move, using simplified geometries
+[ ] Export with a level of precision
+[ ] Export a JS file defining a class, to call on an element
+[ ] Allow placing points (choosing from a set of shapes)
+[ ] Allow associating labels to those points
+[ ] Allow customization of paths strokes
+[ ] Allow adding bubbles (projeted or not)
+[ ] Allow customizing the contour (no contour, size, border-type, color...)
+[ ] Fix different sizes of container for SVG / canvas
+[ ] Give choice of viewBox vs width/height
+[ ] Fix change sea color not working
+ 

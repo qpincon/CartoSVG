@@ -1,8 +1,6 @@
 <script>
 import { drawCustomPaths, parseAndUnprojectPath } from './paths';
 import './style.css';
-// import style from './style.css';
-// console.log(style)
 import {Pane} from 'tweakpane';
 import {geoSatellite} from 'd3-geo-projection';
 import * as topojson from 'topojson-client';
@@ -217,16 +215,7 @@ function appendGlow(selection, id="glows",
     defs.append(() => filter.node());
 }
 
-function appendBgPattern(selection, id, imageSize=500) {
-    // let defsElem = d3.select('#map-defs');
-    // if (defsElem.empty()) {
-    //     defsElem = d3.select('body')
-    //     .append('svg')
-    //         .attr('width', 0)
-    //         .attr('height', 0)
-    //     .append('defs')
-    //         .attr('id', 'map-defs');
-    // }
+function appendBgPattern(selection, id, seaColor, bgNoise = false, imageSize=500) {
     let defs = selection.select('defs');
     if (defs.empty()) defs = selection.append('defs')
     const existing = d3.select(`#${id}`);
@@ -236,21 +225,22 @@ function appendBgPattern(selection, id, imageSize=500) {
         .attr('patternUnits', 'userSpaceOnUse')
         .attr('width', imageSize)
         .attr('height', imageSize);
-
-    pattern.append('image')
-        .attr('href', bg)
-        .attr('x', 0).attr('y', 0)
-        .attr('width', imageSize).attr('height', imageSize);
+    if (bgNoise) {
+        pattern.append('image')
+            .attr('href', bg)
+            .attr('x', 0).attr('y', 0)
+            .attr('width', imageSize).attr('height', imageSize);
+    }
 
     pattern.append('rect')
         .attr('width', imageSize).attr('height', imageSize)
-        .attr('fill', params.seaColor);
+        .attr('fill', seaColor);
     defs.append(() => pattern.node());
     const clipPath = selection.append('clipPath').attr('id', 'clip');
     clipPath.append('rectangle')
         .attr('x', 0).attr('y', 0)
         .attr('width', 300).attr('height', 300)
-        .attr('rx', 15)
+        .attr('rx', 15);
     selection.append(() => clipPath.node());
 }
 
@@ -279,36 +269,47 @@ fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json")
         draw();
     });
 
-
-const container = d3.select('#container');
-container.call(d3.drag()
-    .on("drag", dragged)
-);
-container.call(d3.zoom()
-    .scaleExtent([...bounds.altitude])
-    .on("zoom", zoomed)
-);
-
-function zoomed(event) {
-    params.altitude += event.sourceEvent.deltaY;
-    draw(true);
-    pane.refresh();
-}
-
-function dragged(event) {
-    params.longitude += event.dx / 3;
-    params.latitude -= event.dy / 3;
-    draw(true);
-    pane.refresh();
-
-}
-
 let path = null;
 let projection = null;
 let svg = null;
 let addingPath = false;
 let currentPath = [];
 let providedPaths = [];
+
+const container = d3.select('#container');
+container.call(d3.drag()
+    .on("drag", dragged)
+);
+const zoom = d3.zoom().on('zoom', zoomed);
+container.call(zoom);
+
+const altScale = d3.scaleLinear().domain([1, 0]).range(bounds.altitude);
+function zoomed(event) {
+    if (!projection) return;
+    if(event.transform.k > 0.1) {
+        const newAltitude = altScale(event.transform.k);
+        params.altitude = newAltitude;
+    }
+    else {
+        event.transform.k = 0.1;
+    }
+    draw(true);
+    pane.refresh();
+}
+zoom.scaleBy(container, altScale.invert(params.altitude));
+
+const sensitivity = 75;
+function dragged(event) {
+    const rotate = projection.rotate();
+    const k = sensitivity / projection.scale();
+    params.longitude = -rotate[0] - event.dx * k;
+    params.latitude = -rotate[1] + event.dy * k;
+    draw(true);
+    pane.refresh();
+
+}
+
+
 
 function draw(simplified = false) {
     const snyderP = 1.0 + params.altitude / earthRadius;
@@ -392,7 +393,7 @@ function draw(simplified = false) {
         .attr('xmlns', "http://www.w3.org/2000/svg")
         .attr('xmlns:xlink', "http://www.w3.org/1999/xlink")
         .attr('id', 'map');
-        
+
     path = d3.geoPath(projection);
     svg.html('');
     svg.on("click", function(e) {
@@ -453,10 +454,8 @@ function draw(simplified = false) {
 
     appendGlow(svg, 'firstGlow', params.firstGlow.innerGlow, params.firstGlow.outerGlow);
     appendGlow(svg, 'secondGlow', params.secondGlow.innerGlow, params.secondGlow.outerGlow);
-    appendBgPattern(svg, 'noise');
-    if (params.bgNoise)
-        d3.select('#outline').style('fill', "url(#noise)");
-    else d3.select('#outline').style('fill', "var(--sea-color)");
+    appendBgPattern(svg, 'noise', params.seaColor, params.bgNoise);
+    d3.select('#outline').style('fill', "url(#noise)");
 
     styleLayer(params.countries, 'country');
     styleLayer(params.land, 'land');
@@ -534,6 +533,33 @@ function handleInput(e) {
     reader.readAsText(file);
 }
 
+let providedFonts = [];
+let cssFonts;
+function fontsToCss(fonts) {
+    cssFonts = fonts.map(({name, content}) => {
+        return `@font-face {
+            font-family: "${name}";
+            src: url("${content}");
+        }`;
+    }).join('\n') || '';
+    cssFonts = `<${''}style> ${cssFonts} </${''}style>`;
+}
+$: fontsToCss(providedFonts);
+
+function handleInputFont(e) {
+    const file = e.target.files[0];
+    const fileName = file.name.split('.')[0];
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+        console.log(reader.result);
+        const newFont = {name: fileName, content: reader.result}
+        providedFonts.push(newFont);
+        providedFonts = providedFonts;
+    });
+    reader.readAsDataURL(file);
+
+}
+
 function addPath() {
     addingPath = true;
 }
@@ -545,6 +571,11 @@ function exportSvg() {
 }
 
 </script>
+
+
+<svelte:head>
+	{@html cssFonts}
+</svelte:head>
 
 <h1 class="has-text-centered is-size-2"> Map builder </h1>
 <div id="map-container"></div>
@@ -559,75 +590,15 @@ function exportSvg() {
             </span>
         </label>
     </div>
+    <div class="file m-4">
+        <label class="file-label">
+            <input class="file-input" type="file" accept=".ttf,.woff" on:change={handleInputFont}>
+            <span class="file-cta">
+                <span class="file-icon"> <img src={uploadIcon} alt="upload-font"> </span>
+                <span class="file-label"> Select font </span>
+            </span>
+        </label>
+    </div>
     <div class="button" on:click={addPath}> Add path </div>
     <div class="button" on:click={exportSvg}> Export </div>
 </div>
-
-
-
-<style>
-/* :root {
-    --sea-color: #dde9ff66; 
-    --country-hover-color: #ffe1cc8e;
-    --country-stroke-color: #ffe1cc8e;
-    --country-stroke-width: 1;
-    --country-fill-color: #fff;
-
-    --land-fill-color: #fff;
-    --land-stroke-color: #D1BEB0;
-    --land-stroke-width: 1;
-
-    --provided-borders-fill-color: #fff;
-    --provided-borders-stroke-color: #D1BEB0;
-    --provided-borders-stroke-width: 1;
-
-    --provided-fill-color: #ffe1cc8e;
-    --provided-hover-color: #ffe1cc8e;
-    --provided-stroke-color: #D1BEB0;
-    --provided-stroke-width: 1;
-}
-
-#map {
-    background-repeat: repeat;
-}
-#paths {
-    stroke: black;
-    stroke-width: 5;
-    fill: none;
-}
-.graticule {
-    fill: none;
-    stroke: #777;
-    stroke-width: .5px;
-    stroke-opacity: .5;
-}
-.land {
-    stroke: var(--land-stroke-color);
-    stroke-width: var(--land-stroke-width);
-    fill: var(--land-fill-color);
-}
-.provided-borders {
-    stroke: var(--provided-borders-stroke-color);
-    stroke-width: var(--provided-borders-stroke-width);
-    fill: var(--provided-borders-fill-color);
-}
-.country {
-    stroke: var(--country-stroke-color);
-    stroke-width: var(--country-stroke-width);
-    fill: var(--country-fill-color);
-}
-.provided {
-    stroke: var(--provided-stroke-color);
-    stroke-width: var(--provided-stroke-width);
-    fill: var(--provided-fill-color);
-}
-.country:hover {
-    fill: var(--country-hover-color);
-}
-.provided:hover {
-    fill: var(--provided-hover-color);
-}
-.tp-dfwv {
-  min-width: 360px;
-} */
-</style>
