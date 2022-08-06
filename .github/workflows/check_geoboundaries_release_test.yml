@@ -15,3 +15,13 @@ jobs:
       - name: Check for modified files
         id: git-check
         run: echo ::set-output name=modified::$([ -z "`git status --porcelain`" ] && echo "false" || echo "true")
+      - name: Perform simplification
+        if: steps.git-check.outputs.modified == 'true'
+        uses: actions/get_world_and_simplify_action
+      - name: Commit latest release version and new generated topojson
+        if: steps.git-check.outputs.modified == 'true'
+        run: |
+          git config --global user.name 'qpincon'
+          git config --global user.email 'qpincon@users.noreply.github.com'
+          git commit -am "New release of test repo: new simplified topojson created"
+          git push
