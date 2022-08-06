@@ -1,7 +1,7 @@
 name: Get latest release version
 on:
   schedule:
-  -  cron:  '*/5 * * * *'
+  -  cron:  '@monthly'
 jobs:
   get-release-version:
     runs-on: ubuntu-latest
