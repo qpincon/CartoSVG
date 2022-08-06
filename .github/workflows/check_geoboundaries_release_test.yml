@@ -8,6 +8,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+      - name: Debug message
+        run: echo "::debug::$(tree ./.github)"
       - name: Fetch release version
         run: |
           curl -sL https://api.github.com/repos/qpincon/test-fetch-release/releases/latest | \
