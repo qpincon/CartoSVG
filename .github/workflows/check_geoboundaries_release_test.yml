@@ -18,10 +18,4 @@ jobs:
       - name: Perform simplification
         if: steps.git-check.outputs.modified == 'true'
         uses: actions/get_world_and_simplify_action
-      - name: Commit latest release version and new generated topojson (test)
-        if: steps.git-check.outputs.modified == 'true'
-        run: |
-          git config --global user.name 'qpincon'
-          git config --global user.email 'qpincon@users.noreply.github.com'
-          git commit -am "New release of test repo: new simplified topojson created"
-          git push
+      
