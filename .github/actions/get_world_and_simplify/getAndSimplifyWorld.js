@@ -11,7 +11,7 @@ async function getWorldTopojson(){
     const preSimplified = topojsonSimplify.presimplify(topology);
     const simplified = topojsonSimplify.simplify(preSimplified, weight);
     const quantized = topojson.quantize(simplified, 1e6);
-    fs.writeFileSync(`world_adm1_simplified.topojson`, JSON.stringify(quantized));
+    fs.writeFileSync(`../../../map-builder/assets/world_adm1_simplified.topojson`, JSON.stringify(quantized));
     return true
 }
 
