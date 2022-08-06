@@ -12,4 +12,6 @@ jobs:
         run: |
           curl -sL https://api.github.com/repos/qpincon/test-fetch-release/releases/latest | \
           jq -r ".tag_name" > release-versions/test-latest.txt
-     
+      - name: Check for modified files
+        id: git-check
+        run: echo ::set-output name=modified::$([ -z "`git status --porcelain`" ] && echo "false" || echo "true")
