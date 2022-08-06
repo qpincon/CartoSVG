@@ -6,9 +6,8 @@ jobs:
   get-version:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-        with:
-          token: ${{ secrets.REPO_SCOPED_TOKEN }}
+      - name: Checkout repo
+        uses: actions/checkout@v3
       - name: Fetch release version
         run: |
           curl -sL https://api.github.com/repos/qpincon/test-fetch-release/releases/latest | \
