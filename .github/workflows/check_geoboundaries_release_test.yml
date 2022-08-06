@@ -8,3 +8,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+      - name: Fetch release version
+        run: |
+          curl -sL https://api.github.com/repos/qpincon/test-fetch-release/releases/latest | \
+          jq -r ".tag_name" > release-versions/test-latest.txt
+     
