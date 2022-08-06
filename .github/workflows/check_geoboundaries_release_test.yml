@@ -17,7 +17,7 @@ jobs:
         run: echo ::set-output name=modified::$([ -z "`git status --porcelain`" ] && echo "false" || echo "true")
       - name: Perform simplification
         if: steps.git-check.outputs.modified == 'true'
-        uses: actions/get_world_and_simplify_action@master
+        uses: ./.github/actions/get_world_and_simplify_action
       - name: Commit latest release version and new generated topojson (test)
         if: steps.git-check.outputs.modified == 'true'
         run: |
