@@ -1,0 +1,5 @@
+name: 'Download and simplify world ADM1 topojson'
+description: 'Download and simplify world ADM1 topojson'
+runs:
+  using: 'node16'
+  main: 'getAndSimplifyWorld.js'
