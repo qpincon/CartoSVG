@@ -1,0 +1,56 @@
+#map-container {
+    display: flex;
+    justify-content: center;
+    margin: 0 auto;
+}
+#map, #canvas {
+    border: 2px solid #b8b8b8;
+    border-radius: 5px;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%); 
+    display: block;
+}
+#paths path {
+    stroke: black;
+    stroke-width: 5;
+    fill: none;
+}
+.graticule {
+    fill: none;
+    stroke: #777;
+    stroke-width: .5px;
+    stroke-opacity: .5;
+}
+.land {
+    stroke: {{ land.strokeColor }};
+    stroke-width: {{ land.strokeWidth }};
+    fill: {{ land.fillColor }};
+}
+.provided-borders {
+    stroke: {{ providedBorders.strokeColor }};
+    stroke-width: {{ providedBorders.strokeWidth }};
+    fill: {{ providedBorders.fillColor }};
+}
+.country {
+    stroke: {{ countries.strokeColor }};
+    stroke-width: {{ countries.strokeWidth }};
+    fill: {{ countries.fillColor }};
+}
+.provided {
+    stroke: {{ provided.strokeColor }};
+    stroke-width: {{ provided.strokeWidth }};
+    fill: {{ provided.fillColor }};
+}
+
+{{#countries.hover}}
+.country:hover {
+    fill: {{ countries.hoverColor }};
+}
+{{/countries.hover}}
+{{#provided.hover}}
+.provided:hover {
+    fill: {{ provided.hoverColor }};
+}
+{{/provided.hover}}
+.tp-dfwv {
+  min-width: 360px;
+}

@@ -1,6 +1,6 @@
 <script>
+import { onMount } from 'svelte';
 import { drawCustomPaths, parseAndUnprojectPath } from './paths';
-import './style.css';
 import {Pane} from 'tweakpane';
 import {geoSatellite} from 'd3-geo-projection';
 import * as topojson from 'topojson-client';
@@ -11,12 +11,20 @@ import union from '@turf/union';
 import rewind from '@turf/rewind';
 import SVGO from 'svgo/dist/svgo.browser';
 import svgoConfig from './svgo.config';
+import Mustache from 'mustache';
+// import versor from 'versor';
+import cssTemplate from './style.template.txt';
 
+import exportTemplate from './output_template.txt';
 
+console.log(exportTemplate);
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
 import MotionPathHelper from "./util/MotionPathHelper.js";
 // console.log(MotionPathHelper);
 const params = {
+    width: 850,
+    height: 950,
+    useViewBox: false,
     longitude: 15,
     latitude: 36,
     altitude: 1000,
@@ -69,6 +77,8 @@ const params = {
 };
 
 const bounds = {
+    width: [200, 1500],
+    height: [300, 1600],
     longitude: [-180, 180],
     latitude: [-90, 90],
     rotation: [-180, 180],
@@ -87,8 +97,6 @@ const filterOptions = {
 };
 
 const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView'];
-let width = 1800;
-const numPixelsY = width * 0.4;
 const earthRadius = 6371;
 const degrees = 180 / Math.PI;
 const offCanvasPx = 5;
@@ -138,48 +146,39 @@ function appendGlow(selection, id="glows",
                     outerParams = {blur: 4, strength: 1, color: '#998'}) {
     const colorInner = d3.rgb(innerParams.color);
     const colorOuter = d3.rgb(outerParams.color);
-    // let defsElem = d3.select('#map-defs');
-    // if (defsElem.empty()) {
-    //     defsElem = d3.select('body')
-    //     .append('svg')
-    //         .attr('width', 0)
-    //         .attr('height', 0)
-    //     .append('defs')
-    //         .attr('id', 'map-defs');
-    // }
     const existing = d3.select(`#${id}`);
     // const defs = !existing.empty() ? existing.select(function() { return this.parentNode} ) : 
     //         .append('defs');
     if (!existing.empty()) existing.remove();
     let defs = selection.select('defs');
     if (defs.empty()) defs = selection.append('defs')
-    const filter = defs.append('filter').attr('id', id);
+    const filter = defs.append('filter').attr('id', id).attr('filterUnits', 'userSpaceOnUse');
 
     // OUTER GLOW
-    // filter.append('feMorphology')
-    //     .attr('in', 'SourceGraphic')
-    //     .attr('radius', outerParams.strength)
-    //     .attr('operator', 'dilate')
-    //     .attr('result', 'MASK_OUTER');
-    // filter.append('feColorMatrix')
-    //     .attr('in', 'MASK_OUTER')
-    //     .attr('type', 'matrix')
-    //     .attr('values', `0 0 0 0 ${colorOuter.r / 255} 0 0 0 0 ${colorOuter.g / 255} 0 0 0 0 ${colorOuter.b / 255} 0 0 0 ${colorOuter.opacity} 0`) // apply color
-    //     .attr('result', 'OUTER_COLORED');
-    // filter.append('feGaussianBlur')
-    //     .attr('in', 'OUTER_COLORED')
-    //     .attr('stdDeviation', outerParams.blur)
-    //     .attr('result', 'OUTER_BLUR');
-    // filter.append('feComposite')
-    //     .attr('in', 'OUTER_BLUR')
-    //     .attr('in2', 'SourceGraphic')
-    //     .attr('operator', 'out')
-    //     .attr('result', 'OUTGLOW');
-    filter.append('feDropShadow')
-        .attr('flood-color', `${colorOuter}`)
-        // .attr('flood-opacity', `${colorOuter.opacity}`)
-        .attr('stdDeviation', `${outerParams.strength}`)
+    filter.append('feMorphology')
+        .attr('in', 'SourceGraphic')
+        .attr('radius', outerParams.strength)
+        .attr('operator', 'dilate')
+        .attr('result', 'MASK_OUTER');
+    filter.append('feColorMatrix')
+        .attr('in', 'MASK_OUTER')
+        .attr('type', 'matrix')
+        .attr('values', `0 0 0 0 ${colorOuter.r / 255} 0 0 0 0 ${colorOuter.g / 255} 0 0 0 0 ${colorOuter.b / 255} 0 0 0 ${colorOuter.opacity} 0`) // apply color
+        .attr('result', 'OUTER_COLORED');
+    filter.append('feGaussianBlur')
+        .attr('in', 'OUTER_COLORED')
+        .attr('stdDeviation', outerParams.blur)
+        .attr('result', 'OUTER_BLUR');
+    filter.append('feComposite')
+        .attr('in', 'OUTER_BLUR')
+        .attr('in2', 'SourceGraphic')
+        .attr('operator', 'out')
         .attr('result', 'OUTGLOW');
+    // filter.append('feDropShadow')
+    //     .attr('flood-color', `${colorOuter}`)
+    //     // .attr('flood-opacity', `${colorOuter.opacity}`)
+    //     .attr('stdDeviation', `${outerParams.strength}`)
+    //     .attr('result', 'OUTGLOW');
 
     // INNER GLOW
     filter.append('feMorphology')
@@ -249,25 +248,33 @@ let land = null;
 let providedBorders = null;
 let provided = null;
 let simpleLand = null;
-fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json")
-// fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-10m.json")
-// fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json")
+let commonCss = null;
+
+// let countryPromise = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json")
+let countryPromise = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json")
     .then(response => response.json())
-    // .then(world => topojson.merge(world, world.objects.countries.geometries.filter(feat => feat.id !== '462'))) // remove buggy maldives
-    // .then(world => topojson.feature(world, world.objects.countries))
-    // .then(world => topojson.feature(world, world.objects.land))
     .then(world => {
-        simpleLand = topojsonSimplify.simplify(topojsonSimplify.presimplify(world), 0.001);
-        simpleLand = topojson.merge(simpleLand, simpleLand.objects.countries.geometries);
-        land = topojson.feature(world, world.objects.land);
+        world.objects.countries.geometries = world.objects.countries.geometries.filter(feat => feat.id !== '462');
+        return world;
+    }) // remove buggy maldives
+    .then(world => {
         countries = topojson.feature(world, world.objects.countries);
+        console.log('countries', countries);
+    });
+
+// let landPromise = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-10m.json")
+let landPromise = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-50m.json")
+    .then(response => response.json())
+    .then(world => {
+        simpleLand = topojsonSimplify.simplify(topojsonSimplify.presimplify(world), 0.03);
+        simpleLand = topojson.merge(simpleLand, simpleLand.objects.land.geometries);
+        land = topojson.feature(world, world.objects.land);
         // console.log('land', land);
-        // const newLand = splitMultiPolygons(land);
         land = splitMultiPolygons(land);
         console.log('land', land);
-        console.log('countries', countries);
-        draw();
     });
+
+Promise.all([countryPromise, landPromise]).then(() => draw());
 
 let path = null;
 let projection = null;
@@ -276,17 +283,24 @@ let addingPath = false;
 let currentPath = [];
 let providedPaths = [];
 
-const container = d3.select('#container');
-container.call(d3.drag()
-    .on("drag", dragged)
-);
-const zoom = d3.zoom().on('zoom', zoomed);
-container.call(zoom);
+onMount(() => {
+    const container = d3.select('#map-container');
+    container.call(d3.drag()
+        .on("drag", dragged)
+    );
+    // container.call(d3.drag()
+    //     .on("start", dragstarted)
+    //     .on("drag", dragged)
+    // );
+    const zoom = d3.zoom().on('zoom', zoomed);
+    zoom.scaleBy(container, altScale.invert(params.altitude));
+    container.call(zoom);
+});
 
 const altScale = d3.scaleLinear().domain([1, 0]).range(bounds.altitude);
 function zoomed(event) {
     if (!projection) return;
-    if(event.transform.k > 0.1) {
+    if (event.transform.k > 0.1) {
         const newAltitude = altScale(event.transform.k);
         params.altitude = newAltitude;
     }
@@ -296,28 +310,86 @@ function zoomed(event) {
     draw(true);
     pane.refresh();
 }
-zoom.scaleBy(container, altScale.invert(params.altitude));
 
 const sensitivity = 75;
 function dragged(event) {
-    const rotate = projection.rotate();
-    const k = sensitivity / projection.scale();
-    params.longitude = -rotate[0] - event.dx * k;
-    params.latitude = -rotate[1] + event.dy * k;
+    if (event.sourceEvent.shiftKey) {
+        params.tilt += event.dy / 10;
+    }
+    else if (event.sourceEvent.metaKey || event.sourceEvent.ctrlKey) {
+        params.rotation -= event.dx / 10;
+    }
+    else {
+        const rotate = projection.rotate();
+        const rotRad =  (params.rotation / 180) * Math.PI;
+        const [xPartX, xPartY] = [Math.cos(rotRad), Math.sin(rotRad)]; 
+        const [yPartX, yPartY] = [-Math.sin(rotRad), Math.cos(rotRad)];
+        const k = sensitivity / projection.scale();
+        const adjustedDx = ((event.dx * xPartX) + (event.dy * yPartX)) * k;
+        const adjustedDy = ((event.dy * yPartY) + (event.dx * xPartY)) * k;
+        params.longitude = -rotate[0] - (adjustedDx);
+        params.latitude = -rotate[1] + (adjustedDy);
+    }
     draw(true);
     pane.refresh();
 
 }
 
 
+// let v0, q0, r0;
+
+// function dragstarted(event) {
+//     console.log(event);
+//     v0 = versor.cartesian(projection.invert(d3.pointer(event, this)));
+//     console.log(v0)
+//     q0 = versor(r0 = projection.rotate());
+// }
+
+// function dragged(event) {
+//     console.log('dragged', event);
+//     const p = d3.pointer(event, this);
+//     const v1 = versor.cartesian(projection.rotate(r0).invert(p));
+//     const delta = versor.delta(v0, v1);
+//     let q1 = versor.multiply(q0, delta);
+
+//     projection.rotate(versor.rotation(q1));
+
+//     [params.longitude, params.latitude, params.rotation] = projection.rotate();
+//     // In vicinity of the antipode (unstable) of q0, restart.
+//     if (delta[0] < 0.7) dragstarted.apply(this, [event, this]);
+//     draw(true);
+//     pane.refresh();
+// }
+
+
+
+// remove buggy paths, covering the whole svg element
+function removeCoveringAll(groupElement) {
+    if (!groupElement) return;
+    const parent = groupElement.closest('svg');
+    const containerRect = parent.getBoundingClientRect();
+    for (let child of groupElement.children) {
+        if (child.tagName != 'path') continue;
+        const d = child.getAttribute('d');
+        // ignore empty path, and big ones (that actually draw something)
+        if (!d || d.length > 100) continue;
+        const rect = child.getBoundingClientRect();
+        const includes = rect.x <= containerRect.x && rect.right >= containerRect.right 
+            && rect.y <= containerRect.y && rect.bottom >= containerRect.bottom;
+        if (includes) {
+            console.log('removing', child);
+            child.remove();
+        }
+    }
+}
 
 function draw(simplified = false) {
     const snyderP = 1.0 + params.altitude / earthRadius;
     const dY = params.altitude * Math.sin(params.tilt / degrees);
     const dZ = params.altitude * Math.cos(params.tilt / degrees);
     const visibleYextent = 2 * dZ * Math.tan(0.5 * params.fieldOfView / degrees);
-    const yShift = dY * numPixelsY / visibleYextent;
-    const scale = earthRadius * numPixelsY / visibleYextent;
+    const yShift = dY * params.height / visibleYextent;
+    const scale = earthRadius * params.height / visibleYextent;
     const tilt = params.tilt / degrees;
     const alpha = Math.acos(snyderP * Math.cos(tilt) * 0.999);
     const clipDistance = d3.geoClipCircle(Math.acos(1 / snyderP) - 1e-6);
@@ -357,26 +429,27 @@ function draw(simplified = false) {
         };
     }
 
+    const container = d3.select('#map-container');
+    container.html('');
+
     projection = geoSatellite()
         .scale(scale)
-        .translate([(width / 2), (yShift + numPixelsY / 2)])
+        .translate([(params.width / 2), (yShift + params.height / 2)])
         .rotate([-params.longitude, -params.latitude, params.rotation])
         .tilt(params.tilt)
         .distance(snyderP)
         .preclip(preclip)
-        .postclip(d3.geoClipRectangle(0, 0, width, numPixelsY))
-        .precision(0.1)
-    
-    const container = d3.select('#map-container');
-    container.html('');
+        .postclip(d3.geoClipRectangle(-offCanvasPx, -offCanvasPx, params.width + offCanvasPx, params.height + offCanvasPx))
+        .precision(0.1);
+   
     const outline = {type: "Sphere"};
     const graticule = d3.geoGraticule().step([params.graticuleStep, params.graticuleStep])();
     if (!params.useGraticule) graticule.coordinates = [];
     if (params.useCanvas || simplified) {
         let canvas = container.select('#canvas');
-        if (canvas.empty()) canvas = container.append('canvas').attr('id', 'canvas').attr('width', width).attr('height', numPixelsY);
+        if (canvas.empty()) canvas = container.append('canvas').attr('id', 'canvas').attr('width', params.width).attr('height', params.height);
         const context = canvas.node().getContext('2d');
-        context.clearRect(0, 0, width, numPixelsY);
+        context.clearRect(0, 0, params.width, params.height);
         path = d3.geoPath(projection, context);
         context.fillStyle = "#88d";
         context.beginPath(), path(simplified ? simpleLand : land), context.fill();
@@ -389,10 +462,17 @@ function draw(simplified = false) {
     }
     svg = container.select('svg');
     if (svg.empty()) svg = container.append('svg')
-        .attr('viewBox', `${offCanvasPx} ${offCanvasPx} ${width - offCanvasPx * 2} ${numPixelsY  - offCanvasPx*2}`)
         .attr('xmlns', "http://www.w3.org/2000/svg")
         .attr('xmlns:xlink', "http://www.w3.org/1999/xlink")
         .attr('id', 'map');
+    if (params.useViewBox) {
+        svg.attr('viewBox', `0 0 ${params.width} ${params.height}`);
+    }
+    else {
+        svg.attr('width', `${params.width }`)
+        .attr('height', `${params.height }`)
+    }
+    container.style('width', `${params.width}px`).style('height', `${params.height}px`);
 
     path = d3.geoPath(projection);
     svg.html('');
@@ -450,31 +530,14 @@ function draw(simplified = false) {
     groups.each(drawPaths);
 
     drawCustomPaths(providedPaths, svg, projection);
-    // removeNotVisible();
-
     appendGlow(svg, 'firstGlow', params.firstGlow.innerGlow, params.firstGlow.outerGlow);
     appendGlow(svg, 'secondGlow', params.secondGlow.innerGlow, params.secondGlow.outerGlow);
     appendBgPattern(svg, 'noise', params.seaColor, params.bgNoise);
     d3.select('#outline').style('fill', "url(#noise)");
-
-    styleLayer(params.countries, 'country');
-    styleLayer(params.land, 'land');
-    styleLayer(params.provided, 'provided');
-    styleLayer(params.providedBorders, 'provided-borders');
-    // console.log(`Size of lands (in chars): ${d3.select('#land').node().innerHTML.length}`);
-        // setTimeout(() => {
-    //     MotionPathHelper.editPath("#iso-3166-1-470");
-    // }, 3000);
-}
-function styleLayer(styleParams, prefix) {
-    const map = d3.select('#map');
-    if (styleParams.fillColor)      map.style(`--${prefix}-fill-color`, styleParams.fillColor);
-    if (styleParams.strokeColor)    map.style(`--${prefix}-stroke-color`, styleParams.strokeColor)
-    if (styleParams.strokeWidth)    map.style(`--${prefix}-stroke-width`, styleParams.strokeWidth);
-
-    if (styleParams.hover === undefined) return;
-    if (styleParams.hover) map.style(`--${prefix}-hover-color`, styleParams.hoverColor);
-    else map.style(`--${prefix}-hover-color`, styleParams.fillColor);
+    // const css = Mustache.render(cssTemplate, params);
+    commonCss = Mustache.render(cssTemplate, params);
+    // commonCss = `<${''}style> ${css} </${''}style>`;
+    setTimeout(() => removeCoveringAll(document.getElementById('land')), 0);
 }
 
 function fixOrder(geojson) {
@@ -542,7 +605,6 @@ function fontsToCss(fonts) {
             src: url("${content}");
         }`;
     }).join('\n') || '';
-    cssFonts = `<${''}style> ${cssFonts} </${''}style>`;
 }
 $: fontsToCss(providedFonts);
 
@@ -566,15 +628,35 @@ function addPath() {
 
 function exportSvg() {
     console.log(svg.node().outerHTML)
-    const out = SVGO.optimize(svg.node().outerHTML, svgoConfig);
-    console.log(out.data);
+    const svgExport = SVGO.optimize(svg.node().outerHTML, svgoConfig).data;
+    console.log(svgExport);
+    const exportParams = {
+        svgStr: svgExport,
+        commonCss: commonCss,
+        addedCss: cssFonts,
+    };
+    const out = Mustache.render(exportTemplate, exportParams);
+    download(out, 'text/plain', 'mySvg.js');
+    // return out;
 }
+
+function download(content, mimeType, filename){
+    const a = document.createElement('a');
+    const blob = new Blob([content], {type: mimeType});
+    const url = URL.createObjectURL(blob);
+    a.setAttribute('href', url);
+    a.setAttribute('download', filename);
+    a.click();
+}
+
+
 
 </script>
 
 
 <svelte:head>
-	{@html cssFonts}
+	{@html `<${''}style> ${commonCss} </${''}style>`}
+	{@html `<${''}style> ${cssFonts} </${''}style>`}
 </svelte:head>
 
 <h1 class="has-text-centered is-size-2"> Map builder </h1>

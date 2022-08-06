@@ -47,6 +47,10 @@ module.exports = {
                 test: /\.(svg|png|xlsx|csv)$/,
                 type: 'asset/resource',
             },
+            {
+                test: /\.(txt)$/,
+                type: 'asset/source',
+            },
         ],
     },
 }

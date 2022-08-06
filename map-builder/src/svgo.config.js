@@ -9,22 +9,16 @@ export default {
       'mergeStyles',
       'inlineStyles',
       'minifyStyles',
-      'cleanupIDs',
       'removeUselessDefs',
       'cleanupNumericValues',
       'convertColors',
-      'removeUnknownsAndDefaults',
       'removeNonInheritableGroupAttrs',
       'removeUselessStrokeAndFill',
-      'removeDimensions',
       'cleanupEnableBackground',
       'removeHiddenElems',
       'removeEmptyText',
       'convertShapeToPath',
       'convertEllipseToCircle',
-    //   'moveElemsAttrsToGroup',
-    //   'moveGroupAttrsToElems',
-    //   'collapseGroups',
       'convertTransform',
       'removeEmptyAttrs',
       'removeEmptyContainers',
@@ -57,11 +51,5 @@ export default {
             forceAbsolutePath: false,
         }
       },
-      {
-        name: 'removeAttrs',
-        params: {
-          attrs: 'data.*'
-        }
-      }
     ]
   }
