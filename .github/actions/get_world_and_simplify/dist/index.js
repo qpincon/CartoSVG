@@ -8150,7 +8150,7 @@ async function getWorldTopojson(){
     const preSimplified = topojson_simplify.presimplify(topology);
     const simplified = topojson_simplify.simplify(preSimplified, weight);
     const quantized = topojson_client.quantize(simplified, 1e6);
-    external_fs_namespaceObject.writeFileSync(`../../../../map-builder/assets/world_adm1_simplified.topojson`, JSON.stringify(quantized));
+    external_fs_namespaceObject.writeFileSync(`../../../map-builder/assets/world_adm1_simplified.topojson`, JSON.stringify(quantized));
     return true
 }
 
