@@ -19,7 +19,7 @@ jobs:
         if: steps.git-check.outputs.modified == 'true'
         uses: ./.github/actions/get_world_and_simplify
       - name: Debug message
-        run: echo "::debug::$(tree ./.github)"
+        run: echo "::debug::$(tree . --gitignore)"
       - name: Commit latest release version and new generated topojson (test)
         if: steps.git-check.outputs.modified == 'true'
         run: |
