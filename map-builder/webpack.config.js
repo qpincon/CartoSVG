@@ -1,7 +1,6 @@
 const path = require('path');
 const sveltePreprocess = require('svelte-preprocess');
 module.exports = {
-  
     entry: {
         'index': [ './src/index.js' ]
     },
@@ -15,7 +14,7 @@ module.exports = {
     output: {
         path: __dirname + '/public',
         filename: '[name].js',
-        chunkFilename: '[name].[id].js'
+        chunkFilename: '[contenthash].js',
     },
     module: {
         rules: [
@@ -37,7 +36,6 @@ module.exports = {
                         preprocess: sveltePreprocess({
                             scss: {
                                 renderSync: true,
-                                // includePaths: ['./src/scss'],
                             },
                         })
                     }
@@ -51,6 +49,10 @@ module.exports = {
                 test: /\.(txt)$/,
                 type: 'asset/source',
             },
+            {
+                test: /\.(topojson|geojson)$/,
+                type: 'json',
+            }
         ],
     },
 }
