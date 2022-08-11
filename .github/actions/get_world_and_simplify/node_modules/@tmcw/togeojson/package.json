@@ -1,0 +1,57 @@
+{
+  "name": "@tmcw/togeojson",
+  "version": "4.7.0",
+  "description": "convert KML and GPX to GeoJSON",
+  "umd:main": "dist/togeojson.umd.js",
+  "unpkg": "dist/togeojson.umd.js",
+  "browser": "dist/togeojson.umd.js",
+  "jsdelivr": "dist/togeojson.umd.js",
+  "module": "dist/togeojson.es.js",
+  "main": "dist/togeojson.cjs",
+  "type": "module",
+  "exports": {
+    "require": "./dist/togeojson.cjs",
+    "default": "./dist/togeojson.es.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "eslint lib && tap",
+    "prepare": "rollup -c rollup.config.js",
+    "release": "standard-version"
+  },
+  "devDependencies": {
+    "@xmldom/xmldom": "^0.8.1",
+    "cz-conventional-changelog": "^3.3.0",
+    "eslint": "^8.10.0",
+    "prettier": "^2.5.1",
+    "rollup": "^2.70.0",
+    "rollup-plugin-terser": "^7.0.2",
+    "standard-version": "^9.3.2",
+    "tap": "^16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/tmcw/togeojson.git"
+  },
+  "license": "BSD-2-Clause",
+  "dependencies": {},
+  "keywords": [
+    "kml",
+    "geojson",
+    "gpx",
+    "tcx",
+    "geo",
+    "parser",
+    "formatter",
+    "input",
+    "leaflet",
+    "maps"
+  ],
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  }
+}

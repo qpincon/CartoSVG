@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import fs from'fs';
-import mapshaper from 'mapshaper'
+import mapshaper from 'mapshaper';
 
 const assetsPath = '../../../map-builder/src/assets/layers';
 async function getWorldTopojson(){
