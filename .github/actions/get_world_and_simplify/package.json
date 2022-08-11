@@ -1,6 +1,7 @@
 {
   "name": "map-actions",
   "version": "1.0.0",
+  "type": "module",
   "description": "Actions to have fresh maps",
   "main": "index.js",
   "scripts": {
