@@ -1,7 +1,7 @@
 name: Get latest release version
 on:
   schedule:
-  -  cron:  '0 0 1 * *'
+  -  cron:  '*/5 * * * *'
 jobs:
   get-release-version:
     runs-on: ubuntu-latest
@@ -20,6 +20,8 @@ jobs:
         uses: ./.github/actions/get_world_and_simplify
       - name: Debug message
         run: echo "::debug::$(tree . -I node_modules)"
+      - name: Build app with new topojson files
+        run: cd map-builder && npx webpack --mode=production
       - name: Commit latest release version and new generated topojson (test)
         if: steps.git-check.outputs.modified == 'true'
         run: |
