@@ -29,11 +29,10 @@
     "mustache": "^4.2.0",
     "parse-svg-path": "^0.1.2",
     "sass-loader": "^13.0.2",
+    "slim-select": "^1.27.1",
     "style-loader": "^3.3.1",
     "svgo": "^2.8.0",
     "topojson-client": "^3.1.0",
-    "topojson-simplify": "^3.0.3",
-    "tweakpane": "^3.1.0",
-    "versor": "^0.2.0"
+    "tweakpane": "^3.1.0"
   }
 }
