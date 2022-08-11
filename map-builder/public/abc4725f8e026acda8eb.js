@@ -1,0 +1,22 @@
+"use strict";
+/*
+ * ATTENTION: The "eval" devtool has been used (maybe by default in mode: "development").
+ * This devtool is neither made for production nor for readable output files.
+ * It uses "eval()" calls to create a separate source file in the browser devtools.
+ * If you are trying to read the output file, select a different devtool (https://webpack.js.org/configuration/devtool/)
+ * or disable the default devtool with "devtool: false".
+ * If you are looking for production-ready output files, see mode: "production" (https://webpack.js.org/configuration/mode/).
+ */
+(self["webpackChunkd3_viz_webpack"] = self["webpackChunkd3_viz_webpack"] || []).push([["src_assets_layers_adm1_LCA_ADM1_topojson"],{
+
+/***/ "./src/assets/layers/adm1/LCA_ADM1.topojson":
+/*!**************************************************!*\
+  !*** ./src/assets/layers/adm1/LCA_ADM1.topojson ***!
+  \**************************************************/
+/***/ ((module) => {
+
+eval("module.exports = JSON.parse('{\"type\":\"Topology\",\"arcs\":[[[4111293,4632937],[-481179,-272525]],[[3630114,4360412],[-2841243,2112400]],[[788871,6472812],[1155482,906246]],[[1944353,7379058],[2166940,-2746121]],[[3630114,4360412],[-3630114,1173555]],[[0,5533967],[788871,938845]],[[1944353,7379058],[3155483,2567479]],[[5099836,9946537],[1450082,-2446212]],[[6549918,7500325],[-1430442,-2905202]],[[5119476,4595123],[-644845,-306429]],[[4474631,4288694],[-363338,344243]],[[55646,2061546],[3610475,1487808]],[[3666121,3549354],[-2032733,-2778719]],[[1633388,770635],[-1577742,1290911]],[[6549918,7500325],[3450081,19560]],[[9999999,7519885],[-180033,-2426653]],[[9819966,5093232],[-4700490,-498109]],[[5099836,9946537],[4039279,53462],[860884,-2480114]],[[3666121,3549354],[199672,-78237]],[[3865793,3471117],[-72013,-117355]],[[3793780,3353762],[867431,-3353762]],[[4661211,0],[-3027823,770635]],[[9819966,5093232],[-2376432,-4125700]],[[7443534,967532],[-3649754,2386230]],[[3865793,3471117],[608838,817577]],[[55646,2061546],[-55646,3472421]],[[7443534,967532],[-2782323,-967532]]],\"transform\":{\"scale\":[1.8863819632881443e-8,3.0376611181526387e-8],\"translate\":[-61.06853802325093,13.73629981387478]},\"objects\":{\"country\":{\"type\":\"GeometryCollection\",\"geometries\":[{\"arcs\":[[0,1,2,3]],\"type\":\"Polygon\",\"properties\":{\"shapeName\":\"Anse la Raye\",\"Level\":\"ADM1\",\"shapeID\":\"LCA-ADM1-33957332B99482527\",\"shapeGroup\":\"LCA\",\"shapeType\":\"ADM1\"}},{\"arcs\":[[-2,4,5]],\"type\":\"Polygon\",\"properties\":{\"shapeName\":\"Canaries\",\"Level\":\"ADM1\",\"shapeID\":\"LCA-ADM1-33957332B89483285\",\"shapeGroup\":\"LCA\",\"shapeType\":\"ADM1\"}},{\"arcs\":[[-4,6,7,8,9,10]],\"type\":\"Polygon\",\"properties\":{\"shapeName\":\"Castries\",\"Level\":\"ADM1\",\"shapeID\":\"LCA-ADM1-33957332B93460338\",\"shapeGroup\":\"LCA\",\"shapeType\":\"ADM1\"}},{\"arcs\":[[11,12,13]],\"type\":\"Polygon\",\"properties\":{\"shapeName\":\"Choiseul\",\"Level\":\"ADM1\",\"shapeID\":\"LCA-ADM1-33957332B69403493\",\"shapeGroup\":\"LCA\",\"shapeType\":\"ADM1\"}},{\"arcs\":[[-9,14,15,16]],\"type\":\"Polygon\",\"properties\":{\"shapeName\":\"Dennery\",\"Level\":\"ADM1\",\"shapeID\":\"LCA-ADM1-33957332B62958852\",\"shapeGroup\":\"LCA\",\"shapeType\":\"ADM1\"}},{\"arcs\":[[-8,17,-15]],\"type\":\"Polygon\",\"properties\":{\"shapeName\":\"Gros Islet\",\"Level\":\"ADM1\",\"shapeID\":\"LCA-ADM1-33957332B19729017\",\"shapeGroup\":\"LCA\",\"shapeType\":\"ADM1\"}},{\"arcs\":[[-13,18,19,20,21]],\"type\":\"Polygon\",\"properties\":{\"shapeName\":\"Laborie\",\"Level\":\"ADM1\",\"shapeID\":\"LCA-ADM1-33957332B99390753\",\"shapeGroup\":\"LCA\",\"shapeType\":\"ADM1\"}},{\"arcs\":[[-10,-17,22,23,-20,24]],\"type\":\"Polygon\",\"properties\":{\"shapeName\":\"Micoud\",\"Level\":\"ADM1\",\"shapeID\":\"LCA-ADM1-33957332B8507781\",\"shapeGroup\":\"LCA\",\"shapeType\":\"ADM1\"}},{\"arcs\":[[-1,-11,-25,-19,-12,25,-5]],\"type\":\"Polygon\",\"properties\":{\"shapeName\":\"Soufriere\",\"Level\":\"ADM1\",\"shapeID\":\"LCA-ADM1-33957332B32320768\",\"shapeGroup\":\"LCA\",\"shapeType\":\"ADM1\"}},{\"arcs\":[[-21,-24,26]],\"type\":\"Polygon\",\"properties\":{\"shapeName\":\"Vieux Fort\",\"Level\":\"ADM1\",\"shapeID\":\"LCA-ADM1-33957332B51340040\",\"shapeGroup\":\"LCA\",\"shapeType\":\"ADM1\"}}]}}}');\n\n//# sourceURL=webpack://d3-viz-webpack/./src/assets/layers/adm1/LCA_ADM1.topojson?");
+
+/***/ })
+
+}]);

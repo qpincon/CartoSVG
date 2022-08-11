@@ -1,15 +1,1 @@
-/*!
- * mustache.js - Logic-less {{mustache}} templates with JavaScript
- * http://github.com/janl/mustache.js
- */
-
 /*! Tweakpane 3.1.0 (c) 2016 cocopon, licensed under the MIT license. */
-
-/**
-   * splaytree v3.1.0
-   * Fast Splay tree for Node and browser
-   *
-   * @author Alexander Milevski <info@w8r.name>
-   * @license MIT
-   * @preserve
-   */
