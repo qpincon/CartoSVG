@@ -8,6 +8,8 @@
     border-radius: 5px;
     clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%); 
     display: block;
+    background: rgb(205,205,205);
+    //background: radial-gradient(circle at bottom, rgba(255,255,255,1) 0%, rgba(213,216,255,1) 86%, rgba(161,168,255,1) 100%);
 }
 #paths path {
     stroke: black;
@@ -35,22 +37,35 @@
     stroke-width: {{ countries.strokeWidth }};
     fill: {{ countries.fillColor }};
 }
+.adm1 {
+    stroke: {{ adm1.strokeColor }};
+    stroke-width: {{ adm1.strokeWidth }};
+    fill: {{ adm1.fillColor }};
+}
 .provided {
     stroke: {{ provided.strokeColor }};
     stroke-width: {{ provided.strokeWidth }};
     fill: {{ provided.fillColor }};
 }
 
+{{#adm1.hover}}
+.adm1:hover {
+    fill: {{ adm1.hoverColor }};
+}
+{{/adm1.hover}}
+
 {{#countries.hover}}
 .country:hover {
     fill: {{ countries.hoverColor }};
 }
 {{/countries.hover}}
+
 {{#provided.hover}}
 .provided:hover {
     fill: {{ provided.hoverColor }};
 }
 {{/provided.hover}}
+
 .tp-dfwv {
   min-width: 360px;
 }

@@ -22,7 +22,6 @@ export default {
       'convertTransform',
       'removeEmptyAttrs',
       'removeEmptyContainers',
-      'mergePaths',
       'removeUnusedNS',
       'sortDefsChildren',
       'removeTitle',

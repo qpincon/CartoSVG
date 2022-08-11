@@ -1,100 +1,36 @@
 <script>
 import { onMount } from 'svelte';
-import { drawCustomPaths, parseAndUnprojectPath } from './paths';
-import {Pane} from 'tweakpane';
-import {geoSatellite} from 'd3-geo-projection';
+import { Pane } from 'tweakpane';
+import { geoSatellite } from 'd3-geo-projection';
 import * as topojson from 'topojson-client';
-import * as topojsonSimplify from 'topojson-simplify';
+// import * as topojsonSimplify from 'topojson-simplify';
 import * as d3 from "d3";
-import bbox from 'geojson-bbox';
-import union from '@turf/union';
-import rewind from '@turf/rewind';
+// import bbox from 'geojson-bbox';
+// import union from '@turf/union';
+// import rewind from '@turf/rewind';
 import SVGO from 'svgo/dist/svgo.browser';
-import svgoConfig from './svgo.config';
 import Mustache from 'mustache';
-// import versor from 'versor';
-import cssTemplate from './style.template.txt';
-
-import exportTemplate from './output_template.txt';
-
-console.log(exportTemplate);
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
 import MotionPathHelper from "./util/MotionPathHelper.js";
-// console.log(MotionPathHelper);
-const params = {
-    width: 850,
-    height: 950,
-    useViewBox: false,
-    longitude: 15,
-    latitude: 36,
-    altitude: 1000,
-    rotation: 0,
-    tilt: 25,
-    fieldOfView: 50,
-    useCanvas: false,
-    firstGlow: {
-        innerGlow: {blur: 4, strength: 1.4, color: "#7c490eff"},
-        outerGlow: {blur: 4, strength: 3, color: '#ffffffff'},
-    },
-    secondGlow: {
-        innerGlow: {blur: 4, strength: 1.4, color: "#A88FAFff"},
-        outerGlow: {blur: 4, strength: 3, color: '#ffffffff'},
-    },
-    useGraticule: true,
-    graticuleStep: 3,
-    seaColor: "#b4d0ff8d",
-    land: {
-        show: true,
-        fillColor: "#ffffffff",
-        strokeColor: "#00000000",
-        strokeWidth: 1,
-        filter: 'firstGlow'
-    },
-    countries: {
-        show: true,
-        hover: true,
-        hoverColor: "#fbbc0023",
-        fillColor: "#f3efec80",
-        strokeColor: "#D1BEB038",
-        strokeWidth: 2,
-    },
-    provided: {
-        show: true,
-        hover: true,
-        hoverColor: "#fbbc0023",
-        fillColor: "#ffffff00",
-        strokeColor: "#D1BEB038",
-        strokeWidth: 1,
-    },
-    providedBorders: {
-        show: true,
-        fillColor: "#ffffffff",
-        strokeColor: "#00000000",
-        strokeWidth: 1,
-        filter: ''
-    },
-    bgNoise: true,
-};
 
-const bounds = {
-    width: [200, 1500],
-    height: [300, 1600],
-    longitude: [-180, 180],
-    latitude: [-90, 90],
-    rotation: [-180, 180],
-    tilt: [0, 90],
-    altitude: [8, 6000],
-    fieldOfView: [1, 180],
-    blur: [0.5, 10],
-    strength: [0.1, 10],
-    graticuleStep: [0.1, 10],
-    strokeWidth: [0.1, 5],
-};
-const filterOptions = {
-    none: '',
-    firstGlow: 'firstGlow',
-    secondGlow: 'secondGlow',
-};
+import svgoConfig from './svgo.config';
+import cssTemplate from './templates/style.template.txt';
+import exportTemplate from './templates/output_template.txt';
+import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
+import { params, paramBounds, filterOptions} from './params';
+import { appendBgPattern, appendGlow } from './svg/svgDefs';
+import { fixOrder, splitMultiPolygons } from './util/geojson';
+import { download } from './util/common';
+
+import SlimSelect from './components/SlimSelect.svelte';
+
+const resolvedAdm1 = {};
+const countriesAdm1 = require.context('./assets/layers/adm1/', false, /\..*json$/, 'lazy');
+const availableCountriesAdm1 = countriesAdm1.keys().reduce((acc, file) => {
+    const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
+    acc[name.replace('_ADM', '')] = file;
+    return acc;
+}, {});
 
 const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView'];
 const earthRadius = 6371;
@@ -115,7 +51,7 @@ function gui(opts, redraw) {
             });
         } else {
             let params = {};
-            const boundsDef = bounds[key];
+            const boundsDef = paramBounds[key];
             if (boundsDef) {
                 params = {min: boundsDef[0], max:boundsDef[1]}
             }
@@ -137,111 +73,7 @@ function gui(opts, redraw) {
 }
 const pane = gui(params, draw);
 
-import bg from './assets/img/bg.png';
-// import bg from './assets/img/connection-signal.svg';
 import uploadIcon from './assets/img/icon-upload.svg';
-
-function appendGlow(selection, id="glows",
-                    innerParams = {blur: 2, strength: 1, color: "#7c490e"},
-                    outerParams = {blur: 4, strength: 1, color: '#998'}) {
-    const colorInner = d3.rgb(innerParams.color);
-    const colorOuter = d3.rgb(outerParams.color);
-    const existing = d3.select(`#${id}`);
-    // const defs = !existing.empty() ? existing.select(function() { return this.parentNode} ) : 
-    //         .append('defs');
-    if (!existing.empty()) existing.remove();
-    let defs = selection.select('defs');
-    if (defs.empty()) defs = selection.append('defs')
-    const filter = defs.append('filter').attr('id', id).attr('filterUnits', 'userSpaceOnUse');
-
-    // OUTER GLOW
-    filter.append('feMorphology')
-        .attr('in', 'SourceGraphic')
-        .attr('radius', outerParams.strength)
-        .attr('operator', 'dilate')
-        .attr('result', 'MASK_OUTER');
-    filter.append('feColorMatrix')
-        .attr('in', 'MASK_OUTER')
-        .attr('type', 'matrix')
-        .attr('values', `0 0 0 0 ${colorOuter.r / 255} 0 0 0 0 ${colorOuter.g / 255} 0 0 0 0 ${colorOuter.b / 255} 0 0 0 ${colorOuter.opacity} 0`) // apply color
-        .attr('result', 'OUTER_COLORED');
-    filter.append('feGaussianBlur')
-        .attr('in', 'OUTER_COLORED')
-        .attr('stdDeviation', outerParams.blur)
-        .attr('result', 'OUTER_BLUR');
-    filter.append('feComposite')
-        .attr('in', 'OUTER_BLUR')
-        .attr('in2', 'SourceGraphic')
-        .attr('operator', 'out')
-        .attr('result', 'OUTGLOW');
-    // filter.append('feDropShadow')
-    //     .attr('flood-color', `${colorOuter}`)
-    //     // .attr('flood-opacity', `${colorOuter.opacity}`)
-    //     .attr('stdDeviation', `${outerParams.strength}`)
-    //     .attr('result', 'OUTGLOW');
-
-    // INNER GLOW
-    filter.append('feMorphology')
-        .attr('in', 'SourceAlpha')
-        .attr('radius', innerParams.strength)
-        .attr('operator', 'erode')
-        .attr('result', 'INNER_ERODED');
-
-    filter.append('feGaussianBlur')
-        .attr('in', 'INNER_ERODED')
-        .attr('stdDeviation', innerParams.blur)
-        .attr('result', 'INNER_BLURRED');
-
-    filter.append('feColorMatrix')
-        .attr('in', 'INNER_BLURRED')
-        .attr('type', 'matrix')
-        .attr('values', `0 0 0 0 ${colorInner.r / 255} 0 0 0 0 ${colorInner.g / 255} 0 0 0 0 ${colorInner.b / 255} 0 0 0 -1 ${colorInner.opacity }`) // inverse color
-        .attr('result', 'INNER_COLOR');
-
-    filter.append('feComposite')
-        .attr('in', 'INNER_COLOR')
-        .attr('in2', 'SourceGraphic')
-        .attr('operator', 'in')
-        .attr('result', 'INGLOW');
-
-    // Merge
-    const merge = filter.append('feMerge');
-    merge.append('feMergeNode').attr('in', 'OUTGLOW');
-    merge.append('feMergeNode').attr('in', 'SourceGraphic');
-    merge.append('feMergeNode').attr('in', 'INGLOW');
-    filter.append(() => merge.node());
-
-    defs.append(() => filter.node());
-}
-
-function appendBgPattern(selection, id, seaColor, bgNoise = false, imageSize=500) {
-    let defs = selection.select('defs');
-    if (defs.empty()) defs = selection.append('defs')
-    const existing = d3.select(`#${id}`);
-    if (!existing.empty()) existing.remove();
-    const pattern = defs.append('pattern')
-        .attr('id', id)
-        .attr('patternUnits', 'userSpaceOnUse')
-        .attr('width', imageSize)
-        .attr('height', imageSize);
-    if (bgNoise) {
-        pattern.append('image')
-            .attr('href', bg)
-            .attr('x', 0).attr('y', 0)
-            .attr('width', imageSize).attr('height', imageSize);
-    }
-
-    pattern.append('rect')
-        .attr('width', imageSize).attr('height', imageSize)
-        .attr('fill', seaColor);
-    defs.append(() => pattern.node());
-    const clipPath = selection.append('clipPath').attr('id', 'clip');
-    clipPath.append('rectangle')
-        .attr('x', 0).attr('y', 0)
-        .attr('width', 300).attr('height', 300)
-        .attr('rx', 15);
-    selection.append(() => clipPath.node());
-}
 
 let countries = null;
 let land = null;
@@ -250,31 +82,19 @@ let provided = null;
 let simpleLand = null;
 let commonCss = null;
 
-// let countryPromise = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json")
-let countryPromise = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json")
-    .then(response => response.json())
-    .then(world => {
-        world.objects.countries.geometries = world.objects.countries.geometries.filter(feat => feat.id !== '462');
-        return world;
-    }) // remove buggy maldives
-    .then(world => {
-        countries = topojson.feature(world, world.objects.countries);
-        console.log('countries', countries);
+const adm0Land = import('./assets/layers/world_adm0_simplified.topojson')
+    .then(({default:topoAdm0}) => {
+        countries = topojson.feature(topoAdm0, topoAdm0.objects.simp);
+        // simpleLand = topojsonSimplify.simplify(topojsonSimplify.presimplify(topoAdm0), 0.00019);
+        // simpleLand = splitMultiPolygons(topojson.feature(simpleLand, simpleLand.objects.simp));
+        land = topojson.merge(topoAdm0, topoAdm0.objects.simp.geometries);
+        land = splitMultiPolygons({type: 'FeatureCollection', features: [{type:'Feature', geometry: {...land} }]});
     });
-
-// let landPromise = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-10m.json")
-let landPromise = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-50m.json")
-    .then(response => response.json())
-    .then(world => {
-        simpleLand = topojsonSimplify.simplify(topojsonSimplify.presimplify(world), 0.03);
-        simpleLand = topojson.merge(simpleLand, simpleLand.objects.land.geometries);
-        land = topojson.feature(world, world.objects.land);
-        // console.log('land', land);
-        land = splitMultiPolygons(land);
-        console.log('land', land);
+const verySimpleLand = import('./assets/layers/world_land_very_simplified.topojson')
+    .then(({default:land}) => {
+        simpleLand = topojson.feature(land, land.objects.simp);
     });
-
-Promise.all([countryPromise, landPromise]).then(() => draw());
+Promise.all([adm0Land, verySimpleLand]).then(() => draw());
 
 let path = null;
 let projection = null;
@@ -282,22 +102,18 @@ let svg = null;
 let addingPath = false;
 let currentPath = [];
 let providedPaths = [];
-
+let chosenCountries = [];
 onMount(() => {
     const container = d3.select('#map-container');
     container.call(d3.drag()
         .on("drag", dragged)
     );
-    // container.call(d3.drag()
-    //     .on("start", dragstarted)
-    //     .on("drag", dragged)
-    // );
     const zoom = d3.zoom().on('zoom', zoomed);
     zoom.scaleBy(container, altScale.invert(params.altitude));
     container.call(zoom);
 });
 
-const altScale = d3.scaleLinear().domain([1, 0]).range(bounds.altitude);
+const altScale = d3.scaleLinear().domain([1, 0]).range(paramBounds.altitude);
 function zoomed(event) {
     if (!projection) return;
     if (event.transform.k > 0.1) {
@@ -335,55 +151,17 @@ function dragged(event) {
 
 }
 
-
-// let v0, q0, r0;
-
-// function dragstarted(event) {
-//     console.log(event);
-//     v0 = versor.cartesian(projection.invert(d3.pointer(event, this)));
-//     console.log(v0)
-//     q0 = versor(r0 = projection.rotate());
-// }
-
-// function dragged(event) {
-//     console.log('dragged', event);
-//     const p = d3.pointer(event, this);
-//     const v1 = versor.cartesian(projection.rotate(r0).invert(p));
-//     const delta = versor.delta(v0, v1);
-//     let q1 = versor.multiply(q0, delta);
-
-//     projection.rotate(versor.rotation(q1));
-
-//     [params.longitude, params.latitude, params.rotation] = projection.rotate();
-//     // In vicinity of the antipode (unstable) of q0, restart.
-//     if (delta[0] < 0.7) dragstarted.apply(this, [event, this]);
-//     draw(true);
-//     pane.refresh();
-// }
-
-
-
-// remove buggy paths, covering the whole svg element
-function removeCoveringAll(groupElement) {
-    if (!groupElement) return;
-    const parent = groupElement.closest('svg');
-    const containerRect = parent.getBoundingClientRect();
-    for (let child of groupElement.children) {
-        if (child.tagName != 'path') continue;
-        const d = child.getAttribute('d');
-        // ignore empty path, and big ones (that actually draw something)
-        if (!d || d.length > 100) continue;
-        const rect = child.getBoundingClientRect();
-        const includes = rect.x <= containerRect.x && rect.right >= containerRect.right 
-            && rect.y <= containerRect.y && rect.bottom >= containerRect.bottom;
-        if (includes) {
-            console.log('removing', child);
-            child.remove();
+function draw(simplified = false, _) {
+    for (const country of chosenCountries) {
+        if (!(country in resolvedAdm1)) {
+            countriesAdm1(availableCountriesAdm1[country]).then(resolved => {
+                console.log(resolved);
+                resolvedAdm1[country] = topojson.feature(resolved, resolved.objects.country);;
+                draw(simplified);
+            });
+            return;
         }
     }
-}
-
-function draw(simplified = false) {
     const snyderP = 1.0 + params.altitude / earthRadius;
     const dY = params.altitude * Math.sin(params.tilt / degrees);
     const dZ = params.altitude * Math.cos(params.tilt / degrees);
@@ -494,7 +272,7 @@ function draw(simplified = false) {
             addingPath = false;
             MotionPathHelper.editPath(`#${id}`, {
                 onRelease: function() {
-                    const parsed = parseAndUnprojectPath(this.path.getAttribute('d'), projection);
+                    const parsed = parseAndUnprojectPath(this.path, projection);
                     providedPaths[pathIndex] = parsed;
                 }
             });
@@ -508,20 +286,27 @@ function draw(simplified = false) {
     if (params.land.show)
         groupData.push({ name: 'land', data: land, id: null, props: [], class: 'land', filter: params.land.filter });
     if (params.countries.show && countries)
-        groupData.push({ name: 'countries', data: countries, id: { prefix: 'iso-3166-1-', field: 'id' }, props: ['name'], class: 'country', filter: null });
+        groupData.push({ name: 'countries', data: countries, id: (prop) => prop.ISO_CODE, props: [], class: 'country', filter: null });
     if (providedBorders && params.providedBorders.show)
         groupData.push({ name: 'provided-borders', data: [providedBorders], id: null, props: [], class: 'provided-borders', filter: params.providedBorders.filter });
     if (provided && params.provided.show)
-        groupData.push({ name: 'provided', data: provided, id: null, props: [], class: 'provided', filter: null });
-        
+    groupData.push({ name: 'provided', data: provided, id: null, props: [], class: 'provided', filter: null });
+
+    if (params.adm1.show) {
+        for (const country of chosenCountries) {
+            groupData.push({ name: country, data: resolvedAdm1[country], id: (prop) => prop.shapeName, props: [], class: 'adm1', filter: null });
+        }
+    }
     const groups = svg.selectAll('g').data(groupData).join('g').attr('id', d => d.name);
     
     function drawPaths(data) {
+        if (!data.data) return;
         const pathElem = d3.select(this).selectAll('path')
         .data(data.data.features ? data.data.features : data.data)
         .join('path')
         .attr('d', (d) => {return path(d)});
-        if (data.id) pathElem.attr('id', (d) => data.id.prefix + d[data.id.field]);
+        if (data.id && typeof data.id === 'object') pathElem.attr('id', (d) => data.id.prefix + d[data.id.field]);
+        else if (typeof data.id === 'function') pathElem.attr('id', (d) => data.id(d.properties));
         if (data.class) pathElem.attr('class', data.class);
         if (data.filter) pathElem.attr('filter', `url(#${data.filter})`);
         data.props.forEach((prop) => pathElem.attr(prop, (d) => d.properties[prop]))
@@ -534,67 +319,30 @@ function draw(simplified = false) {
     appendGlow(svg, 'secondGlow', params.secondGlow.innerGlow, params.secondGlow.outerGlow);
     appendBgPattern(svg, 'noise', params.seaColor, params.bgNoise);
     d3.select('#outline').style('fill', "url(#noise)");
-    // const css = Mustache.render(cssTemplate, params);
     commonCss = Mustache.render(cssTemplate, params);
-    // commonCss = `<${''}style> ${css} </${''}style>`;
-    setTimeout(() => removeCoveringAll(document.getElementById('land')), 0);
 }
 
-function fixOrder(geojson) {
-    if (geojson.features) {
-        const fixed = {...geojson};
-        fixed.features = fixed.features.map(f =>
-            rewind(f, { reverse: true })
-        );
-        return fixed;
-    }
-    return rewind(geojson);
-}
+// function handleInput(e) {
+//     const file = e.target.files[0];
+//     const reader = new FileReader();
+//     reader.addEventListener('load', () => {
+//         // winding order matters !!!
+//         provided = fixOrder(JSON.parse(reader.result));
+//         providedBorders = provided.features.length > 1 ? provided.features.reduce((acc, cur)  => {
+//             return union(acc, cur);
+//         }, provided.features[0]) : provided.features[0];
+//         const boundingBox = bbox(providedBorders);
 
-function splitMultiPolygons(geojson) {
-    const newGeojson = {type: 'FeatureCollection', features: []};
-    geojson.features.forEach(feat => {
-        if (feat.geometry.type == 'MultiPolygon') {
-            feat.geometry.coordinates.map(coords => {
-                newGeojson.features.push(
-                {
-                    type: 'Feature', 
-                    properties: feat.properties, 
-                    geometry: {
-                        type: 'Polygon', coordinates: coords
-                    }
-                });
-            });
-        }
-        else newGeojson.features.push(feat);
-    });
-    return newGeojson;
-}
-
-let providedProps = null;
-function handleInput(e) {
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.addEventListener('load', () => {
-        // winding order matters !!!
-        provided = fixOrder(JSON.parse(reader.result));
-        providedBorders = provided.features.length > 1 ? provided.features.reduce((acc, cur)  => {
-            return union(acc, cur);
-        }, provided.features[0]) : provided.features[0];
-        // const simpOptions = {tolerance: 0.005, highQuality: false};
-        // providedBorders = simplify(buffer(providedBorders, 2), simpOptions); // buffer 1km and simplify
-        const boundingBox = bbox(providedBorders);
-
-        providedBorders = fixOrder({ type: "FeatureCollection", features: [{...providedBorders}] });
+//         providedBorders = fixOrder({ type: "FeatureCollection", features: [{...providedBorders}] });
         
-        params.longitude = (boundingBox[2] + boundingBox[0]) / 2;
-        params.latitude = (boundingBox[3] + boundingBox[1]) / 2;
-        params.tilt = 0;
-        pane.refresh();
-        draw();
-    });
-    reader.readAsText(file);
-}
+//         params.longitude = (boundingBox[2] + boundingBox[0]) / 2;
+//         params.latitude = (boundingBox[3] + boundingBox[1]) / 2;
+//         params.tilt = 0;
+//         pane.refresh();
+//         draw();
+//     });
+//     reader.readAsText(file);
+// }
 
 let providedFonts = [];
 let cssFonts;
@@ -627,30 +375,39 @@ function addPath() {
 }
 
 function exportSvg() {
-    console.log(svg.node().outerHTML)
     const svgExport = SVGO.optimize(svg.node().outerHTML, svgoConfig).data;
-    console.log(svgExport);
+    const renderedCss = exportStyleSheet();
     const exportParams = {
         svgStr: svgExport,
-        commonCss: commonCss,
+        commonCss: renderedCss,
         addedCss: cssFonts,
     };
     const out = Mustache.render(exportTemplate, exportParams);
+    console.log(renderedCss);
     download(out, 'text/plain', 'mySvg.js');
-    // return out;
-}
-
-function download(content, mimeType, filename){
-    const a = document.createElement('a');
-    const blob = new Blob([content], {type: mimeType});
-    const url = URL.createObjectURL(blob);
-    a.setAttribute('href', url);
-    a.setAttribute('download', filename);
-    a.click();
 }
 
 
+$: draw(false, chosenCountries); // redraw when chosenCountries changes
 
+function styleSheetToText(sheet) {
+    let styleTxt = '';
+    const rules = sheet.cssRules;
+    for (let r in rules) {
+        styleTxt += rules[r].cssText;
+    }
+    return styleTxt;
+}
+function exportStyleSheet() {
+    const sheets = document.styleSheets;
+    for (let i in sheets) {
+        const rules = sheets[i].cssRules;
+        for (let r in rules) {
+            const selectorText = rules[r].selectorText;
+            if (selectorText == "#map-container") return styleSheetToText(sheets[i]);
+        }
+    }
+}
 </script>
 
 
@@ -663,7 +420,7 @@ function download(content, mimeType, filename){
 <div id="map-container"></div>
 
 <div>
-    <div class="file m-4">
+    <!-- <div class="file m-4">
         <label class="file-label">
             <input class="file-input" type="file" accept=".geojson,.json" on:change={handleInput}>
             <span class="file-cta">
@@ -671,7 +428,9 @@ function download(content, mimeType, filename){
                 <span class="file-label"> Select geojson </span>
             </span>
         </label>
-    </div>
+    </div> -->
+    <p> {chosenCountries} </p>
+    <SlimSelect bind:value={chosenCountries} options={Object.keys(availableCountriesAdm1)} multiple="true"/>
     <div class="file m-4">
         <label class="file-label">
             <input class="file-input" type="file" accept=".ttf,.woff" on:change={handleInputFont}>
