@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import fs from'fs';
 import mapshaper from 'mapshaper';
 
-const assetsPath = '../../../map-builder/src/assets/layers';
+const assetsPath = 'map-builder/src/assets/layers';
 async function getWorldTopojson(){
     let topology = await fetch('https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/main/releaseData/CGAZ/geoBoundariesCGAZ_ADM1.topojson');
     topology = await topology.json();
