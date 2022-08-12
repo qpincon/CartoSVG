@@ -21,7 +21,7 @@ jobs:
       - name: Debug message
         run: echo "::debug::$(tree . -I node_modules)"
       - name: Build app with new topojson files
-        run: cd map-builder && npx webpack --mode=production
+        run: cd map-builder && npm install && npx webpack --mode=production
       - name: Commit latest release version and new generated topojson (test)
         if: steps.git-check.outputs.modified == 'true'
         run: |
