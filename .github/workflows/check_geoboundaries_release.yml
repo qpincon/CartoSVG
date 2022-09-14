@@ -1,0 +1,34 @@
+name: Get latest GeoBoundaries release version
+on:
+  schedule:
+  -  cron:  '0 0 1 * *'
+jobs:
+  get-release-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Fetch release version
+        run: |
+          curl -sL https://api.github.com/repos/wmgeolab/geoBoundaries/releases/latest | \
+          jq -r ".tag_name" > release-versions/geoboundaries-latest.txt
+      - name: Check for modified files
+        id: git-check
+        run: echo ::set-output name=modified::$([ -z "`git status --porcelain`" ] && echo "false" || echo "true")
+      - name: Perform simplification
+        if: steps.git-check.outputs.modified == 'true'
+        uses: ./.github/actions/get_world_and_simplify
+      - name: Remove old js assets
+        run: find map-builder/public/ -name "*.js" | xargs rm
+        if: steps.git-check.outputs.modified == 'true'
+      - name: Build app with new topojson files
+        run: cd map-builder && npm install && npx webpack --mode=production
+        if: steps.git-check.outputs.modified == 'true'
+      - name: Commit latest release version and new generated topojsons
+        if: steps.git-check.outputs.modified == 'true'
+        run: |
+          git config --global user.name 'qpincon'
+          git config --global user.email 'qpincon@users.noreply.github.com'
+          git add map-builder/public/
+          git commit -am "New release of geoboundaries: new simplified topojson created"
+          git push
