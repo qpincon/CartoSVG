@@ -3,13 +3,11 @@ import { onMount } from 'svelte';
 import { Pane } from 'tweakpane';
 import { geoSatellite } from 'd3-geo-projection';
 import * as topojson from 'topojson-client';
-// import * as topojsonSimplify from 'topojson-simplify';
 import * as d3 from "d3";
-// import bbox from 'geojson-bbox';
-// import union from '@turf/union';
-// import rewind from '@turf/rewind';
 import SVGO from 'svgo/dist/svgo.browser';
 import Mustache from 'mustache';
+// import InlineStyleEditor from 'inline-style-editor';
+import InlineStyleEditor from 'inline-style-editor/dist/inline-style-editor.mjs';
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
 import MotionPathHelper from "./util/MotionPathHelper.js";
 
@@ -19,8 +17,10 @@ import exportTemplate from './templates/output_template.txt';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import { params, paramBounds, filterOptions} from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
-import { fixOrder, splitMultiPolygons } from './util/geojson';
+import { splitMultiPolygons } from './util/geojson';
 import { download } from './util/common';
+import * as shapes from './util/shapes';
+import { setTransformScale, setTransformTranslate } from './svg/svg';
 
 import SlimSelect from './components/SlimSelect.svelte';
 
@@ -73,15 +73,14 @@ function gui(opts, redraw) {
 }
 const pane = gui(params, draw);
 
-import uploadIcon from './assets/img/icon-upload.svg';
-
 let countries = null;
 let land = null;
-let providedBorders = null;
-let provided = null;
+// let providedBorders = null;
+// let provided = null;
 let simpleLand = null;
 let commonCss = null;
-
+let openContextMenuInfo;
+let currentlyDragging = null;
 const adm0Land = import('./assets/layers/world_adm0_simplified.topojson')
     .then(({default:topoAdm0}) => {
         countries = topojson.feature(topoAdm0, topoAdm0.objects.simp);
@@ -102,26 +101,80 @@ let svg = null;
 let addingPath = false;
 let currentPath = [];
 let providedPaths = [];
+let providedShapes = []; // {name, coords, scale}
 let chosenCountries = [];
+let chosingPoint = false;
+let pointSelected = false;
+const inlineStyles = {}; // elemID -> prop -> value
+let styleEditor;
+let contextualMenu;
+
 onMount(() => {
+    styleEditor = new InlineStyleEditor({
+        getAdditionnalElems: (el) => {
+            if (el.classList.contains('adm1')) {
+                const parentCountry = target.parentNode.getAttribute('id').replace('-adm1', '');
+                const countryElem = document.getElementById(parentCountry);
+                return [countryElem];
+            }
+            return [];
+        },
+        onStyleChanged: (target, eventType, cssProp, value) => {
+            if (eventType === 'inline') {
+                if (target.hasAttribute('id')) {
+                    const elemId = target.getAttribute('id');
+                    if (elemId in inlineStyles) inlineStyles[elemId][cssProp] = value;
+                    else inlineStyles[elemId] = {[cssProp]: value};
+                }
+            }
+        },
+        customProps: {
+            'scale': {
+                type: 'slider', min: 0.5, max: 5, step: 0.1,
+                getter: (el) => {
+                    if (el.parentNode.getAttribute('id') !== 'points-labels') return null;
+                    const transform = el.getAttribute('transform');
+                    if (!transform) return 1;
+                    else {
+                        const scaleValue = transform.match(/scale\(([0-9\.]+)\)/);
+                        if (scaleValue && scaleValue.length > 1) return parseFloat(scaleValue[1]);
+                    }
+                    return 1;
+                },
+                setter: (el, val) => {
+                    const scaleStr = `scale(${val})`;
+                    setTransformScale(el, scaleStr);
+                }
+            },
+        }
+    });
+    document.body.append(contextualMenu);
+    contextualMenu.style.display = 'none';
+    contextualMenu.style.position = 'absolute';
     const container = d3.select('#map-container');
     container.call(d3.drag()
         .on("drag", dragged)
+        .on('start', () => {currentlyDragging = "all"; closeMenu();})
+        .on('end', () => currentlyDragging = null)
     );
-    const zoom = d3.zoom().on('zoom', zoomed);
+    const zoom = d3.zoom().on('zoom', zoomed).on('start', () => closeMenu());
     zoom.scaleBy(container, altScale.invert(params.altitude));
     container.call(zoom);
 });
 
 const altScale = d3.scaleLinear().domain([1, 0]).range(paramBounds.altitude);
 function zoomed(event) {
+    if (!event.sourceEvent) return;
     if (!projection) return;
-    if (event.transform.k > 0.1) {
+    if (event.transform.k > 0.01 && event.transform.k < 1.0) {
         const newAltitude = altScale(event.transform.k);
         params.altitude = newAltitude;
     }
+    else if (event.transform.k < 0.01) {
+        event.transform.k = 0.01;
+    }
     else {
-        event.transform.k = 0.1;
+        event.transform.k  = 1.0;
     }
     draw(true);
     pane.refresh();
@@ -129,6 +182,7 @@ function zoomed(event) {
 
 const sensitivity = 75;
 function dragged(event) {
+    if (currentlyDragging !== 'all') return;
     if (event.sourceEvent.shiftKey) {
         params.tilt += event.dy / 10;
     }
@@ -148,14 +202,13 @@ function dragged(event) {
     }
     draw(true);
     pane.refresh();
-
 }
 
 function draw(simplified = false, _) {
+    // console.log((new Error()));
     for (const country of chosenCountries) {
         if (!(country in resolvedAdm1)) {
             countriesAdm1(availableCountriesAdm1[country]).then(resolved => {
-                console.log(resolved);
                 resolvedAdm1[country] = topojson.feature(resolved, resolved.objects.country);;
                 draw(simplified);
             });
@@ -254,9 +307,17 @@ function draw(simplified = false, _) {
 
     path = d3.geoPath(projection);
     svg.html('');
+    svg.on('contextmenu', function(e) {
+        console.log('contextmenu global', e);
+        e.preventDefault();
+        showMenu(e);
+        chosingPoint = false;
+        return false;
+    }, false);
     svg.on("click", function(e) {
-        const pos = projection.invert(d3.pointer(e));
+        closeMenu();
         if (!addingPath) return;
+        const pos = projection.invert(d3.pointer(e));
         let elem = svg.select('#paths');
         if (elem.empty()) elem = svg.append('g').attr('id', 'paths');
         currentPath.push(pos);
@@ -283,20 +344,23 @@ function draw(simplified = false, _) {
     const groupData = [];
     groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
     groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
-    if (params.land.show)
+    if (params.land.show) {
         groupData.push({ name: 'land', data: land, id: null, props: [], class: 'land', filter: params.land.filter });
-    if (params.countries.show && countries)
-        groupData.push({ name: 'countries', data: countries, id: (prop) => prop.ISO_CODE, props: [], class: 'country', filter: null });
-    if (providedBorders && params.providedBorders.show)
-        groupData.push({ name: 'provided-borders', data: [providedBorders], id: null, props: [], class: 'provided-borders', filter: params.providedBorders.filter });
-    if (provided && params.provided.show)
-    groupData.push({ name: 'provided', data: provided, id: null, props: [], class: 'provided', filter: null });
-
+    }
+    if (params.countries.show && countries) {
+        groupData.push({ name: 'countries', data: countries, id: (prop) => prop.shapeGroup, props: [], class: 'country', filter: null });
+    }
+    // if (providedBorders && params.providedBorders.show)
+    //     groupData.push({ name: 'provided-borders', data: [providedBorders], id: null, props: [], class: 'provided-borders', filter: params.providedBorders.filter });
+    // if (provided && params.provided.show)
+    //     groupData.push({ name: 'provided', data: provided, id: null, props: [], class: 'provided', filter: null });
     if (params.adm1.show) {
         for (const country of chosenCountries) {
-            groupData.push({ name: country, data: resolvedAdm1[country], id: (prop) => prop.shapeName, props: [], class: 'adm1', filter: null });
+            groupData.push({ name: `${country}-adm1`, data: resolvedAdm1[country], id: (prop) => prop.shapeName, props: [], class: 'adm1', filter: null });
         }
     }
+    groupData.push({ name: 'points-labels', data: [], id: null, props: [], class: null, filter: null });
+
     const groups = svg.selectAll('g').data(groupData).join('g').attr('id', d => d.name);
     
     function drawPaths(data) {
@@ -320,8 +384,23 @@ function draw(simplified = false, _) {
     appendBgPattern(svg, 'noise', params.seaColor, params.bgNoise);
     d3.select('#outline').style('fill', "url(#noise)");
     commonCss = Mustache.render(cssTemplate, params);
+    
+    drawShapes();
+
 }
 
+function applyStyles() {
+    // apply inline styles
+    Object.entries(inlineStyles).forEach((([elemId, style]) => {
+        const elem = document.getElementById(elemId);
+        Object.entries(style).forEach(([cssProp, cssValue]) => {
+            if (cssProp === 'scale') {
+                setTransformScale(elem, `scale(${cssValue})`);
+            }
+            else elem.style[cssProp] = cssValue;
+        });
+    }));
+}
 // function handleInput(e) {
 //     const file = e.target.files[0];
 //     const reader = new FileReader();
@@ -367,10 +446,10 @@ function handleInputFont(e) {
         providedFonts = providedFonts;
     });
     reader.readAsDataURL(file);
-
 }
 
 function addPath() {
+    closeMenu();
     addingPath = true;
 }
 
@@ -386,7 +465,6 @@ function exportSvg() {
     console.log(renderedCss);
     download(out, 'text/plain', 'mySvg.js');
 }
-
 
 $: draw(false, chosenCountries); // redraw when chosenCountries changes
 
@@ -408,6 +486,103 @@ function exportStyleSheet() {
         }
     }
 }
+
+const domParser = new DOMParser();
+
+function closeMenu() {
+    contextualMenu.style.display = 'none';
+    chosingPoint = false;
+    pointSelected = false;
+}
+function editStyles() {
+    closeMenu();
+    styleEditor.open(openContextMenuInfo.event.target, openContextMenuInfo.event.pageX, openContextMenuInfo.event.pageY);
+}
+function addPoint(e) {
+    // closeMenu();
+    chosingPoint = true;
+    console.log('add point', e);
+}
+function addLabel(e) {
+    closeMenu();
+    console.log('add label', e);
+}
+
+function drawShapes() {
+    const container = document.getElementById('points-labels');
+    if (!container) return;
+    container.innerHTML = '';
+    providedShapes.forEach((shapeDef, i) => {
+        const svgStr = `<svg xmlns="http://www.w3.org/2000/svg">${shapes[shapeDef.name]}</svg>`;
+        const svgShape = domParser.parseFromString(svgStr, 'text/html').body.childNodes[0].firstChild;
+        const projectedPos = projection(shapeDef.pos);
+        const transform = `translate(${projectedPos[0]} ${projectedPos[1]})`;
+        svgShape.setAttribute('transform', transform);
+        svgShape.setAttribute('id', shapeDef.id);
+        container.appendChild(svgShape);
+    });
+    d3.select(container).call(d3.drag()
+        .on("drag", function(event) {
+            setTransformTranslate(currentlyDragging, `translate(${event.x} ${event.y})`);
+        })
+        .on('start', (e) => currentlyDragging = e.sourceEvent.target)
+        .on('end', (e) => {
+            const pointId = currentlyDragging.getAttribute('id');
+            const pointDef = providedShapes.find(def => def.id === pointId);
+            pointDef.pos = projection.invert([e.x, e.y]);
+            currentlyDragging = null;
+        })
+    );
+    d3.select(container).on('contextmenu', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        pointSelected = true;
+        showMenu(e);
+        return false;
+    }, false);
+    applyStyles();
+}
+
+function showMenu(e) {
+    openContextMenuInfo = {event: e, position: projection.invert(d3.pointer(e))};
+    contextualMenu.style.display = 'block';
+    contextualMenu.style.left = e.pageX + "px";
+    contextualMenu.style.top = e.pageY + "px";
+}
+
+let shapeCount = 0;
+function addShape(shapeName) {
+    const shapeId = `${shapeName}-${shapeCount++}`;
+    providedShapes.push({name: shapeName, pos: openContextMenuInfo.position, scale: 1, id:shapeId});
+    drawShapes();
+    closeMenu();
+    setTimeout(() => {
+        const lastShape = document.getElementById(providedShapes[providedShapes.length -1].id);
+        styleEditor.open(lastShape, openContextMenuInfo.event.pageX, openContextMenuInfo.event.pageY);
+    }, 0);
+}
+
+function copySelection() {
+    const pointId = openContextMenuInfo.event.target.getAttribute('id');
+    const newDef = {...providedShapes.find(def => def.id === pointId)};
+    const projected = projection(newDef.pos);
+    newDef.pos = projection.invert([projected[0] - 10, projected[1]]);
+    const newShapeId = `${newDef.name}-${shapeCount++}`;
+    inlineStyles[newShapeId] = {...inlineStyles[newDef.id]};
+    newDef.id = newShapeId;
+    providedShapes.push(newDef);
+    drawShapes();
+    closeMenu();
+}
+
+function deleteSelection() {
+    const pointId = openContextMenuInfo.event.target.getAttribute('id');
+    delete inlineStyles[pointId];
+    providedShapes = providedShapes.filter(def => def.id !== pointId);
+    drawShapes();
+    closeMenu();
+}
+
 </script>
 
 
@@ -416,7 +591,23 @@ function exportStyleSheet() {
 	{@html `<${''}style> ${cssFonts} </${''}style>`}
 </svelte:head>
 
-<h1 class="has-text-centered is-size-2"> Map builder </h1>
+<div id="contextmenu" class="border rounded" bind:this={contextualMenu}>
+    {#if chosingPoint}
+        {#each Object.keys(shapes) as shapeName (shapeName)}
+            <div role="button" class="px-2 py-1" on:click={() => addShape(shapeName)}> { shapeName } </div>
+        {/each}
+    {:else if pointSelected}
+        <div role="button" class="px-2 py-1" on:click={editStyles}> Edit styles </div>
+        <div role="button" class="px-2 py-1" on:click={copySelection}> Copy </div>
+        <div role="button" class="px-2 py-1" on:click={deleteSelection}> Delete </div>
+    {:else}
+        <div role="button" class="px-2 py-1" on:click={editStyles}> Edit styles </div>
+        <div role="button" class="px-2 py-1" on:click={addPath}> Draw path </div>
+        <div role="button" class="px-2 py-1" on:click={addPoint}> Add point </div>
+        <div role="button" class="px-2 py-1" on:click={addLabel}> Add label </div>
+    {/if}
+</div>
+<h1 class="text-center fs-2"> Static SVG Map builder </h1>
 <div id="map-container"></div>
 
 <div>
@@ -433,13 +624,9 @@ function exportStyleSheet() {
     <SlimSelect bind:value={chosenCountries} options={Object.keys(availableCountriesAdm1)} multiple="true"/>
     <div class="file m-4">
         <label class="file-label">
-            <input class="file-input" type="file" accept=".ttf,.woff" on:change={handleInputFont}>
-            <span class="file-cta">
-                <span class="file-icon"> <img src={uploadIcon} alt="upload-font"> </span>
-                <span class="file-label"> Select font </span>
-            </span>
+            <input class="form-control" type="file" accept=".ttf,.woff" on:change={handleInputFont}>
         </label>
     </div>
-    <div class="button" on:click={addPath}> Add path </div>
-    <div class="button" on:click={exportSvg}> Export </div>
+    <div class="btn btn-light" on:click={addPath}> Add path </div>
+    <div class="btn btn-light" on:click={exportSvg}> Export </div>
 </div>

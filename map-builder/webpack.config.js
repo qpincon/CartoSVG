@@ -1,14 +1,15 @@
 const path = require('path');
 const sveltePreprocess = require('svelte-preprocess');
-module.exports = {
+
+const config = {
     entry: {
-        'index': [ './src/index.js' ]
+        'index': ['./src/index.js']
     },
     resolve: {
         alias: {
             svelte: path.resolve('node_modules', 'svelte')
         },
-        extensions: ['.mjs', '.js', '.svelte'],
+        extensions: ['.js', '.svelte'],
         mainFields: ['svelte', 'browser', 'module', 'main']
     },
     output: {
@@ -20,13 +21,11 @@ module.exports = {
         rules: [
             {
                 test: /\.css$/i,
-                use: [ "style-loader", "css-loader"],
-                exclude: /node_modules/
+                use: ["style-loader", "css-loader"],
             },
             {
                 test: /\.s[ac]ss$/i,
-                use: [ "style-loader", "css-loader", "sass-loader"],
-                exclude: /node_modules/
+                use: ["style-loader", "css-loader", "sass-loader"],
             },
             {
                 test: /\.(html|svelte)$/,
@@ -55,4 +54,6 @@ module.exports = {
             }
         ],
     },
-}
+};
+
+module.exports = config;

@@ -17,3 +17,33 @@ function removeCoveringAll(groupElement) {
         }
     }
 }
+
+function setTransformScale(el, scaleStr) {
+    const existingTransform = el.getAttribute('transform');
+    if (!existingTransform) {
+        el.setAttribute("transform", scaleStr);
+    }
+    else if (existingTransform.length && !existingTransform.includes('scale')) {
+        el.setAttribute("transform", `${existingTransform} ${scaleStr}`);
+    }
+    else {
+        const newAttr = existingTransform.replace(/scale\(.*?\)/, scaleStr);
+        el.setAttribute("transform", newAttr);
+    }
+} 
+
+function setTransformTranslate(el, translateStr) {
+    const existingTransform = el.getAttribute('transform');
+    if (!existingTransform) {
+        el.setAttribute("transform", translateStr);
+    }
+    else if (existingTransform.length && !existingTransform.includes('translate')) {
+        el.setAttribute("transform", `${translateStr} ${existingTransform}`);
+    }
+    else {
+        const newAttr = existingTransform.replace(/translate\(.*?\)/, translateStr);
+        el.setAttribute("transform", newAttr);
+    }
+}
+
+export { setTransformScale, setTransformTranslate };

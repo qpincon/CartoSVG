@@ -1,2 +1,43 @@
-@import "~bulma/bulma";
+// @import "~bulma/bulma";
+
+
+// 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
+@import "bootstrap/scss/functions";
+
+// // 3. Include remainder of required Bootstrap stylesheets
+@import "bootstrap/scss/variables";
+
+// // 4. Include any default map overrides here
+
+// // 5. Include remainder of required parts
+@import "bootstrap/scss/maps";
+@import "bootstrap/scss/mixins";
+@import "bootstrap/scss/root";
+
+// // 6. Optionally include any other parts as needed
+@import "bootstrap/scss/reboot";
+@import "bootstrap/scss/forms";
+@import "bootstrap/scss/utilities";
+@import "bootstrap/scss/accordion";
+@import "bootstrap/scss/buttons";
+
+// @import "bootstrap/scss/grid";
+@import "bootstrap/scss/helpers";
+@import "bootstrap/scss/type";
+// @import "bootstrap/scss/toasts";
+// @import "bootstrap/scss/close";
+// @import "bootstrap/scss/pagination";
+
+// 7. Optionally include utilities API last to generate classes based on the Sass map in `_utilities.scss`
+@import "bootstrap/scss/utilities/api";
 @import '../../node_modules/slim-select/dist/slimselect.min.css';
+@import '../../node_modules/inline-style-editor/dist/inline-style-editor.css';
+
+#contextmenu  {
+    background-color: #f8f8f8;
+    div {
+        &:hover {
+            background-color:#e2eef8;
+        }
+    }
+}

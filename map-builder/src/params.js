@@ -44,21 +44,6 @@ const params = {
         strokeColor: "#D1BEB038",
         strokeWidth: 1,
     },
-    provided: {
-        show: true,
-        hover: true,
-        hoverColor: "#fbbc0023",
-        fillColor: "#ffffff00",
-        strokeColor: "#D1BEB038",
-        strokeWidth: 1,
-    },
-    providedBorders: {
-        show: true,
-        fillColor: "#ffffffff",
-        strokeColor: "#00000000",
-        strokeWidth: 1,
-        filter: ''
-    },
     bgNoise: true,
 };
 
@@ -69,7 +54,7 @@ const paramBounds = {
     latitude: [-90, 90],
     rotation: [-180, 180],
     tilt: [0, 90],
-    altitude: [8, 6000],
+    altitude: [100, 10000],
     fieldOfView: [1, 180],
     blur: [0.5, 10],
     strength: [0.1, 10],

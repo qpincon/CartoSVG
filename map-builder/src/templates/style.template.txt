@@ -27,11 +27,6 @@
     stroke-width: {{ land.strokeWidth }};
     fill: {{ land.fillColor }};
 }
-.provided-borders {
-    stroke: {{ providedBorders.strokeColor }};
-    stroke-width: {{ providedBorders.strokeWidth }};
-    fill: {{ providedBorders.fillColor }};
-}
 .country {
     stroke: {{ countries.strokeColor }};
     stroke-width: {{ countries.strokeWidth }};
@@ -41,11 +36,6 @@
     stroke: {{ adm1.strokeColor }};
     stroke-width: {{ adm1.strokeWidth }};
     fill: {{ adm1.fillColor }};
-}
-.provided {
-    stroke: {{ provided.strokeColor }};
-    stroke-width: {{ provided.strokeWidth }};
-    fill: {{ provided.fillColor }};
 }
 
 {{#adm1.hover}}
@@ -59,12 +49,6 @@
     fill: {{ countries.hoverColor }};
 }
 {{/countries.hover}}
-
-{{#provided.hover}}
-.provided:hover {
-    fill: {{ provided.hoverColor }};
-}
-{{/provided.hover}}
 
 .tp-dfwv {
   min-width: 360px;
