@@ -20,8 +20,9 @@ import { params, paramBounds, filterOptions} from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
 import { download } from './util/common';
-import * as shapes from './util/shapes';
-import { setTransformScale, setTransformTranslate } from './svg/svg';
+import * as shapes from './svg/shapeDefs';
+import { setTransformScale } from './svg/svg';
+import { drawShapes } from './svg/shape';
 
 import SlimSelect from './components/SlimSelect.svelte';
 
@@ -104,9 +105,14 @@ let currentPath = [];
 let providedPaths = [];
 let providedShapes = []; // {name, coords, scale, id}
 let chosenCountries = [];
-let chosingPoint = false;
-let pointSelected = false;
-let addingLabel = false;
+const menuStates = {
+    chosingPoint:      false,
+    pointSelected:     false,
+    addingLabel:       false,
+};
+// let chosingPoint = false;
+// let pointSelected = false;
+// let addingLabel = false;
 let editedLabelId;
 let textInput;
 let typedText = "";
@@ -132,9 +138,7 @@ onMount(() => {
         getAdditionalElems: (el) => {
             if (el.classList.contains('adm1')) {
                 const parentCountry = el.parentNode.getAttribute('id').replace('-adm1', '');
-                console.log(parentCountry);
                 const countryElem = document.getElementById(parentCountry);
-                console.log(countryElem);
                 return [countryElem];
             }
             return [];
@@ -167,7 +171,7 @@ onMount(() => {
         .on("drag", dragged)
         .on('start', () => {
             currentlyDragging = "all";
-            if (addingLabel) validateLabel();
+            if (menuStates.addingLabel) validateLabel();
             styleEditor.close();
             closeMenu();
         })
@@ -326,7 +330,7 @@ function draw(simplified = false, _) {
     svg.on('contextmenu', function(e) {
         e.preventDefault();
         showMenu(e);
-        chosingPoint = false;
+        menuStates.chosingPoint = false;
         return false;
     }, false);
     svg.on("click", function(e) {
@@ -400,7 +404,7 @@ function draw(simplified = false, _) {
     d3.select('#outline').style('fill', "url(#noise)");
     commonCss = Mustache.render(cssTemplate, params);
     
-    drawShapes();
+    drawAndSetupShapes();
 
 }
 
@@ -502,30 +506,24 @@ function exportStyleSheet() {
     }
 }
 
-const domParser = new DOMParser();
 
 function closeMenu() {
     contextualMenu.style.display = 'none';
-    chosingPoint = false;
-    pointSelected = false;
-    addingLabel = false;
+    menuStates.chosingPoint = false;
+    menuStates.pointSelected = false;
+    menuStates.addingLabel = false;
     editedLabelId = null;
 }
 function editStyles() {
     closeMenu();
     styleEditor.open(openContextMenuInfo.event.target, openContextMenuInfo.event.pageX, openContextMenuInfo.event.pageY);
 }
-function addPoint(e) {
-    chosingPoint = true;
-}
-
-function createSvgFromPart(partStr) {
-    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg">${partStr}</svg>`;
-    return domParser.parseFromString(svgStr, 'text/html').body.childNodes[0].firstChild;
+function addPoint() {
+    menuStates.chosingPoint = true;
 }
 
 async function addLabel(e) {
-    addingLabel = true;
+    menuStates.addingLabel = true;
     await tick();
     textInput.focus();
     textInput.addEventListener('keydown', ({key}) => {
@@ -538,9 +536,7 @@ async function addLabel(e) {
 function validateLabel() {
     if (typedText.length) {
         if (editedLabelId) {
-            console.log(editedLabelId)
             const labelDef = providedShapes.find(def => def.id === editedLabelId);
-            console.log(labelDef)
             labelDef.text = typedText;
         }
         else {
@@ -550,50 +546,15 @@ function validateLabel() {
         }
         typedText = '';
     }
-    drawShapes();
+    drawAndSetupShapes();
     closeMenu();
 }
 
-function drawShapes() {
+function drawAndSetupShapes() {
     const container = document.getElementById('points-labels');
     if (!container) return;
-    container.innerHTML = '';
-    providedShapes.forEach((shapeDef, i) => {
-        // shape is a symbol
-        const projectedPos = projection(shapeDef.pos);
-        let svgShape;
-        if (shapeDef.name) {
-            svgShape = createSvgFromPart(shapes[shapeDef.name]);
-        }
-        // shape is a label
-        else {
-            const svgPart = `<text stroke-width="0"> ${shapeDef.text} </text>`;
-            svgShape = createSvgFromPart(svgPart);
-        }
-        const transform = `translate(${projectedPos[0]} ${projectedPos[1]})`;
-        svgShape.setAttribute('transform', transform);
-        svgShape.setAttribute('id', shapeDef.id);
-        container.appendChild(svgShape);
-    });
-    let dragging = false;
-    d3.select(container).call(d3.drag()
-        .on("drag", function(event) {
-            dragging = true;
-            console.log(event);
-            setTransformTranslate(currentlyDragging, `translate(${event.x} ${event.y})`);
-        })
-        .on('start', (e) => currentlyDragging = e.sourceEvent.target)
-        .on('end', (e) => {
-            if (!dragging) return;
-            dragging = false;
-            const pointId = currentlyDragging.getAttribute('id');
-            const pointDef = providedShapes.find(def => def.id === pointId);
-            pointDef.pos = projection.invert([e.x, e.y]);
-            currentlyDragging = null;
-        })
-    );
+    drawShapes(providedShapes, container, projection);
     d3.select(container).on('dblclick', e => {
-        console.log(e);
         const target = e.target;
         const targetId = target.getAttribute('id');
         if (targetId.includes('label')) {
@@ -608,7 +569,7 @@ function drawShapes() {
     d3.select(container).on('contextmenu', function(e) {
         e.stopPropagation();
         e.preventDefault();
-        pointSelected = true;
+        menuStates.pointSelected = true;
         showMenu(e);
         return false;
     }, false);
@@ -626,7 +587,7 @@ let shapeCount = 0;
 function addShape(shapeName) {
     const shapeId = `${shapeName}-${shapeCount++}`;
     providedShapes.push({name: shapeName, pos: openContextMenuInfo.position, scale: 1, id:shapeId});
-    drawShapes();
+    drawAndSetupShapes();
     closeMenu();
     setTimeout(() => {
         const lastShape = document.getElementById(providedShapes[providedShapes.length -1].id);
@@ -643,7 +604,7 @@ function copySelection() {
     inlineStyles[newShapeId] = {...inlineStyles[newDef.id]};
     newDef.id = newShapeId;
     providedShapes.push(newDef);
-    drawShapes();
+    drawAndSetupShapes();
     closeMenu();
 }
 
@@ -651,7 +612,7 @@ function deleteSelection() {
     const pointId = openContextMenuInfo.event.target.getAttribute('id');
     delete inlineStyles[pointId];
     providedShapes = providedShapes.filter(def => def.id !== pointId);
-    drawShapes();
+    drawAndSetupShapes();
     closeMenu();
 }
 
@@ -664,13 +625,13 @@ function deleteSelection() {
 </svelte:head>
 
 <div id="contextmenu" class="border rounded" bind:this={contextualMenu}>
-    {#if chosingPoint}
+    {#if menuStates.chosingPoint}
         {#each Object.keys(shapes) as shapeName (shapeName)}
             <div role="button" class="px-2 py-1" on:click={() => addShape(shapeName)}> { shapeName } </div>
         {/each}
-    {:else if addingLabel}
+    {:else if menuStates.addingLabel}
         <input type="text" bind:this={textInput} bind:value={typedText}/>
-    {:else if pointSelected}
+    {:else if menuStates.pointSelected}
         <div role="button" class="px-2 py-1" on:click={editStyles}> Edit styles </div>
         <div role="button" class="px-2 py-1" on:click={copySelection}> Copy </div>
         <div role="button" class="px-2 py-1" on:click={deleteSelection}> Delete </div>

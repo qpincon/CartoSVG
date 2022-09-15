@@ -1,3 +1,5 @@
+const domParser = new DOMParser();
+
 // remove buggy paths, covering the whole svg element
 function removeCoveringAll(groupElement) {
     if (!groupElement) return;
@@ -32,6 +34,14 @@ function setTransformScale(el, scaleStr) {
     }
 } 
 
+function getTranslateFromTransform(el) {
+    const existingTransform = el.getAttribute('transform');
+    if (!existingTransform) return null;
+    const matched = existingTransform.match(/([0-9\.]+) ([0-9\.]+)/);
+    if (matched.length === 3) return [parseInt(matched[1]), parseInt(matched[2])];
+    return null;
+}
+
 function setTransformTranslate(el, translateStr) {
     const existingTransform = el.getAttribute('transform');
     if (!existingTransform) {
@@ -46,4 +56,9 @@ function setTransformTranslate(el, translateStr) {
     }
 }
 
-export { setTransformScale, setTransformTranslate };
+function createSvgFromPart(partStr) {
+    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg">${partStr}</svg>`;
+    return domParser.parseFromString(svgStr, 'text/html').body.childNodes[0].firstChild;
+}
+
+export { createSvgFromPart, setTransformScale, setTransformTranslate, getTranslateFromTransform };
