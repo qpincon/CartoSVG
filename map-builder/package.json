@@ -7,7 +7,7 @@
     "serve": "npx webpack --mode=development --watch",
     "build": "npx webpack --mode=production"
   },
-  "author": "Masae Analytics",
+  "author": "Quentin Pinçon",
   "license": "ISC",
   "devDependencies": {
     "sass": "^1.53.0",
@@ -20,12 +20,13 @@
   },
   "dependencies": {
     "@turf/turf": "^6.5.0",
+    "bootstrap": "^5.2.0",
     "bulma": "^0.9.4",
     "css-loader": "^6.7.1",
     "d3": "^7.6.1",
     "d3-geo-projection": "^4.0.0",
     "d3-zoom": "^3.0.0",
-    "geojson-bbox": "^0.0.0",
+    "inline-style-editor": "^1.1.1",
     "mustache": "^4.2.0",
     "parse-svg-path": "^0.1.2",
     "sass-loader": "^13.0.2",

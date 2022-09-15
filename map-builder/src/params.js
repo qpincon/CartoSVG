@@ -1,7 +1,7 @@
 
 const params = {
-    width: 850,
-    height: 950,
+    width: 550,
+    height: 600,
     useViewBox: false,
     longitude: 15,
     latitude: 36,

@@ -1,5 +1,5 @@
 <script>
-import { onMount } from 'svelte';
+import { onMount, tick } from 'svelte';
 import { Pane } from 'tweakpane';
 import { geoSatellite } from 'd3-geo-projection';
 import * as topojson from 'topojson-client';
@@ -7,7 +7,8 @@ import * as d3 from "d3";
 import SVGO from 'svgo/dist/svgo.browser';
 import Mustache from 'mustache';
 // import InlineStyleEditor from 'inline-style-editor';
-import InlineStyleEditor from 'inline-style-editor/dist/inline-style-editor.mjs';
+// import InlineStyleEditor from 'inline-style-editor/dist/inline-style-editor.js';
+import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
 import MotionPathHelper from "./util/MotionPathHelper.js";
 
@@ -101,32 +102,42 @@ let svg = null;
 let addingPath = false;
 let currentPath = [];
 let providedPaths = [];
-let providedShapes = []; // {name, coords, scale}
+let providedShapes = []; // {name, coords, scale, id}
 let chosenCountries = [];
 let chosingPoint = false;
 let pointSelected = false;
+let addingLabel = false;
+let editedLabelId;
+let textInput;
+let typedText = "";
 const inlineStyles = {}; // elemID -> prop -> value
+let lastUsedLabelFont = "Luminari"
 let styleEditor;
 let contextualMenu;
 
 onMount(() => {
     styleEditor = new InlineStyleEditor({
-        getAdditionnalElems: (el) => {
-            if (el.classList.contains('adm1')) {
-                const parentCountry = target.parentNode.getAttribute('id').replace('-adm1', '');
-                const countryElem = document.getElementById(parentCountry);
-                return [countryElem];
-            }
-            return [];
-        },
         onStyleChanged: (target, eventType, cssProp, value) => {
             if (eventType === 'inline') {
                 if (target.hasAttribute('id')) {
                     const elemId = target.getAttribute('id');
+                    if (elemId.includes('label') && cssProp === 'font-family') {
+                        lastUsedLabelFont = value;
+                    }
                     if (elemId in inlineStyles) inlineStyles[elemId][cssProp] = value;
                     else inlineStyles[elemId] = {[cssProp]: value};
                 }
             }
+        },
+        getAdditionalElems: (el) => {
+            if (el.classList.contains('adm1')) {
+                const parentCountry = el.parentNode.getAttribute('id').replace('-adm1', '');
+                console.log(parentCountry);
+                const countryElem = document.getElementById(parentCountry);
+                console.log(countryElem);
+                return [countryElem];
+            }
+            return [];
         },
         customProps: {
             'scale': {
@@ -154,7 +165,12 @@ onMount(() => {
     const container = d3.select('#map-container');
     container.call(d3.drag()
         .on("drag", dragged)
-        .on('start', () => {currentlyDragging = "all"; closeMenu();})
+        .on('start', () => {
+            currentlyDragging = "all";
+            if (addingLabel) validateLabel();
+            styleEditor.close();
+            closeMenu();
+        })
         .on('end', () => currentlyDragging = null)
     );
     const zoom = d3.zoom().on('zoom', zoomed).on('start', () => closeMenu());
@@ -308,7 +324,6 @@ function draw(simplified = false, _) {
     path = d3.geoPath(projection);
     svg.html('');
     svg.on('contextmenu', function(e) {
-        console.log('contextmenu global', e);
         e.preventDefault();
         showMenu(e);
         chosingPoint = false;
@@ -493,19 +508,50 @@ function closeMenu() {
     contextualMenu.style.display = 'none';
     chosingPoint = false;
     pointSelected = false;
+    addingLabel = false;
+    editedLabelId = null;
 }
 function editStyles() {
     closeMenu();
     styleEditor.open(openContextMenuInfo.event.target, openContextMenuInfo.event.pageX, openContextMenuInfo.event.pageY);
 }
 function addPoint(e) {
-    // closeMenu();
     chosingPoint = true;
-    console.log('add point', e);
 }
-function addLabel(e) {
+
+function createSvgFromPart(partStr) {
+    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg">${partStr}</svg>`;
+    return domParser.parseFromString(svgStr, 'text/html').body.childNodes[0].firstChild;
+}
+
+async function addLabel(e) {
+    addingLabel = true;
+    await tick();
+    textInput.focus();
+    textInput.addEventListener('keydown', ({key}) => {
+        if (key === "Enter") {
+            validateLabel();
+        }
+    });
+}
+
+function validateLabel() {
+    if (typedText.length) {
+        if (editedLabelId) {
+            console.log(editedLabelId)
+            const labelDef = providedShapes.find(def => def.id === editedLabelId);
+            console.log(labelDef)
+            labelDef.text = typedText;
+        }
+        else {
+            const labelId = `label-${shapeCount++}`;
+            providedShapes.push({pos: openContextMenuInfo.position, scale: 1, id: labelId, text: typedText});
+            inlineStyles[labelId] = { 'font-family': lastUsedLabelFont};
+        }
+        typedText = '';
+    }
+    drawShapes();
     closeMenu();
-    console.log('add label', e);
 }
 
 function drawShapes() {
@@ -513,29 +559,55 @@ function drawShapes() {
     if (!container) return;
     container.innerHTML = '';
     providedShapes.forEach((shapeDef, i) => {
-        const svgStr = `<svg xmlns="http://www.w3.org/2000/svg">${shapes[shapeDef.name]}</svg>`;
-        const svgShape = domParser.parseFromString(svgStr, 'text/html').body.childNodes[0].firstChild;
+        // shape is a symbol
         const projectedPos = projection(shapeDef.pos);
+        let svgShape;
+        if (shapeDef.name) {
+            svgShape = createSvgFromPart(shapes[shapeDef.name]);
+        }
+        // shape is a label
+        else {
+            const svgPart = `<text stroke-width="0"> ${shapeDef.text} </text>`;
+            svgShape = createSvgFromPart(svgPart);
+        }
         const transform = `translate(${projectedPos[0]} ${projectedPos[1]})`;
         svgShape.setAttribute('transform', transform);
         svgShape.setAttribute('id', shapeDef.id);
         container.appendChild(svgShape);
     });
+    let dragging = false;
     d3.select(container).call(d3.drag()
         .on("drag", function(event) {
+            dragging = true;
+            console.log(event);
             setTransformTranslate(currentlyDragging, `translate(${event.x} ${event.y})`);
         })
         .on('start', (e) => currentlyDragging = e.sourceEvent.target)
         .on('end', (e) => {
+            if (!dragging) return;
+            dragging = false;
             const pointId = currentlyDragging.getAttribute('id');
             const pointDef = providedShapes.find(def => def.id === pointId);
             pointDef.pos = projection.invert([e.x, e.y]);
             currentlyDragging = null;
         })
     );
-    d3.select(container).on('contextmenu', function(e) {
+    d3.select(container).on('dblclick', e => {
+        console.log(e);
+        const target = e.target;
+        const targetId = target.getAttribute('id');
+        if (targetId.includes('label')) {
+            editedLabelId = targetId;
+            typedText = target.childNodes[0].nodeValue;
+            addLabel();
+            showMenu(e);
+        }
         e.preventDefault();
         e.stopPropagation();
+    });
+    d3.select(container).on('contextmenu', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
         pointSelected = true;
         showMenu(e);
         return false;
@@ -596,6 +668,8 @@ function deleteSelection() {
         {#each Object.keys(shapes) as shapeName (shapeName)}
             <div role="button" class="px-2 py-1" on:click={() => addShape(shapeName)}> { shapeName } </div>
         {/each}
+    {:else if addingLabel}
+        <input type="text" bind:this={textInput} bind:value={typedText}/>
     {:else if pointSelected}
         <div role="button" class="px-2 py-1" on:click={editStyles}> Edit styles </div>
         <div role="button" class="px-2 py-1" on:click={copySelection}> Copy </div>
