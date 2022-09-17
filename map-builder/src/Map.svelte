@@ -1,6 +1,5 @@
 <script>
 import { onMount, tick } from 'svelte';
-import { Pane } from 'tweakpane';
 import { geoSatellite } from 'd3-geo-projection';
 import * as topojson from 'topojson-client';
 import * as d3 from "d3";
@@ -16,7 +15,7 @@ import svgoConfig from './svgo.config';
 import cssTemplate from './templates/style.template.txt';
 import exportTemplate from './templates/output_template.txt';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
-import { params, paramBounds, filterOptions} from './params';
+import { newParams, paramDefs, params, paramBounds, filterOptions} from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
 import { download } from './util/common';
@@ -25,6 +24,7 @@ import { setTransformScale } from './svg/svg';
 import { drawShapes } from './svg/shape';
 
 import SlimSelect from './components/SlimSelect.svelte';
+import NestedAccordions from './components/NestedAccordions.svelte';
 
 const resolvedAdm1 = {};
 const countriesAdm1 = require.context('./assets/layers/adm1/', false, /\..*json$/, 'lazy');
@@ -34,46 +34,22 @@ const availableCountriesAdm1 = countriesAdm1.keys().reduce((acc, file) => {
     return acc;
 }, {});
 
+function findProp(propName, obj) {
+    if (propName in obj) return obj[propName];
+    for (let v of Object.values(obj)) {
+        if (typeof v === 'object') {
+            const found = findProp(propName, v);
+            if (found !== undefined) return found;
+        }
+    }
+}
+const p = (propName, obj = newParams) => findProp(propName, obj);
+
 const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView'];
 const earthRadius = 6371;
 const degrees = 180 / Math.PI;
 const offCanvasPx = 5;
 let timeoutId;
-function gui(opts, redraw) {
-    const pane = new Pane({title: 'Options', expanded: false});
-    Object.entries(params).forEach(([key, value]) => {
-        add(opts, key, value);
-    })
-
-    function add(opts, key, value, folder = pane) {
-        if (typeof value == 'object') {
-            const group = folder.addFolder({title: key, expanded: false});
-            Object.entries(value).forEach(([innerKey, innerValue]) => {
-                add(value, innerKey, innerValue, group);
-            });
-        } else {
-            let params = {};
-            const boundsDef = paramBounds[key];
-            if (boundsDef) {
-                params = {min: boundsDef[0], max:boundsDef[1]}
-            }
-            if (key.includes('filter')) params = { options: filterOptions };
-            folder.addInput(opts, key, params);
-        }
-    }
-    pane.on('change', (e) => {
-        const prop = e.presetKey;
-        if (positionVars.includes(prop)) {
-            redraw(true);
-        }
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-            redraw(false);
-        }, 300);
-    });
-    return pane;
-}
-const pane = gui(params, draw);
 
 let countries = null;
 let land = null;
@@ -82,7 +58,6 @@ let land = null;
 let simpleLand = null;
 let commonCss = null;
 let openContextMenuInfo;
-let currentlyDragging = null;
 const adm0Land = import('./assets/layers/world_adm0_simplified.topojson')
     .then(({default:topoAdm0}) => {
         countries = topojson.feature(topoAdm0, topoAdm0.objects.simp);
@@ -110,9 +85,13 @@ const menuStates = {
     pointSelected:     false,
     addingLabel:       false,
 };
-// let chosingPoint = false;
-// let pointSelected = false;
-// let addingLabel = false;
+const inlineProps = {
+    longitude: 15,
+    latitude: 36,
+    altitude: 1000,
+    rotation: 0,
+    tilt: 25,
+}
 let editedLabelId;
 let textInput;
 let typedText = "";
@@ -170,25 +149,23 @@ onMount(() => {
     container.call(d3.drag()
         .on("drag", dragged)
         .on('start', () => {
-            currentlyDragging = "all";
             if (menuStates.addingLabel) validateLabel();
             styleEditor.close();
             closeMenu();
         })
-        .on('end', () => currentlyDragging = null)
     );
     const zoom = d3.zoom().on('zoom', zoomed).on('start', () => closeMenu());
-    zoom.scaleBy(container, altScale.invert(params.altitude));
+    zoom.scaleBy(container, altScale.invert(inlineProps.altitude));
     container.call(zoom);
 });
 
-const altScale = d3.scaleLinear().domain([1, 0]).range(paramBounds.altitude);
+const altScale = d3.scaleLinear().domain([1, 0]).range([100, 10000]);
 function zoomed(event) {
     if (!event.sourceEvent) return;
     if (!projection) return;
     if (event.transform.k > 0.01 && event.transform.k < 1.0) {
         const newAltitude = altScale(event.transform.k);
-        params.altitude = newAltitude;
+        inlineProps.altitude = newAltitude;
     }
     else if (event.transform.k < 0.01) {
         event.transform.k = 0.01;
@@ -196,32 +173,29 @@ function zoomed(event) {
     else {
         event.transform.k  = 1.0;
     }
-    draw(true);
-    pane.refresh();
+    redraw('altitude');
 }
 
 const sensitivity = 75;
 function dragged(event) {
-    if (currentlyDragging !== 'all') return;
     if (event.sourceEvent.shiftKey) {
-        params.tilt += event.dy / 10;
+        inlineProps.tilt += event.dy / 10;
     }
     else if (event.sourceEvent.metaKey || event.sourceEvent.ctrlKey) {
-        params.rotation -= event.dx / 10;
+        inlineProps.rotation -= event.dx / 10;
     }
     else {
         const rotate = projection.rotate();
-        const rotRad =  (params.rotation / 180) * Math.PI;
+        const rotRad =  (inlineProps.rotation / 180) * Math.PI;
         const [xPartX, xPartY] = [Math.cos(rotRad), Math.sin(rotRad)]; 
         const [yPartX, yPartY] = [-Math.sin(rotRad), Math.cos(rotRad)];
         const k = sensitivity / projection.scale();
         const adjustedDx = ((event.dx * xPartX) + (event.dy * yPartX)) * k;
         const adjustedDy = ((event.dy * yPartY) + (event.dx * xPartY)) * k;
-        params.longitude = -rotate[0] - (adjustedDx);
-        params.latitude = -rotate[1] + (adjustedDy);
+        inlineProps.longitude = -rotate[0] - (adjustedDx);
+        inlineProps.latitude = -rotate[1] + (adjustedDy);
     }
-    draw(true);
-    pane.refresh();
+    redraw('longitude');
 }
 
 function draw(simplified = false, _) {
@@ -235,13 +209,13 @@ function draw(simplified = false, _) {
             return;
         }
     }
-    const snyderP = 1.0 + params.altitude / earthRadius;
-    const dY = params.altitude * Math.sin(params.tilt / degrees);
-    const dZ = params.altitude * Math.cos(params.tilt / degrees);
-    const visibleYextent = 2 * dZ * Math.tan(0.5 * params.fieldOfView / degrees);
-    const yShift = dY * params.height / visibleYextent;
-    const scale = earthRadius * params.height / visibleYextent;
-    const tilt = params.tilt / degrees;
+    const snyderP = 1.0 + inlineProps.altitude / earthRadius;
+    const dY = inlineProps.altitude * Math.sin(inlineProps.tilt / degrees);
+    const dZ = inlineProps.altitude * Math.cos(inlineProps.tilt / degrees);
+    const visibleYextent = 2 * dZ * Math.tan(0.5 * p('fieldOfView') / degrees);
+    const yShift = dY * p('height') / visibleYextent;
+    const scale = earthRadius * p('height') / visibleYextent;
+    const tilt = inlineProps.tilt / degrees;
     const alpha = Math.acos(snyderP * Math.cos(tilt) * 0.999);
     const clipDistance = d3.geoClipCircle(Math.acos(1 / snyderP) - 1e-6);
     const preclip = alpha ? geoPipeline(
@@ -285,22 +259,22 @@ function draw(simplified = false, _) {
 
     projection = geoSatellite()
         .scale(scale)
-        .translate([(params.width / 2), (yShift + params.height / 2)])
-        .rotate([-params.longitude, -params.latitude, params.rotation])
-        .tilt(params.tilt)
+        .translate([(p('width') / 2), (yShift + p('height') / 2)])
+        .rotate([-inlineProps.longitude, -inlineProps.latitude, inlineProps.rotation])
+        .tilt(inlineProps.tilt)
         .distance(snyderP)
         .preclip(preclip)
-        .postclip(d3.geoClipRectangle(-offCanvasPx, -offCanvasPx, params.width + offCanvasPx, params.height + offCanvasPx))
+        .postclip(d3.geoClipRectangle(-offCanvasPx, -offCanvasPx, p('width') + offCanvasPx, p('height') + offCanvasPx))
         .precision(0.1);
    
     const outline = {type: "Sphere"};
-    const graticule = d3.geoGraticule().step([params.graticuleStep, params.graticuleStep])();
-    if (!params.useGraticule) graticule.coordinates = [];
-    if (params.useCanvas || simplified) {
+    const graticule = d3.geoGraticule().step([p('graticuleStep'), p('graticuleStep')])();
+    if (!p('useGraticule')) graticule.coordinates = [];
+    if (simplified) {
         let canvas = container.select('#canvas');
-        if (canvas.empty()) canvas = container.append('canvas').attr('id', 'canvas').attr('width', params.width).attr('height', params.height);
+        if (canvas.empty()) canvas = container.append('canvas').attr('id', 'canvas').attr('width', p('width')).attr('height', p('height'));
         const context = canvas.node().getContext('2d');
-        context.clearRect(0, 0, params.width, params.height);
+        context.clearRect(0, 0, p('width'), p('height'));
         path = d3.geoPath(projection, context);
         context.fillStyle = "#88d";
         context.beginPath(), path(simplified ? simpleLand : land), context.fill();
@@ -316,14 +290,14 @@ function draw(simplified = false, _) {
         .attr('xmlns', "http://www.w3.org/2000/svg")
         .attr('xmlns:xlink', "http://www.w3.org/1999/xlink")
         .attr('id', 'map');
-    if (params.useViewBox) {
-        svg.attr('viewBox', `0 0 ${params.width} ${params.height}`);
+    if (p('useViewBox')) {
+        svg.attr('viewBox', `0 0 ${p('width')} ${p('height')}`);
     }
     else {
-        svg.attr('width', `${params.width }`)
-        .attr('height', `${params.height }`)
+        svg.attr('width', `${p('width') }`)
+        .attr('height', `${p('height') }`)
     }
-    container.style('width', `${params.width}px`).style('height', `${params.height}px`);
+    container.style('width', `${p('width')}px`).style('height', `${p('height')}px`);
 
     path = d3.geoPath(projection);
     svg.html('');
@@ -363,23 +337,20 @@ function draw(simplified = false, _) {
     const groupData = [];
     groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
     groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
-    if (params.land.show) {
-        groupData.push({ name: 'land', data: land, id: null, props: [], class: 'land', filter: params.land.filter });
+    if (p('showLand')) {
+        groupData.push({ name: 'land', data: land, id: null, props: [], class: 'land', filter: 'firstGlow' });
     }
-    if (params.countries.show && countries) {
+    if (p('showCountries') && countries) {
         groupData.push({ name: 'countries', data: countries, id: (prop) => prop.shapeGroup, props: [], class: 'country', filter: null });
     }
     // if (providedBorders && params.providedBorders.show)
     //     groupData.push({ name: 'provided-borders', data: [providedBorders], id: null, props: [], class: 'provided-borders', filter: params.providedBorders.filter });
     // if (provided && params.provided.show)
     //     groupData.push({ name: 'provided', data: provided, id: null, props: [], class: 'provided', filter: null });
-    if (params.adm1.show) {
-        for (const country of chosenCountries) {
-            groupData.push({ name: `${country}-adm1`, data: resolvedAdm1[country], id: (prop) => prop.shapeName, props: [], class: 'adm1', filter: null });
-        }
+    for (const country of chosenCountries) {
+        groupData.push({ name: `${country}-adm1`, data: resolvedAdm1[country], id: (prop) => prop.shapeName, props: [], class: 'adm1', filter: null });
     }
     groupData.push({ name: 'points-labels', data: [], id: null, props: [], class: null, filter: null });
-
     const groups = svg.selectAll('g').data(groupData).join('g').attr('id', d => d.name);
     
     function drawPaths(data) {
@@ -398,12 +369,11 @@ function draw(simplified = false, _) {
     groups.each(drawPaths);
 
     drawCustomPaths(providedPaths, svg, projection);
-    appendGlow(svg, 'firstGlow', params.firstGlow.innerGlow, params.firstGlow.outerGlow);
-    appendGlow(svg, 'secondGlow', params.secondGlow.innerGlow, params.secondGlow.outerGlow);
-    appendBgPattern(svg, 'noise', params.seaColor, params.bgNoise);
+    appendGlow(svg, 'firstGlow', p('innerGlow1'), p('outerGlow1'));
+    appendGlow(svg, 'secondGlow', p('innerGlow2'), p('outerGlow2'));
+    appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
     d3.select('#outline').style('fill', "url(#noise)");
     commonCss = Mustache.render(cssTemplate, params);
-    
     drawAndSetupShapes();
 
 }
@@ -433,9 +403,9 @@ function applyStyles() {
 
 //         providedBorders = fixOrder({ type: "FeatureCollection", features: [{...providedBorders}] });
         
-//         params.longitude = (boundingBox[2] + boundingBox[0]) / 2;
-//         params.latitude = (boundingBox[3] + boundingBox[1]) / 2;
-//         params.tilt = 0;
+//         inlineProps.longitude = (boundingBox[2] + boundingBox[0]) / 2;
+//         inlineProps.latitude = (boundingBox[3] + boundingBox[1]) / 2;
+//         inlineProps.tilt = 0;
 //         pane.refresh();
 //         draw();
 //     });
@@ -506,6 +476,20 @@ function exportStyleSheet() {
     }
 }
 
+function redraw(propName) {
+    if (positionVars.includes(propName)) {
+        draw(true);
+    }
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+        draw(false);
+    }, 300);
+}
+
+function handleChangeProp(event) {
+    const {prop, value} = event.detail;
+    redraw(prop);
+}
 
 function closeMenu() {
     contextualMenu.style.display = 'none';
@@ -643,8 +627,11 @@ function deleteSelection() {
     {/if}
 </div>
 <h1 class="text-center fs-2"> Static SVG Map builder </h1>
-<div id="map-container"></div>
 
+<div class="d-flex p-3">
+    <NestedAccordions sections={newParams} paramDefs={paramDefs} on:change={handleChangeProp} ></NestedAccordions>
+    <div id="map-container"></div>
+</div>
 <div>
     <!-- <div class="file m-4">
         <label class="file-label">

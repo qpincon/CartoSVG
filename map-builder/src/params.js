@@ -1,4 +1,28 @@
+const newParams = {
+    "General": {
+        width: 550,
+        height: 600,
+        useViewBox: false,
+        fieldOfView: 50,
+    },
+    "Styling": {
+        showLand: true,
+        showCountries: true,
+        useGraticule: true,
+        graticuleStep: 3,
+        seaColor: "#dce7f8ff",
+        backgroundNoise: true,
+        firstGlow: {
+            innerGlow1: {blur: 4, strength: 1.4, color: "#7c490eff"},
+            outerGlow1: {blur: 4, strength: 3, color: '#ffffffff'},
+        },
+        secondGlow: {
+            innerGlow2: {blur: 4, strength: 1.4, color: "#A88FAFff"},
+            outerGlow2: {blur: 4, strength: 3, color: '#ffffffff'},
+        },
+    },
 
+}
 const params = {
     width: 550,
     height: 600,
@@ -44,7 +68,22 @@ const params = {
         strokeColor: "#D1BEB038",
         strokeWidth: 1,
     },
-    bgNoise: true,
+    backgroundNoise: true,
+};
+
+const paramDefs = {
+    width:          {type: 'range', min: 200, max: 1500},
+    height:         {type: 'range', min: 200, max: 1500},
+    // longitude:      {type: 'range', min: -180, max: 180},
+    // latitude:       {type: 'range', min: -90, max: 90},
+    // rotation:       {type: 'range', min: -180, max: 180},
+    // tilt:           {type: 'range', min: 0, max: 90},
+    // altitude:       {type: 'range', min: 100, max: 10000},
+    fieldOfView:    {type: 'range', min: 1, max: 180},
+    blur:           {type: 'range', min: 0.5, max: 10, step: 0.1},
+    strength:       {type: 'range', min: 0.1, max: 10, step: 0.1},
+    graticuleStep:  {type: 'range', min: 0.1, max: 10, step: 0.1},
+    filter:         {type: 'select', choices: ['none', 'firstGlow', 'secondGlow']}
 };
 
 const paramBounds = {
@@ -67,4 +106,4 @@ const filterOptions = {
     secondGlow: 'secondGlow',
 };
 
-export {params, paramBounds, filterOptions};
+export {params, paramDefs, newParams, paramBounds, filterOptions};

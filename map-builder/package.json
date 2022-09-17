@@ -26,7 +26,7 @@
     "d3": "^7.6.1",
     "d3-geo-projection": "^4.0.0",
     "d3-zoom": "^3.0.0",
-    "inline-style-editor": "^1.1.1",
+    "inline-style-editor": "^1.1.2",
     "mustache": "^4.2.0",
     "parse-svg-path": "^0.1.2",
     "sass-loader": "^13.0.2",
@@ -34,6 +34,6 @@
     "style-loader": "^3.3.1",
     "svgo": "^2.8.0",
     "topojson-client": "^3.1.0",
-    "tweakpane": "^3.1.0"
+    "vanilla-picker": "^2.12.1"
   }
 }

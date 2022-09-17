@@ -73,7 +73,7 @@ function appendGlow(selection, id="glows",
     defs.append(() => filter.node());
 }
 
-function appendBgPattern(selection, id, seaColor, bgNoise = false, imageSize = 300) {
+function appendBgPattern(selection, id, seaColor, backgroundNoise = false, imageSize = 300) {
     let defs = selection.select('defs');
     if (defs.empty()) defs = selection.append('defs')
     const existing = d3.select(`#${id}`);
@@ -87,7 +87,7 @@ function appendBgPattern(selection, id, seaColor, bgNoise = false, imageSize = 3
     pattern.append('rect')
     .attr('width', imageSize).attr('height', imageSize)
     .attr('fill', seaColor);
-    if (bgNoise) {
+    if (backgroundNoise) {
         pattern.append('image')
             .attr('href', bg)
             .attr('x', 0).attr('y', 0)

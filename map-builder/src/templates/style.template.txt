@@ -8,7 +8,6 @@
     border-radius: 5px;
     clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%); 
     display: block;
-    background: rgb(205,205,205);
     //background: radial-gradient(circle at bottom, rgba(255,255,255,1) 0%, rgba(213,216,255,1) 86%, rgba(161,168,255,1) 100%);
 }
 #paths path {

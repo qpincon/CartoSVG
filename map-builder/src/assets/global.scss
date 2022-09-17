@@ -1,5 +1,14 @@
-// @import "~bulma/bulma";
-
+$primary: #37383d;
+$accordion-padding-y:                     0.5rem;
+$accordion-padding-x:                     0.6rem;
+$accordion-body-padding-y:                0;
+$accordion-body-padding-x:                0;
+$form-range-thumb-width:                  0.8rem;
+$form-range-thumb-height:                 1rem;
+$form-range-thumb-border-radius:          2px;
+$accordion-inner-border-radius:           0;
+$accordion-border-radius:                 0;
+$form-label-margin-bottom:                0;
 
 // 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
 @import "bootstrap/scss/functions";
@@ -13,10 +22,12 @@
 @import "bootstrap/scss/maps";
 @import "bootstrap/scss/mixins";
 @import "bootstrap/scss/root";
+$accordion-button-bg:                     tint-color($component-active-bg, 90%);
 
 // // 6. Optionally include any other parts as needed
 @import "bootstrap/scss/reboot";
 @import "bootstrap/scss/forms";
+@import "bootstrap/scss/transitions";
 @import "bootstrap/scss/utilities";
 @import "bootstrap/scss/accordion";
 @import "bootstrap/scss/buttons";
@@ -33,6 +44,7 @@
 @import '../../node_modules/slim-select/dist/slimselect.min.css';
 @import '../../node_modules/inline-style-editor/dist/inline-style-editor.css';
 
+
 #contextmenu  {
     background-color: #f8f8f8;
     div {
@@ -40,4 +52,14 @@
             background-color:#e2eef8;
         }
     }
+}
+
+.accordion-item.noborder {
+    border: none;
+}
+.accordion-item .picker_sample {
+    display: none;
+}
+.accordion-item .picker_editor {
+    display: none;
 }
