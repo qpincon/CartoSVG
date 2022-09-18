@@ -5,8 +5,6 @@ import * as topojson from 'topojson-client';
 import * as d3 from "d3";
 import SVGO from 'svgo/dist/svgo.browser';
 import Mustache from 'mustache';
-// import InlineStyleEditor from 'inline-style-editor';
-// import InlineStyleEditor from 'inline-style-editor/dist/inline-style-editor.js';
 import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
 import MotionPathHelper from "./util/MotionPathHelper.js";
@@ -15,7 +13,7 @@ import svgoConfig from './svgo.config';
 import cssTemplate from './templates/style.template.txt';
 import exportTemplate from './templates/output_template.txt';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
-import { newParams, paramDefs, params, paramBounds, filterOptions} from './params';
+import { paramDefs, params} from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
 import { download } from './util/common';
@@ -23,6 +21,8 @@ import * as shapes from './svg/shapeDefs';
 import { setTransformScale } from './svg/svg';
 import { drawShapes } from './svg/shape';
 
+import DataTable from './components/DataTable.svelte';
+import Modal from './components/Modal.svelte';
 import SlimSelect from './components/SlimSelect.svelte';
 import NestedAccordions from './components/NestedAccordions.svelte';
 
@@ -43,7 +43,24 @@ function findProp(propName, obj) {
         }
     }
 }
-const p = (propName, obj = newParams) => findProp(propName, obj);
+
+String.prototype.formatUnicorn = String.prototype.formatUnicorn || function () {
+    let str = this.toString();
+    if (arguments.length) {
+        const t = typeof arguments[0];
+        const args = ("string" === t || "number" === t) ?
+            Array.prototype.slice.call(arguments)
+            : arguments[0];
+
+        for (const key in args) {
+            str = str.replace(new RegExp("\\{" + key + "\\}", "gi"), args[key]);
+        }
+    }
+
+    return str;
+};
+
+const p = (propName, obj = params) => findProp(propName, obj);
 
 const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView'];
 const earthRadius = 6371;
@@ -53,16 +70,12 @@ let timeoutId;
 
 let countries = null;
 let land = null;
-// let providedBorders = null;
-// let provided = null;
 let simpleLand = null;
 let commonCss = null;
 let openContextMenuInfo;
 const adm0Land = import('./assets/layers/world_adm0_simplified.topojson')
     .then(({default:topoAdm0}) => {
         countries = topojson.feature(topoAdm0, topoAdm0.objects.simp);
-        // simpleLand = topojsonSimplify.simplify(topojsonSimplify.presimplify(topoAdm0), 0.00019);
-        // simpleLand = splitMultiPolygons(topojson.feature(simpleLand, simpleLand.objects.simp));
         land = topojson.merge(topoAdm0, topoAdm0.objects.simp.geometries);
         land = splitMultiPolygons({type: 'FeatureCollection', features: [{type:'Feature', geometry: {...land} }]});
     });
@@ -99,6 +112,12 @@ const inlineStyles = {}; // elemID -> prop -> value
 let lastUsedLabelFont = "Luminari"
 let styleEditor;
 let contextualMenu;
+let zonesData = {}; // key => {data (list), provided (bool)}
+let showModal = false;
+let htmlPopupElem;
+let tooltip = {currentId: null, element: null};
+let tooltipTemplate = defaultPopupContent('shapeGroup');
+let tooltipPreview;
 
 onMount(() => {
     styleEditor = new InlineStyleEditor({
@@ -341,6 +360,9 @@ function draw(simplified = false, _) {
         groupData.push({ name: 'land', data: land, id: null, props: [], class: 'land', filter: 'firstGlow' });
     }
     if (p('showCountries') && countries) {
+        if (!('countries' in zonesData) || !zonesData['countries'].provided) {
+            zonesData['countries'] = {data: countries.features.map(f => f.properties)};
+        }
         groupData.push({ name: 'countries', data: countries, id: (prop) => prop.shapeGroup, props: [], class: 'country', filter: null });
     }
     // if (providedBorders && params.providedBorders.show)
@@ -375,7 +397,41 @@ function draw(simplified = false, _) {
     d3.select('#outline').style('fill', "url(#noise)");
     commonCss = Mustache.render(cssTemplate, params);
     drawAndSetupShapes();
+    
+    const map = document.getElementById('map')
+    if(!map) return;
+    map.addEventListener('mousemove', e => {
+        const shapeId = e.target.getAttribute('id');
+        if (shapeId && tooltip.shapeId === shapeId) {
+            tooltip.element.style.left = `${e.clientX + 10}px`;
+            tooltip.element.style.top = `${e.clientY + 10}px`;
+        }
+        else {
+            if (tooltip.element) {
+                tooltip.element.remove();
+                tooltip.shapeId = null;
+            }
+            if (shapeId && e.target.classList.contains('country')) {
+                const data = zonesData['countries'].data.find(row => row['shapeGroup'] === shapeId);
+                tooltip.element = instanciateTooltip(data, e);
+                tooltip.shapeId = shapeId;
+                tooltip.element.setAttribute('id', 'tooltip');
+                container.node().appendChild(tooltip.element);
+            }
+        }
+    });
+}
 
+function instanciateTooltip(dataRow, event) {
+    const tooltip = document.createElement('div');
+    if (!htmlPopupElem) return tooltip;
+    tooltip.setAttribute('id', 'tooltip');
+    tooltip.innerHTML = htmlPopupElem.outerHTML.formatUnicorn(dataRow);
+    if (event) {
+        tooltip.style.left =    `${event.clientX + 10}px`;
+        tooltip.style.top =     `${event.clientY + 10}px`;
+    }
+    return tooltip;
 }
 
 function applyStyles() {
@@ -600,6 +656,51 @@ function deleteSelection() {
     closeMenu();
 }
 
+const onModalClose = () => {
+    showModal = false;
+}
+
+function exportJson(data) {
+    download(JSON.stringify(data), 'text/json', 'data.json');
+}
+
+function handleDataImport(e, key) {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+        console.log(reader.result);
+        try {
+            const parsed = JSON.parse(reader.result);
+            zonesData[key] = {data: parsed, provided:true };
+        } catch (e) {
+            console.log('Parse error:', e);
+        }
+    });
+    reader.readAsText(file);
+}
+
+
+$: if(tooltipTemplate) {
+    setTimeout(() => {
+        tooltipPreview = instanciateTooltip(zonesData?.['countries']?.['data'][0]).outerHTML;
+    }, 0)
+    
+}
+function defaultPopupContent(idCol) {
+    return `<div>
+    <span> Country: {${idCol}}</span>
+</div>
+    `;
+}
+
+function editPopup(e) {
+    const rect = e.target.getBoundingClientRect();
+    styleEditor.open(e.target, rect.right, rect.bottom);
+}
+
+function editFrame(e) {
+    styleEditor.open(document.getElementById('map'));
+}
 </script>
 
 
@@ -629,9 +730,43 @@ function deleteSelection() {
 <h1 class="text-center fs-2"> Static SVG Map builder </h1>
 
 <div class="d-flex p-3">
-    <NestedAccordions sections={newParams} paramDefs={paramDefs} on:change={handleChangeProp} ></NestedAccordions>
+    <aside id="menu" class="border">
+        <NestedAccordions sections={params} paramDefs={paramDefs} on:change={handleChangeProp} ></NestedAccordions>
+        <div class="m-2 btn btn-outline-warning" on:click={editFrame}> Edit frame </div>
+        <SlimSelect bind:value={chosenCountries} options={Object.keys(availableCountriesAdm1)} multiple="true"/>
+        <div class="w-100 px-2 my-3 row">
+            <label for="data-input-json" class="col-form-label col-4">Import data</label>
+            <input class="form-control col" type="file" id="data-input-json" accept=".json" on:change={(e) => handleDataImport(e, 'countries')}>
+        </div>
+        <div class="data-table mb-2" on:click={() => (showModal = true)}>
+            <DataTable data={zonesData?.['countries']?.['data']} idCol='shapeGroup'> </DataTable>
+        </div>
+        <div class="mx-2 btn btn-outline-primary" on:click={() => exportJson(zonesData?.['countries']?.['data'])}> Export JSON </div>
+
+        <div class="w-100 px-2 my-3 row">
+            <label for="fontinput" class="col-form-label col-4">Font file</label>
+            <input class="form-control col" type="file" id="fontinput" accept=".ttf,.woff" on:change={handleInputFont}>
+        </div>
+        <div class="m-2">
+            <label for="templatePopup" class="form-label"> Popup template </label>
+            <textarea class="form-control template-input" id="templatePopup" rows="3" bind:value={tooltipTemplate}></textarea>
+        </div>
+        <div class="popup-preview">
+            <div bind:this={htmlPopupElem} on:click={editPopup} style="padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem;">
+                {@html tooltipTemplate}
+            </div>
+            <div>
+                Preview
+                {@html tooltipPreview}
+            </div>
+        </div>
+        <div class="m-2 btn btn-light" on:click={exportSvg}> Export </div>
+    </aside>
     <div id="map-container"></div>
 </div>
+<Modal open={showModal} onClosed={() => onModalClose()}>
+    <DataTable data={zonesData?.['countries']?.['data']} idCol='shapeGroup'> </DataTable>
+</Modal>
 <div>
     <!-- <div class="file m-4">
         <label class="file-label">
@@ -642,13 +777,21 @@ function deleteSelection() {
             </span>
         </label>
     </div> -->
-    <p> {chosenCountries} </p>
-    <SlimSelect bind:value={chosenCountries} options={Object.keys(availableCountriesAdm1)} multiple="true"/>
-    <div class="file m-4">
-        <label class="file-label">
-            <input class="form-control" type="file" accept=".ttf,.woff" on:change={handleInputFont}>
-        </label>
-    </div>
-    <div class="btn btn-light" on:click={addPath}> Add path </div>
-    <div class="btn btn-light" on:click={exportSvg}> Export </div>
+    
 </div>
+
+<style lang="scss" scoped>
+#menu {
+    min-width: 20rem;
+}
+.data-table {
+    max-height: 10rem;
+    overflow-y: scroll;
+}
+.popup-preview {
+    padding: 10px;
+}
+// .template-input {
+
+// }
+</style>

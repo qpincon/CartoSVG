@@ -22,22 +22,28 @@
     stroke-opacity: .5;
 }
 .land {
-    stroke: {{ land.strokeColor }};
-    stroke-width: {{ land.strokeWidth }};
-    fill: {{ land.fillColor }};
+    stroke: #00000000;
+    stroke-width: 1px;
+    fill: #ffffffff;
 }
 .country {
-    stroke: {{ countries.strokeColor }};
-    stroke-width: {{ countries.strokeWidth }};
-    fill: {{ countries.fillColor }};
+    stroke: #D1BEB038;
+    stroke-width: 2px;
+    fill: #f3efec80;
+}
+.country:hover {
+    fill: #fbbc0023;
 }
 .adm1 {
-    stroke: {{ adm1.strokeColor }};
-    stroke-width: {{ adm1.strokeWidth }};
-    fill: {{ adm1.fillColor }};
+    stroke: #D1BEB038;
+    stroke-width: 2px;
+    fill: #f3efec80;
+}
+.adm1:hover {
+    fill: #7c490ea0;
 }
 
-{{#adm1.hover}}
+/* {{#adm1.hover}}
 .adm1:hover {
     fill: {{ adm1.hoverColor }};
 }
@@ -47,8 +53,8 @@
 .country:hover {
     fill: {{ countries.hoverColor }};
 }
-{{/countries.hover}}
+{{/countries.hover}} */
 
-.tp-dfwv {
-  min-width: 360px;
+#tooltip {
+    position: absolute;
 }

@@ -22,4 +22,13 @@ function nbDecimals(num) {
     return num.toString().split('.')[1].length;
 }
 
-export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals };
+function sortBy(data, key) {
+    if (!data) return;
+    return data.sort((a, b) => {
+        if (a[key] < b[key]) return -1;
+        if (a[key] > b[key]) return  1;
+        return 0;
+    });
+}
+
+export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, sortBy };

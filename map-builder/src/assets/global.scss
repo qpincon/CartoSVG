@@ -3,13 +3,13 @@ $accordion-padding-y:                     0.5rem;
 $accordion-padding-x:                     0.6rem;
 $accordion-body-padding-y:                0;
 $accordion-body-padding-x:                0;
+$accordion-border-width:                  0;
 $form-range-thumb-width:                  0.8rem;
 $form-range-thumb-height:                 1rem;
 $form-range-thumb-border-radius:          2px;
 $accordion-inner-border-radius:           0;
 $accordion-border-radius:                 0;
 $form-label-margin-bottom:                0;
-
 // 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
 @import "bootstrap/scss/functions";
 
@@ -25,12 +25,16 @@ $form-label-margin-bottom:                0;
 $accordion-button-bg:                     tint-color($component-active-bg, 90%);
 
 // // 6. Optionally include any other parts as needed
+@import "bootstrap/scss/grid";
 @import "bootstrap/scss/reboot";
+@import "bootstrap/scss/tables";
 @import "bootstrap/scss/forms";
 @import "bootstrap/scss/transitions";
 @import "bootstrap/scss/utilities";
 @import "bootstrap/scss/accordion";
 @import "bootstrap/scss/buttons";
+@import "bootstrap/scss/modal";
+@import "bootstrap/scss/close";
 
 // @import "bootstrap/scss/grid";
 @import "bootstrap/scss/helpers";
@@ -44,6 +48,9 @@ $accordion-button-bg:                     tint-color($component-active-bg, 90%);
 @import '../../node_modules/slim-select/dist/slimselect.min.css';
 @import '../../node_modules/inline-style-editor/dist/inline-style-editor.css';
 
+html {
+    font-size: 14px;
+}
 
 #contextmenu  {
     background-color: #f8f8f8;

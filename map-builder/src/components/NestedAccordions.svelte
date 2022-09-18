@@ -15,10 +15,12 @@
         const payload = { prop, value };
 		dispatch('change', payload);
 	}
+
+    $: padding = level === 0 ? 0 : 4;
 </script>
 
-<div class="accordion" style="padding:4px 0 0 4px;">
-    {#each Object.entries(sections) as [key, value]}
+<div class="accordion" style="padding:{padding}px 0 0  {padding}px;">
+    {#each Object.entries(sections) as [key, value], i}
         {@const isObject = typeof value === "object"}
         <div class="accordion-item" class:noborder={!isObject}>
             {#if isObject}
@@ -35,7 +37,7 @@
                 <div
                     id={`panel-${key}-collapse`}
                     class="accordion-collapse collapse"
-                    class:show={level === 0}
+                    class:show={level === 0 && i === 0}
                 >
                     <div class="accordion-body" style="border-left: solid {2 * level}px var(--bs-accordion-active-bg);">
                         <svelte:self on:change sections={sections[key]} {paramDefs} level={level + 1} />
@@ -43,11 +45,11 @@
                 </div>
             {:else if key in paramDefs}
                 {#if paramDefs[key].type == "range"}
-                    <div class="mb-1">
-                        <label for={`form-${key}`} class="form-label">
+                    <div class="row mb-1">
+                        <label for={`form-${key}`} class="col-4 col-form-label">
                             {camelCaseToSentence(key)}
                         </label>
-                        <div class="d-flex">
+                        <div class="d-flex align-items-center col">
                             <input
                                 type="range"
                                 class="form-range"
@@ -86,11 +88,11 @@
                     </label>
                 </div>
             {:else if key.toLowerCase().includes('color')}
-                <div class="mb-1">
-                    <label for={`form-${key}`} class="form-label">
+                <div class="mb-1 row">
+                    <label for={`form-${key}`} class="col-form-label col-4">
                         {camelCaseToSentence(key)}
                     </label>
-                    <div class="d-flex align-items-center">
+                    <div class="d-flex align-items-center col">
                         <div class="color-preview border border-primary rounded-1" on:click={(e) => {pickers[key].open();}} style="background-color: {sections[key]};"></div>
                         <input
                             type="text"
@@ -130,7 +132,7 @@
         width: 2rem;
         height: 2rem;
     }
-    .accordion-body {
+    /* .accordion-body {
         padding-bottom: 1rem;
-    }
+    } */
 </style>
