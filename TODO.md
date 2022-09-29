@@ -11,14 +11,17 @@
 - [ ] Export with a level of precision
 - [ ] Export a JS file defining a class, to call on an element
 - [ ] Allow placing points (choosing from a set of shapes)
+    - [ ] Make the shape resizable / stylable with inline-style-editor (right click -> edit size + edit style)
 - [ ] Allow associating labels to those points
 - [ ] Allow customization of paths strokes
-- [ ] Allow adding bubbles (projeted or not)
+- [ ] Allow adding bubbles (projected or not)
+    - [ ] Add "create bubble" on right click -> display radius, editable later on with inline-style-editor
+    - [ ] Create tooltip for the bubbles (one for each bubble) 
 - [ ] Allow customizing the contour (no contour, size, border-type, color...)
 - [x] Fix different sizes of container for SVG / canvas
 - [ ] Give choice of viewBox vs width/height
 - [x] If viewBox, always fill container, and get dynamic size for drawing with canvas
-- [ ] If width/height, give control over width/height
+- [x] If width/height, give control over width/height
 - [x] Fix change sea color not working
 - [ ] Add spinner on loading (geosjon / font)
 - [ ] Fix dragging created paths
@@ -28,5 +31,10 @@
     - greensock
     - d3
     - github
+    - "tilting the satellite observable"
+- [ ] Option to push to front on hover to avoid surrounding boundaries of top of hovered ( add js to export ?)
+- [x] Find a way to retain inline styles on redraw  
+- [x] Define <style> in <defs> in SVG directly  
+- [ ] Allow for ordering <land> div after/before countries/ADM1. If after, remove <SourceGraphic> from merge filter, otherwise retain it (for stroke)
 
  
