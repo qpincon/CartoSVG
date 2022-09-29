@@ -1,15 +1,10 @@
 <script>
 
-import { sortBy } from '../util/common';
-
 export let data = [];
-export let idCol = null;
 
-$: headers = data.length ? Object.keys(data[0]) : [];
-$: sortedData = sortBy(data, idCol);
+$: headers = data.length ? Object.keys(data[1]) : [];
 
 </script>
-
 
 <table class="table">
     <thead>
@@ -21,7 +16,7 @@ $: sortedData = sortBy(data, idCol);
     </thead>
 
     <tbody>
-        {#each sortedData as row}
+        {#each data as row}
             <tr> 
                 {#each headers as header }
                     <td> { row[header] } </td>

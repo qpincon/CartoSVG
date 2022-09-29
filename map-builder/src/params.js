@@ -72,13 +72,8 @@ const params = {
 // };
 
 const paramDefs = {
-    width:          {type: 'range', min: 200, max: 1500},
-    height:         {type: 'range', min: 200, max: 1500},
-    // longitude:      {type: 'range', min: -180, max: 180},
-    // latitude:       {type: 'range', min: -90, max: 90},
-    // rotation:       {type: 'range', min: -180, max: 180},
-    // tilt:           {type: 'range', min: 0, max: 90},
-    // altitude:       {type: 'range', min: 100, max: 10000},
+    width:          {type: 'range', min: 100, max: 800},
+    height:         {type: 'range', min: 100, max: 800},
     fieldOfView:    {type: 'range', min: 1, max: 180},
     blur:           {type: 'range', min: 0.5, max: 10, step: 0.1},
     strength:       {type: 'range', min: 0.1, max: 10, step: 0.1},

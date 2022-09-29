@@ -1,4 +1,12 @@
 
+
+function formatUnicorn(str, data) {
+    for (const key in data) {
+        str = str.replace(new RegExp("\\{" + key + "\\}", "gi"), args[key]);
+    }
+    return str;
+};
+
 class CustomMap {
 
     constructor(containerId) {
@@ -14,6 +22,7 @@ class CustomMap {
         container.innerHTML = svg;
         const commonCss = `{{&commonCss}}`;
         const addedCss = `{{&addedCss}}`;
+        this.tooltipTemplate = `{{&tooltip}}`;
         this.addCssSheet(commonCss, addedCss);
     }
 
@@ -24,6 +33,8 @@ class CustomMap {
         styleSheet.innerText = allStyle;
         document.head.appendChild(styleSheet);
     }
+
+    
 }
 
 new CustomMap('#test');

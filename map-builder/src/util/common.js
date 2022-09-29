@@ -16,19 +16,42 @@ function camelCaseToSentence(str) {
     return capitalizeFirstLetter(splitted);
 }
 
+function htmlToElement(html) {
+    var template = document.createElement('template');
+    html = html.trim(); // Never return a text node of whitespace as the result
+    template.innerHTML = html;
+    return template.content.firstChild;
+}
+
 function nbDecimals(num) {
     const splited = num.toString().split('.');
     if (splited.length === 1) return 1;
     return num.toString().split('.')[1].length;
 }
 
+function indexBy(data, col) {
+    return data.reduce((acc, cur) => {
+        acc[cur[col]] = cur;
+        return acc;
+    });
+}
+
+function pick(obj, keys) {
+    return keys.reduce((picked, curKey) => {
+        picked[curKey] = obj[curKey];
+        return picked;
+    }, {});
+}
+
 function sortBy(data, key) {
     if (!data) return;
     return data.sort((a, b) => {
+        if (!a || Object.keys(a).length === 0) return 1;
+        if (!b || Object.keys(b).length === 0) return -1;
         if (a[key] < b[key]) return -1;
         if (a[key] > b[key]) return  1;
         return 0;
     });
 }
 
-export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, sortBy };
+export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement };

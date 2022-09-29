@@ -9,15 +9,17 @@ function fixOrder(geojson) {
     return rewind(geojson);
 }
 
-function splitMultiPolygons(geojson) {
+function splitMultiPolygons(geojson, id_prefix=null) {
     const newGeojson = {type: 'FeatureCollection', features: []};
     geojson.features.forEach(feat => {
         if (feat.geometry.type == 'MultiPolygon') {
-            feat.geometry.coordinates.map(coords => {
+            feat.geometry.coordinates.map((coords, i) => {
+                const props = feat.properties || {};
+                if (id_prefix) props['id'] = `${id_prefix}_${i}`;
                 newGeojson.features.push(
                 {
                     type: 'Feature', 
-                    properties: feat.properties, 
+                    properties: props,
                     geometry: {
                         type: 'Polygon', coordinates: coords
                     }

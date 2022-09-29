@@ -1,35 +1,35 @@
-#map-container {
-    display: flex;
-    justify-content: center;
-    margin: 0 auto;
-}
 #map, #canvas {
     border: 2px solid #b8b8b8;
     border-radius: 5px;
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%); 
     display: block;
-    //background: radial-gradient(circle at bottom, rgba(255,255,255,1) 0%, rgba(213,216,255,1) 86%, rgba(161,168,255,1) 100%);
 }
 #paths path {
-    stroke: black;
-    stroke-width: 5;
+    pointer-events: none;
+    stroke: #7c490ea0;
+    stroke-dasharray: 5px;
+    stroke-width: 2;
     fill: none;
 }
-.graticule {
+#outline {
+    pointer-events: none;
+}
+#graticule {
+    pointer-events: none;
     fill: none;
     stroke: #777;
     stroke-width: .5px;
     stroke-opacity: .5;
 }
-.land {
+#land {
+    pointer-events: none;
     stroke: #00000000;
     stroke-width: 1px;
     fill: #ffffffff;
 }
 .country {
-    stroke: #D1BEB038;
+    stroke: #d1beb0;
     stroke-width: 2px;
-    fill: #f3efec80;
+    fill: #f3efec;
 }
 .country:hover {
     fill: #fbbc0023;
@@ -37,7 +37,7 @@
 .adm1 {
     stroke: #D1BEB038;
     stroke-width: 2px;
-    fill: #f3efec80;
+    fill: #ffffffd0;
 }
 .adm1:hover {
     fill: #7c490ea0;
@@ -57,4 +57,8 @@
 
 #tooltip {
     position: absolute;
+}
+
+foreignObject {
+    overflow: visible;
 }

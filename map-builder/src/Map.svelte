@@ -7,24 +7,26 @@ import SVGO from 'svgo/dist/svgo.browser';
 import Mustache from 'mustache';
 import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
+
 import MotionPathHelper from "./util/MotionPathHelper.js";
 
 import svgoConfig from './svgo.config';
 import cssTemplate from './templates/style.template.txt';
-import exportTemplate from './templates/output_template.txt';
+// import exportTemplate from './templates/output_template.txt';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import { paramDefs, params} from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
-import { download } from './util/common';
+import { download, sortBy, indexBy, pick, htmlToElement } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import { setTransformScale } from './svg/svg';
 import { drawShapes } from './svg/shape';
-
+import iso3Data from './assets/data/iso3_filtered.json';
 import DataTable from './components/DataTable.svelte';
 import Modal from './components/Modal.svelte';
 import SlimSelect from './components/SlimSelect.svelte';
 import NestedAccordions from './components/NestedAccordions.svelte';
+import { Tabs, TabList, TabPanel, Tab } from './components/tabs/tabs.js';
 
 const resolvedAdm1 = {};
 const countriesAdm1 = require.context('./assets/layers/adm1/', false, /\..*json$/, 'lazy');
@@ -49,8 +51,8 @@ String.prototype.formatUnicorn = String.prototype.formatUnicorn || function () {
     if (arguments.length) {
         const t = typeof arguments[0];
         const args = ("string" === t || "number" === t) ?
-            Array.prototype.slice.call(arguments)
-            : arguments[0];
+        Array.prototype.slice.call(arguments)
+        : arguments[0];
 
         for (const key in args) {
             str = str.replace(new RegExp("\\{" + key + "\\}", "gi"), args[key]);
@@ -67,7 +69,6 @@ const earthRadius = 6371;
 const degrees = 180 / Math.PI;
 const offCanvasPx = 5;
 let timeoutId;
-
 let countries = null;
 let land = null;
 let simpleLand = null;
@@ -76,8 +77,12 @@ let openContextMenuInfo;
 const adm0Land = import('./assets/layers/world_adm0_simplified.topojson')
     .then(({default:topoAdm0}) => {
         countries = topojson.feature(topoAdm0, topoAdm0.objects.simp);
+        const iso3DataById = indexBy(iso3Data, 'alpha-3');
+        countries.features.forEach(feat => {
+            feat.properties = iso3DataById[feat.properties['shapeGroup']] || {};
+        });
         land = topojson.merge(topoAdm0, topoAdm0.objects.simp.geometries);
-        land = splitMultiPolygons({type: 'FeatureCollection', features: [{type:'Feature', geometry: {...land} }]});
+        land = splitMultiPolygons({type: 'FeatureCollection', features: [{type:'Feature', geometry: {...land} }]}, 'land');
     });
 const verySimpleLand = import('./assets/layers/world_land_very_simplified.topojson')
     .then(({default:land}) => {
@@ -114,11 +119,10 @@ let styleEditor;
 let contextualMenu;
 let zonesData = {}; // key => {data (list), provided (bool)}
 let showModal = false;
-let htmlPopupElem;
 let tooltip = {currentId: null, element: null};
-let tooltipTemplate = defaultPopupContent('shapeGroup');
-let tooltipPreview;
-
+let htmlPopupElem;;
+let tooltipTemplate = {'countries': defaultPopupContent('name')};
+let currentTab = 'countries';
 onMount(() => {
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
@@ -221,8 +225,12 @@ function draw(simplified = false, _) {
     // console.log((new Error()));
     for (const country of chosenCountries) {
         if (!(country in resolvedAdm1)) {
+            tooltipTemplate[country] = defaultPopupContent('shapeName');
             countriesAdm1(availableCountriesAdm1[country]).then(resolved => {
-                resolvedAdm1[country] = topojson.feature(resolved, resolved.objects.country);;
+                resolvedAdm1[country] = topojson.feature(resolved, resolved.objects.country);
+                if (!(country in zonesData) && !zonesData?.[country]?.provided) {
+                    zonesData[country] = {data: sortBy(resolvedAdm1[country].features.map(f => f.properties), 'shapeName')};
+                }
                 draw(simplified);
             });
             return;
@@ -352,18 +360,17 @@ function draw(simplified = false, _) {
         }
     });
     
-
     const groupData = [];
     groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
     groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
-    if (p('showLand')) {
-        groupData.push({ name: 'land', data: land, id: null, props: [], class: 'land', filter: 'firstGlow' });
-    }
     if (p('showCountries') && countries) {
-        if (!('countries' in zonesData) || !zonesData['countries'].provided) {
-            zonesData['countries'] = {data: countries.features.map(f => f.properties)};
+        if (!('countries' in zonesData) && !zonesData?.['countries']?.provided) {
+            zonesData['countries'] = {data: sortBy(countries.features.map(f => f.properties), 'alpha-3')};
         }
-        groupData.push({ name: 'countries', data: countries, id: (prop) => prop.shapeGroup, props: [], class: 'country', filter: null });
+        groupData.push({ name: 'countries', data: countries, id: (prop) => prop['alpha-3'], props: [], class: 'country', filter: null });
+    }
+    if (p('showLand')) {
+        groupData.push({ name: 'land', data: land, id: (prop) => prop['id'], props: [], class: 'land', filter: 'firstGlow' });
     }
     // if (providedBorders && params.providedBorders.show)
     //     groupData.push({ name: 'provided-borders', data: [providedBorders], id: null, props: [], class: 'provided-borders', filter: params.providedBorders.filter });
@@ -400,33 +407,34 @@ function draw(simplified = false, _) {
     
     const map = document.getElementById('map')
     if(!map) return;
-    map.addEventListener('mousemove', e => {
-        const shapeId = e.target.getAttribute('id');
-        if (shapeId && tooltip.shapeId === shapeId) {
-            tooltip.element.style.left = `${e.clientX + 10}px`;
-            tooltip.element.style.top = `${e.clientY + 10}px`;
-        }
-        else {
-            if (tooltip.element) {
-                tooltip.element.remove();
-                tooltip.shapeId = null;
-            }
-            if (shapeId && e.target.classList.contains('country')) {
-                const data = zonesData['countries'].data.find(row => row['shapeGroup'] === shapeId);
-                tooltip.element = instanciateTooltip(data, e);
-                tooltip.shapeId = shapeId;
-                tooltip.element.setAttribute('id', 'tooltip');
-                container.node().appendChild(tooltip.element);
-            }
-        }
-    });
+    // map.addEventListener('mousemove', e => {
+    //     const shapeId = e.target.getAttribute('id');
+    //     if (shapeId && tooltip.shapeId === shapeId) {
+    //         tooltip.element.style.left = `${e.clientX + 10}px`;
+    //         tooltip.element.style.top = `${e.clientY + 10}px`;
+    //     }
+    //     else {
+    //         if (tooltip.element) {
+    //             tooltip.element.remove();
+    //             tooltip.shapeId = null;
+    //         }
+    //         if (shapeId && e.target.classList.contains('country')) {
+    //             const data = zonesData['countries'].data.find(row => row['alpha-3'] === shapeId);
+    //             tooltip.element = instanciateTooltip(data, 'countries', e);
+    //             tooltip.shapeId = shapeId;
+    //             tooltip.element.setAttribute('id', 'tooltip');
+    //             container.node().appendChild(tooltip.element);
+    //         }
+    //     }
+    // });
 }
 
-function instanciateTooltip(dataRow, event) {
+function instanciateTooltip(dataRow, groupId, event) {
     const tooltip = document.createElement('div');
     if (!htmlPopupElem) return tooltip;
+    tooltip.innerHTML = tooltipTemplate[groupId].formatUnicorn(dataRow);
+    reportStyle(htmlPopupElem, tooltip);
     tooltip.setAttribute('id', 'tooltip');
-    tooltip.innerHTML = htmlPopupElem.outerHTML.formatUnicorn(dataRow);
     if (event) {
         tooltip.style.left =    `${event.clientX + 10}px`;
         tooltip.style.top =     `${event.clientY + 10}px`;
@@ -438,6 +446,7 @@ function applyStyles() {
     // apply inline styles
     Object.entries(inlineStyles).forEach((([elemId, style]) => {
         const elem = document.getElementById(elemId);
+        if (!elem) return;
         Object.entries(style).forEach(([cssProp, cssValue]) => {
             if (cssProp === 'scale') {
                 setTransformScale(elem, `scale(${cssValue})`);
@@ -499,20 +508,125 @@ function addPath() {
 }
 
 function exportSvg() {
-    const svgExport = SVGO.optimize(svg.node().outerHTML, svgoConfig).data;
-    const renderedCss = exportStyleSheet();
-    const exportParams = {
-        svgStr: svgExport,
-        commonCss: renderedCss,
-        addedCss: cssFonts,
-    };
-    const out = Mustache.render(exportTemplate, exportParams);
-    console.log(renderedCss);
-    download(out, 'text/plain', 'mySvg.js');
+    // const finalSvg = svg.node();
+    // const defs = finalSvg.querySelector('defs');
+    const defs = svg.select('defs');
+    const renderedCss = exportStyleSheet('map-style');
+    defs.append('style').html(renderedCss + cssFonts);
+    // let str = "I have a cat, a dog, and a goat.";
+// str = str.replace(/\b(?:cat|dog|goat)\b/gi, matched => mapObj[matched]);
+// console.log(str);
+    // let regexExpr = '';
+    // for (let key of ['ab', 'cd']) {
+    //     if (regexExpr.length) regexExpr += '|';
+    //     regexExpr += `\{${key}\}`;
+    // }
+    // console.log(regexExpr);
+    const ttTemplate = getFinalTooltipTemplate('countries');
+    // console.log(tooltipTemplate)
+    // console.log(/\{\w+\}/g)
+    // console.log([...tooltipTemplate.matchAll(/\{(\w+)\}/g)])
+    let usedVars = [...ttTemplate.matchAll(/\{(\w+)\}/g)].map(group => {
+        return group[1];
+    });
+    usedVars = [...new Set(usedVars)];
+    const functionStr = ttTemplate.replaceAll(/\{(\w+)\}/gi, '${r.$1}');
+    // console.log(functionStr);
+    // const regex = new RegExp(regexExpr, "gi");
+    // console.log("coucou{ab}hehe{cd}".replace(regex, matched => mapObj[matched]));
+     // elem.innerHTML = \`${functionStr}\`;
+            // elem.firstChild.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+    defs.append('script').html(`<![CDATA[
+    window.addEventListener('DOMContentLoaded', () => {
+        let tooltip = null;
+        let tooltipType = '';
+        function constructTooltip(r) {
+            const elem = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+            elem.setAttribute('width', 1);
+            elem.setAttribute('height', 1);
+            const body = document.createElementNS('http://www.w3.org/1999/xhtml', 'body');
+            body.innerHTML = \`${functionStr}\`;
+            elem.append(body);
+            return elem;
+        }
+        document.firstChild.addEventListener('mouseover', (e) => {
+            const parent = e.target.parentNode;
+            if (!parent?.hasAttribute("id")) return;
+            const groupId = parent.getAttribute('id');
+            console.log(groupId);
+            tooltip = constructTooltip({name: 'test'});
+            tooltip.setAttribute('x', e.clientX);
+            tooltip.setAttribute('y', e.clientY);
+            tooltip.style.display = 'block';
+            tooltipType = groupId;
+            const lastChild = document.firstChild.lastChild;
+            console.log(lastChild.tagName)
+            if (lastChild.tagName === 'foreignObject') {
+                document.firstChild.lastChild.replaceWith(tooltip);
+            }
+            else {
+                document.firstChild.append(tooltip);
+            }
+        });
+
+        document.firstChild.addEventListener('mousemove', (e) => {
+            tooltip.setAttribute('x', e.clientX);
+            tooltip.setAttribute('y', e.clientY)
+        });
+        document.firstChild.addEventListener('mouseout', (e) => {
+            tooltip.style.display = 'none';
+        });
+        
+    });
+`);
+
+
+    // const svgExport = SVGO.optimize(finalSvg.outerHTML, svgoConfig).data;
+    // const renderedCss = exportStyleSheet();
+    // const exportParams = {
+    //     svgStr: svgExport,
+    //     commonCss: renderedCss,
+    //     addedCss: cssFonts,
+    //     tooltip: getFinalTooltipTemplate(),
+    // };
+    // const out = Mustache.render(exportTemplate, exportParams);
+    // console.log(renderedCss);
+    // download(out, 'text/plain', 'mySvg.js');
+    const finalSvg = SVGO.optimize(svg.node().outerHTML, svgoConfig).data;
+    // console.log(finalSvg)
+    // let optimizedSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const domParser = new DOMParser();
+
+    const optimizedSVG = domParser.parseFromString(finalSvg, 'text/html');
+    const finalDataByGroup = {};
+    console.log(zonesData);
+    [...chosenCountries, 'countries'].forEach(groupId => {
+        const indexed = indexBy(zonesData[groupId].data, groupId === 'countries' ? 'alpha-3': 'shapeName');
+        const group = optimizedSVG.getElementById(groupId);
+        const finalData = {};
+        for (let child of group.children) {
+            const id = child.getAttribute('id');
+            if (!id) continue;
+            finalData[id] = pick(indexed[id], usedVars);
+        }
+        finalDataByGroup[groupId] = finalData;
+    });
+    // console.log(finalSvg)
+    download(finalSvg, 'text/plain', 'mySvg.svg');
 }
 
-$: draw(false, chosenCountries); // redraw when chosenCountries changes
+function getTooltipData(groupId, optimizedSvg) {
+    const indexed = indexBy(zonesData[groupId].data, groupId === 'countries' ? 'alpha-3': 'shapeName');
+    const group = optimizedSvg.getElementById(groupId);
+    const finalData = {};
+    for (let child of group.children) {
+        const id = child.getAttribute('id');
+        if (!id) continue;
+        finalData[id] = pick(indexed[id], usedVars);
+    }
+}
 
+$:draw(false, chosenCountries); // redraw when chosenCountries changes
 function styleSheetToText(sheet) {
     let styleTxt = '';
     const rules = sheet.cssRules;
@@ -521,13 +635,14 @@ function styleSheetToText(sheet) {
     }
     return styleTxt;
 }
+
 function exportStyleSheet() {
     const sheets = document.styleSheets;
     for (let i in sheets) {
         const rules = sheets[i].cssRules;
         for (let r in rules) {
             const selectorText = rules[r].selectorText;
-            if (selectorText == "#map-container") return styleSheetToText(sheets[i]);
+            if (selectorText?.includes("#paths path")) return styleSheetToText(sheets[i]);
         }
     }
 }
@@ -670,7 +785,7 @@ function handleDataImport(e, key) {
     reader.addEventListener('load', () => {
         console.log(reader.result);
         try {
-            const parsed = JSON.parse(reader.result);
+            const parsed = sortBy(JSON.parse(reader.result), 'alpha-3');
             zonesData[key] = {data: parsed, provided:true };
         } catch (e) {
             console.log('Parse error:', e);
@@ -679,13 +794,6 @@ function handleDataImport(e, key) {
     reader.readAsText(file);
 }
 
-
-$: if(tooltipTemplate) {
-    setTimeout(() => {
-        tooltipPreview = instanciateTooltip(zonesData?.['countries']?.['data'][0]).outerHTML;
-    }, 0)
-    
-}
 function defaultPopupContent(idCol) {
     return `<div>
     <span> Country: {${idCol}}</span>
@@ -701,11 +809,43 @@ function editPopup(e) {
 function editFrame(e) {
     styleEditor.open(document.getElementById('map'));
 }
+
+function reportStyle(reference, target) {
+    const walkerRef = document.createTreeWalker(reference, NodeFilter.SHOW_ELEMENT); 
+    const walkerTarget = document.createTreeWalker(target, NodeFilter.SHOW_ELEMENT);
+    reportStyleElem(walkerRef.currentNode, walkerTarget.currentNode);
+    while (walkerRef.nextNode()) {
+        walkerTarget.nextNode();
+        reportStyleElem(walkerRef.currentNode, walkerTarget.currentNode);
+    }
+}
+
+function reportStyleElem(ref, target) {
+    target.setAttribute('style', ref.getAttribute('style'));
+}
+
+function getFinalTooltipTemplate(groupId) {
+    let finalTemplate = htmlPopupElem.cloneNode(true);
+    finalTemplate.innerHTML = tooltipTemplate[groupId];
+    reportStyle(htmlPopupElem, finalTemplate);
+    return finalTemplate.outerHTML;
+}
+
+const popupContents = {};
+async function onTabChanged(e) {
+    // save changes made on the popup template
+    popupContents[currentTab] = htmlPopupElem.outerHTML;
+    currentTab = e.detail.tab;
+    await tick();
+    if (e.detail.tab in popupContents) {
+        const tmpElem = htmlToElement(popupContents[e.detail.tab]);
+        reportStyle(tmpElem, htmlPopupElem);
+    }
+}
 </script>
 
-
 <svelte:head>
-	{@html `<${''}style> ${commonCss} </${''}style>`}
+	{@html `<${''}style id="map-style"> ${commonCss} </${''}style>`}
 	{@html `<${''}style> ${cssFonts} </${''}style>`}
 </svelte:head>
 
@@ -730,42 +870,51 @@ function editFrame(e) {
 <h1 class="text-center fs-2"> Static SVG Map builder </h1>
 
 <div class="d-flex p-3">
-    <aside id="menu" class="border">
+    <aside id="menu" class="border me-2">
         <NestedAccordions sections={params} paramDefs={paramDefs} on:change={handleChangeProp} ></NestedAccordions>
         <div class="m-2 btn btn-outline-warning" on:click={editFrame}> Edit frame </div>
         <SlimSelect bind:value={chosenCountries} options={Object.keys(availableCountriesAdm1)} multiple="true"/>
-        <div class="w-100 px-2 my-3 row">
-            <label for="data-input-json" class="col-form-label col-4">Import data</label>
-            <input class="form-control col" type="file" id="data-input-json" accept=".json" on:change={(e) => handleDataImport(e, 'countries')}>
-        </div>
-        <div class="data-table mb-2" on:click={() => (showModal = true)}>
-            <DataTable data={zonesData?.['countries']?.['data']} idCol='shapeGroup'> </DataTable>
-        </div>
-        <div class="mx-2 btn btn-outline-primary" on:click={() => exportJson(zonesData?.['countries']?.['data'])}> Export JSON </div>
-
-        <div class="w-100 px-2 my-3 row">
-            <label for="fontinput" class="col-form-label col-4">Font file</label>
-            <input class="form-control col" type="file" id="fontinput" accept=".ttf,.woff" on:change={handleInputFont}>
-        </div>
-        <div class="m-2">
-            <label for="templatePopup" class="form-label"> Popup template </label>
-            <textarea class="form-control template-input" id="templatePopup" rows="3" bind:value={tooltipTemplate}></textarea>
-        </div>
-        <div class="popup-preview">
-            <div bind:this={htmlPopupElem} on:click={editPopup} style="padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem;">
-                {@html tooltipTemplate}
-            </div>
-            <div>
-                Preview
-                {@html tooltipPreview}
-            </div>
-        </div>
+        <Tabs>
+            <TabList>
+                {#each ['countries', ...chosenCountries] as tabTitle }
+                    <Tab on:change={onTabChanged} tabTitle={tabTitle}> </Tab>
+                {/each}
+            </TabList>
+            {#each ['countries', ...chosenCountries] as tabTitle }
+            {#if zonesData?.[tabTitle]?.['data']}
+            <TabPanel>
+                    <div class="w-100 px-2 my-3 row">
+                        <label for="data-input-json" class="col-form-label col-4">Import data</label>
+                        <input class="form-control col" type="file" id="data-input-json" accept=".json" on:change={(e) => handleDataImport(e, 'countries')}>
+                    </div>
+                    <div class="data-table mb-2" on:click={() => (showModal = true)}>
+                        <DataTable data={zonesData?.[tabTitle]?.['data']} idCol='alpha-3'> </DataTable>
+                    </div>
+                    <div class="mx-2 btn btn-outline-primary" on:click={() => exportJson(zonesData?.[tabTitle]?.['data'])}> Export JSON </div>
+                    
+                    <div class="w-100 px-2 my-3 row">
+                        <label for="fontinput" class="col-form-label col-4">Font file</label>
+                        <input class="form-control col" type="file" id="fontinput" accept=".ttf,.woff" on:change={handleInputFont}>
+                    </div>
+                    <div class="m-2">
+                        <label for="templatePopup" class="form-label"> Popup template </label>
+                        <textarea class="form-control template-input" id="templatePopup" rows="3" bind:value={tooltipTemplate[tabTitle]}></textarea>
+                    </div>
+                    <div class="popup-preview">
+                        <div id="popup-preview" bind:this={htmlPopupElem} on:click={editPopup} style="padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
+                            {@html tooltipTemplate[tabTitle].formatUnicorn(zonesData?.[tabTitle]?.['data'][0])}
+                        </div>
+                    </div>
+                </TabPanel>   
+            {/if}     
+            {/each}
+        </Tabs>
         <div class="m-2 btn btn-light" on:click={exportSvg}> Export </div>
     </aside>
     <div id="map-container"></div>
 </div>
 <Modal open={showModal} onClosed={() => onModalClose()}>
-    <DataTable data={zonesData?.['countries']?.['data']} idCol='shapeGroup'> </DataTable>
+    <DataTable data={zonesData?.['countries']?.['data']} idCol='alpha-3'> </DataTable>
 </Modal>
 <div>
     <!-- <div class="file m-4">
@@ -783,6 +932,7 @@ function editFrame(e) {
 <style lang="scss" scoped>
 #menu {
     min-width: 20rem;
+    max-width: 25rem;
 }
 .data-table {
     max-height: 10rem;
@@ -790,6 +940,10 @@ function editFrame(e) {
 }
 .popup-preview {
     padding: 10px;
+}
+#map-container {
+    margin: 0 auto;
+    flex: 0 0 auto;
 }
 // .template-input {
 

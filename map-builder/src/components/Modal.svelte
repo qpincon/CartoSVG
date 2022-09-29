@@ -92,7 +92,7 @@
             in:fly={{ y: -50, duration: 300 }}
             out:fly={{ y: -50, duration: 300, easing: quintOut }}
         >
-            <div class="modal-content">
+            <div class="modal-content p-3">
                 <slot />
             </div>
         </div>

@@ -9,7 +9,7 @@ export default {
       'mergeStyles',
       'inlineStyles',
       'minifyStyles',
-      'removeUselessDefs',
+    //   'removeUselessDefs',
       'cleanupNumericValues',
       'convertColors',
       'removeNonInheritableGroupAttrs',

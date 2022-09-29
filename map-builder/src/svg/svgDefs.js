@@ -44,7 +44,14 @@ function appendGlow(selection, id="glows",
         .attr('in', 'SourceAlpha')
         .attr('radius', innerParams.strength)
         .attr('operator', 'erode')
-        .attr('result', 'INNER_ERODED');
+        .attr('result', 'INNER_ERODED_A');
+    filter.append('feComponentTransfer')
+        .attr('in', 'INNER_ERODED_A')
+        .attr('result', 'INNER_ERODED')
+        .append('feFuncA')
+            .attr('type', 'linear')
+            .attr('slope', '1000')
+            .attr('intercept', '0');
 
     filter.append('feGaussianBlur')
         .attr('in', 'INNER_ERODED')
@@ -66,7 +73,7 @@ function appendGlow(selection, id="glows",
     // Merge
     const merge = filter.append('feMerge');
     merge.append('feMergeNode').attr('in', 'OUTGLOW');
-    merge.append('feMergeNode').attr('in', 'SourceGraphic');
+    // merge.append('feMergeNode').attr('in', 'SourceGraphic');
     merge.append('feMergeNode').attr('in', 'INGLOW');
     filter.append(() => merge.node());
 
