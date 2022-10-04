@@ -24,15 +24,15 @@ import { drawShapes } from './svg/shape';
 import iso3Data from './assets/data/iso3_filtered.json';
 import DataTable from './components/DataTable.svelte';
 import Modal from './components/Modal.svelte';
-import SlimSelect from './components/SlimSelect.svelte';
 import NestedAccordions from './components/NestedAccordions.svelte';
 import { Tabs, TabList, TabPanel, Tab } from './components/tabs/tabs.js';
 
+const iso3DataById = indexBy(iso3Data, 'alpha-3');
 const resolvedAdm1 = {};
 const countriesAdm1 = require.context('./assets/layers/adm1/', false, /\..*json$/, 'lazy');
 const availableCountriesAdm1 = countriesAdm1.keys().reduce((acc, file) => {
     const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
-    acc[name.replace('_ADM', '')] = file;
+    acc[iso3DataById[name.replace('_ADM', '')]?.name] = file;
     return acc;
 }, {});
 
@@ -77,7 +77,7 @@ let openContextMenuInfo;
 const adm0Land = import('./assets/layers/world_adm0_simplified.topojson')
     .then(({default:topoAdm0}) => {
         countries = topojson.feature(topoAdm0, topoAdm0.objects.simp);
-        const iso3DataById = indexBy(iso3Data, 'alpha-3');
+        
         countries.features.forEach(feat => {
             feat.properties = iso3DataById[feat.properties['shapeGroup']] || {};
         });
@@ -201,6 +201,7 @@ function zoomed(event) {
 
 const sensitivity = 75;
 function dragged(event) {
+    console.log(event.sourceEvent)
     if (event.sourceEvent.shiftKey) {
         inlineProps.tilt += event.dy / 10;
     }
@@ -231,6 +232,7 @@ function draw(simplified = false, _) {
                 if (!(country in zonesData) && !zonesData?.[country]?.provided) {
                     zonesData[country] = {data: sortBy(resolvedAdm1[country].features.map(f => f.properties), 'shapeName')};
                 }
+                console.log(zonesData)
                 draw(simplified);
             });
             return;
@@ -283,10 +285,9 @@ function draw(simplified = false, _) {
 
     const container = d3.select('#map-container');
     container.html('');
-
     projection = geoSatellite()
         .scale(scale)
-        .translate([(p('width') / 2), (yShift + p('height') / 2)])
+        .translate([((p('width') / 2)), (yShift + p('height') / 2)])
         .rotate([-inlineProps.longitude, -inlineProps.latitude, inlineProps.rotation])
         .tilt(inlineProps.tilt)
         .distance(snyderP)
@@ -317,15 +318,17 @@ function draw(simplified = false, _) {
         .attr('xmlns', "http://www.w3.org/2000/svg")
         .attr('xmlns:xlink', "http://www.w3.org/1999/xlink")
         .attr('id', 'map');
+
+
     if (p('useViewBox')) {
         svg.attr('viewBox', `0 0 ${p('width')} ${p('height')}`);
     }
     else {
         svg.attr('width', `${p('width') }`)
-        .attr('height', `${p('height') }`)
+        .attr('height', `${p('height')}`)
     }
     container.style('width', `${p('width')}px`).style('height', `${p('height')}px`);
-
+    
     path = d3.geoPath(projection);
     svg.html('');
     svg.on('contextmenu', function(e) {
@@ -394,7 +397,7 @@ function draw(simplified = false, _) {
         if (data.filter) pathElem.attr('filter', `url(#${data.filter})`);
         data.props.forEach((prop) => pathElem.attr(prop, (d) => d.properties[prop]))
     }
-        
+
     groups.each(drawPaths);
 
     drawCustomPaths(providedPaths, svg, projection);
@@ -404,29 +407,35 @@ function draw(simplified = false, _) {
     d3.select('#outline').style('fill', "url(#noise)");
     commonCss = Mustache.render(cssTemplate, params);
     drawAndSetupShapes();
-    
+
+    svg.append('rect')
+        .attr('id', 'frame')
+        .attr('width', p('width'))
+        .attr('height', p('height'))
+        .attr('rx', p('borderRadius'));
+   
     const map = document.getElementById('map')
     if(!map) return;
-    // map.addEventListener('mousemove', e => {
-    //     const shapeId = e.target.getAttribute('id');
-    //     if (shapeId && tooltip.shapeId === shapeId) {
-    //         tooltip.element.style.left = `${e.clientX + 10}px`;
-    //         tooltip.element.style.top = `${e.clientY + 10}px`;
-    //     }
-    //     else {
-    //         if (tooltip.element) {
-    //             tooltip.element.remove();
-    //             tooltip.shapeId = null;
-    //         }
-    //         if (shapeId && e.target.classList.contains('country')) {
-    //             const data = zonesData['countries'].data.find(row => row['alpha-3'] === shapeId);
-    //             tooltip.element = instanciateTooltip(data, 'countries', e);
-    //             tooltip.shapeId = shapeId;
-    //             tooltip.element.setAttribute('id', 'tooltip');
-    //             container.node().appendChild(tooltip.element);
-    //         }
-    //     }
-    // });
+    map.addEventListener('mousemove', e => {
+        const shapeId = e.target.getAttribute('id');
+        if (shapeId && tooltip.shapeId === shapeId) {
+            tooltip.element.style.left = `${e.clientX + 10}px`;
+            tooltip.element.style.top = `${e.clientY + 10}px`;
+        }
+        else {
+            if (tooltip.element) {
+                tooltip.element.remove();
+                tooltip.shapeId = null;
+            }
+            if (shapeId && e.target.classList.contains('country')) {
+                const data = zonesData['countries'].data.find(row => row['alpha-3'] === shapeId);
+                tooltip.element = instanciateTooltip(data, 'countries', e);
+                tooltip.shapeId = shapeId;
+                tooltip.element.setAttribute('id', 'tooltip');
+                container.node().appendChild(tooltip.element);
+            }
+        }
+    });
 }
 
 function instanciateTooltip(dataRow, groupId, event) {
@@ -626,7 +635,6 @@ function getTooltipData(groupId, optimizedSvg) {
     }
 }
 
-$:draw(false, chosenCountries); // redraw when chosenCountries changes
 function styleSheetToText(sheet) {
     let styleTxt = '';
     const rules = sheet.cssRules;
@@ -806,9 +814,6 @@ function editPopup(e) {
     styleEditor.open(e.target, rect.right, rect.bottom);
 }
 
-function editFrame(e) {
-    styleEditor.open(document.getElementById('map'));
-}
 
 function reportStyle(reference, target) {
     const walkerRef = document.createTreeWalker(reference, NodeFilter.SHOW_ELEMENT); 
@@ -842,6 +847,12 @@ async function onTabChanged(e) {
         reportStyle(tmpElem, htmlPopupElem);
     }
 }
+
+function addNewCountry(e) {
+    chosenCountries.push(e.target.value);
+    chosenCountries = chosenCountries;
+    draw(false);
+}
 </script>
 
 <svelte:head>
@@ -872,13 +883,21 @@ async function onTabChanged(e) {
 <div class="d-flex p-3">
     <aside id="menu" class="border me-2">
         <NestedAccordions sections={params} paramDefs={paramDefs} on:change={handleChangeProp} ></NestedAccordions>
-        <div class="m-2 btn btn-outline-warning" on:click={editFrame}> Edit frame </div>
-        <SlimSelect bind:value={chosenCountries} options={Object.keys(availableCountriesAdm1)} multiple="true"/>
         <Tabs>
             <TabList>
                 {#each ['countries', ...chosenCountries] as tabTitle }
                     <Tab on:change={onTabChanged} tabTitle={tabTitle}> </Tab>
                 {/each}
+                <!-- <Tab changeOnClick={false}> -->
+                <div class="nav-item">
+                    <select role="button" id='countrySelect' on:change={addNewCountry}>
+                        {#each Object.keys(availableCountriesAdm1) as country}
+                            <option value={country}> {country} </option>
+                        {/each}
+                    </select>
+                    <span class="nav-link"> ➕ </span>
+                </div>
+                <!-- </Tab> -->
             </TabList>
             {#each ['countries', ...chosenCountries] as tabTitle }
             {#if zonesData?.[tabTitle]?.['data']}
@@ -945,7 +964,10 @@ async function onTabChanged(e) {
     margin: 0 auto;
     flex: 0 0 auto;
 }
-// .template-input {
+#countrySelect{
+  opacity: 0;
+  position: absolute;
+  height: 38px;
+}
 
-// }
 </style>

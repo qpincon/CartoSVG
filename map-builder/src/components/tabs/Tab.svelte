@@ -5,6 +5,7 @@
 
 	export const tab = {};
     export let tabTitle;
+    export let changeOnClick = true;
 	const { registerTab, selectTab, selectedTab } = getContext(TABS);
 
 	registerTab(tab);
@@ -15,14 +16,15 @@
 		dispatch('change', {
             tab: tabTitle
 		});
-        selectTab(tab);
+        if (changeOnClick) selectTab(tab);
     }
 
 </script>
 
 
-<li class="nav-item" on:click="{changeTab}">
+<li role="button" class="nav-item" on:click="{changeTab}">
     <a class:active="{$selectedTab === tab}" class="nav-link">
-        {  tabTitle }
+        {#if tabTitle} { tabTitle } {/if}
+        <slot></slot>
     </a>
 </li>

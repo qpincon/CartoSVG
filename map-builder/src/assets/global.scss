@@ -33,6 +33,7 @@ $accordion-button-bg:                     tint-color($component-active-bg, 90%);
 @import "bootstrap/scss/transitions";
 @import "bootstrap/scss/utilities";
 @import "bootstrap/scss/accordion";
+@import "bootstrap/scss/dropdown";
 @import "bootstrap/scss/buttons";
 @import "bootstrap/scss/modal";
 @import "bootstrap/scss/close";
@@ -46,7 +47,6 @@ $accordion-button-bg:                     tint-color($component-active-bg, 90%);
 
 // 7. Optionally include utilities API last to generate classes based on the Sass map in `_utilities.scss`
 @import "bootstrap/scss/utilities/api";
-@import '../../node_modules/slim-select/dist/slimselect.min.css';
 @import '../../node_modules/inline-style-editor/dist/inline-style-editor.css';
 
 html {

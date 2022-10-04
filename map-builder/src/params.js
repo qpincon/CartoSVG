@@ -6,6 +6,11 @@ const params = {
         fieldOfView: 50,
     },
     "Styling": {
+        "Border": {
+            borderRadius: 15,
+            borderWidth: 2,
+            borderColor: "#65BA54",
+        },
         showLand: true,
         showCountries: true,
         useGraticule: true,

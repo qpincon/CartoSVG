@@ -1,7 +1,11 @@
 #map, #canvas {
-    border: 2px solid #b8b8b8;
-    border-radius: 5px;
     display: block;
+    border-radius: {{Styling.Border.borderRadius}}px; 
+}
+#frame {
+    fill: none;
+    stroke: {{Styling.Border.borderColor}};
+    stroke-width: {{Styling.Border.borderWidth}}px;
 }
 #paths path {
     pointer-events: none;
