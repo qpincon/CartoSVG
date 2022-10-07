@@ -33,7 +33,7 @@ function indexBy(data, col) {
     return data.reduce((acc, cur) => {
         acc[cur[col]] = cur;
         return acc;
-    });
+    }, {});
 }
 
 function pick(obj, keys) {

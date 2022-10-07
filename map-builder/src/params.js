@@ -8,8 +8,8 @@ const params = {
     "Styling": {
         "Border": {
             borderRadius: 15,
-            borderWidth: 2,
-            borderColor: "#65BA54",
+            borderWidth: 3,
+            borderColor: "#b8b8b8",
         },
         showLand: true,
         showCountries: true,
@@ -28,53 +28,6 @@ const params = {
     },
 
 }
-// const params = {
-//     width: 550,
-//     height: 600,
-//     useViewBox: false,
-//     longitude: 15,
-//     latitude: 36,
-//     altitude: 1000,
-//     rotation: 0,
-//     tilt: 25,
-//     fieldOfView: 50,
-//     useCanvas: false,
-//     firstGlow: {
-//         innerGlow: {blur: 4, strength: 1.4, color: "#7c490eff"},
-//         outerGlow: {blur: 4, strength: 3, color: '#ffffffff'},
-//     },
-//     secondGlow: {
-//         innerGlow: {blur: 4, strength: 1.4, color: "#A88FAFff"},
-//         outerGlow: {blur: 4, strength: 3, color: '#ffffffff'},
-//     },
-//     useGraticule: true,
-//     graticuleStep: 3,
-//     seaColor: "#dce7f8ff",
-//     land: {
-//         show: true,
-//         fillColor: "#ffffffff",
-//         strokeColor: "#00000000",
-//         strokeWidth: 1,
-//         filter: 'firstGlow'
-//     },
-//     countries: {
-//         show: true,
-//         hover: true,
-//         hoverColor: "#fbbc0023",
-//         fillColor: "#f3efec80",
-//         strokeColor: "#D1BEB038",
-//         strokeWidth: 2,
-//     },
-//     adm1: {
-//         show: true,
-//         hover: true,
-//         hoverColor: "#7c490ea0",
-//         fillColor: "#ffffffd0",
-//         strokeColor: "#D1BEB038",
-//         strokeWidth: 1,
-//     },
-//     backgroundNoise: true,
-// };
 
 const paramDefs = {
     width:          {type: 'range', min: 100, max: 800},

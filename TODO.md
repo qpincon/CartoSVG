@@ -36,5 +36,9 @@
 - [x] Find a way to retain inline styles on redraw  
 - [x] Define <style> in <defs> in SVG directly  
 - [ ] Allow for ordering <land> div after/before countries/ADM1. If after, remove <SourceGraphic> from merge filter, otherwise retain it (for stroke)
-
+- [ ] Wrap "land" inside an inline <image> tag, inside a separate <svg> for FF performance (and maybe other browsers?)
+    - MUCH worse performance on chrome. Tried:
+        - Move svg containing <image> on the outside: same
+        - Same principle, using <img> tag: same
+    - Solution: will-change: opacity
  

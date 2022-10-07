@@ -33,11 +33,6 @@ function appendGlow(selection, id="glows",
         .attr('in2', 'SourceGraphic')
         .attr('operator', 'out')
         .attr('result', 'OUTGLOW');
-    // filter.append('feDropShadow')
-    //     .attr('flood-color', `${colorOuter}`)
-    //     // .attr('flood-opacity', `${colorOuter.opacity}`)
-    //     .attr('stdDeviation', `${outerParams.strength}`)
-    //     .attr('result', 'OUTGLOW');
 
     // INNER GLOW
     filter.append('feMorphology')
@@ -101,12 +96,6 @@ function appendBgPattern(selection, id, seaColor, backgroundNoise = false, image
             .attr('width', imageSize).attr('height', imageSize);
     }
     defs.append(() => pattern.node());
-    // const clipPath = selection.append('clipPath').attr('id', 'clip');
-    // clipPath.append('rectangle')
-    //     .attr('x', 0).attr('y', 0)
-    //     .attr('width', 300).attr('height', 300)
-    //     .attr('rx', 15);
-    // selection.append(() => clipPath.node());
 }
 
 export {appendGlow, appendBgPattern}; 

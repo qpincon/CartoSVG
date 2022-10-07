@@ -121,11 +121,15 @@ let zonesData = {}; // key => {data (list), provided (bool)}
 let showModal = false;
 let tooltip = {currentId: null, element: null};
 let htmlPopupElem;;
-let tooltipTemplate = {'countries': defaultPopupContent('name')};
+let tooltipTemplates = {countries: defaultPopupContent('name')};
 let currentTab = 'countries';
+const popupContents = {countries: defaultPopupFull(tooltipTemplates['countries'])};
 onMount(() => {
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
+            if (htmlPopupElem.contains(target)) {
+                popupContents[currentTab] = htmlPopupElem.outerHTML;
+            }
             if (eventType === 'inline') {
                 if (target.hasAttribute('id')) {
                     const elemId = target.getAttribute('id');
@@ -226,13 +230,13 @@ function draw(simplified = false, _) {
     // console.log((new Error()));
     for (const country of chosenCountries) {
         if (!(country in resolvedAdm1)) {
-            tooltipTemplate[country] = defaultPopupContent('shapeName');
+            tooltipTemplates[country] = defaultPopupContent('shapeName');
+            popupContents[country] = defaultPopupFull(tooltipTemplates[country]);
             countriesAdm1(availableCountriesAdm1[country]).then(resolved => {
                 resolvedAdm1[country] = topojson.feature(resolved, resolved.objects.country);
                 if (!(country in zonesData) && !zonesData?.[country]?.provided) {
                     zonesData[country] = {data: sortBy(resolvedAdm1[country].features.map(f => f.properties), 'shapeName')};
                 }
-                console.log(zonesData)
                 draw(simplified);
             });
             return;
@@ -317,7 +321,7 @@ function draw(simplified = false, _) {
     if (svg.empty()) svg = container.append('svg')
         .attr('xmlns', "http://www.w3.org/2000/svg")
         .attr('xmlns:xlink', "http://www.w3.org/1999/xlink")
-        .attr('id', 'map');
+        .attr('id', 'static-svg-map');
 
 
     if (p('useViewBox')) {
@@ -372,25 +376,24 @@ function draw(simplified = false, _) {
         }
         groupData.push({ name: 'countries', data: countries, id: (prop) => prop['alpha-3'], props: [], class: 'country', filter: null });
     }
-    if (p('showLand')) {
-        groupData.push({ name: 'land', data: land, id: (prop) => prop['id'], props: [], class: 'land', filter: 'firstGlow' });
-    }
+    // if (p('showLand')) {
+    //     groupData.push({ name: 'land', data: land, id: (prop) => prop['id'], props: [], class: 'land', filter: 'firstGlow' });
+    // }
     // if (providedBorders && params.providedBorders.show)
     //     groupData.push({ name: 'provided-borders', data: [providedBorders], id: null, props: [], class: 'provided-borders', filter: params.providedBorders.filter });
     // if (provided && params.provided.show)
     //     groupData.push({ name: 'provided', data: provided, id: null, props: [], class: 'provided', filter: null });
-    for (const country of chosenCountries) {
-        groupData.push({ name: `${country}-adm1`, data: resolvedAdm1[country], id: (prop) => prop.shapeName, props: [], class: 'adm1', filter: null });
-    }
+    // for (const country of chosenCountries) {
+    //     groupData.push({ name: `${country}-adm1`, data: resolvedAdm1[country], id: (prop) => prop.shapeName, props: [], class: 'adm1', filter: null });
+    // }
     groupData.push({ name: 'points-labels', data: [], id: null, props: [], class: null, filter: null });
-    const groups = svg.selectAll('g').data(groupData).join('g').attr('id', d => d.name);
-    
+    const groups = svg.selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
     function drawPaths(data) {
         if (!data.data) return;
-        const pathElem = d3.select(this).selectAll('path')
-        .data(data.data.features ? data.data.features : data.data)
-        .join('path')
-        .attr('d', (d) => {return path(d)});
+        const pathElem = d3.select(this).style('will-change', 'opacity').selectAll('path')
+            .data(data.data.features ? data.data.features : data.data)
+            .join('path')
+                .attr('d', (d) => {return path(d)});
         if (data.id && typeof data.id === 'object') pathElem.attr('id', (d) => data.id.prefix + d[data.id.field]);
         else if (typeof data.id === 'function') pathElem.attr('id', (d) => data.id(d.properties));
         if (data.class) pathElem.attr('class', data.class);
@@ -400,8 +403,28 @@ function draw(simplified = false, _) {
 
     groups.each(drawPaths);
 
+    if (p('showLand')) {
+        const landElem = d3.create('svg')
+            .attr('xmlns', "http://www.w3.org/2000/svg");
+        const pathElem = landElem.selectAll('path')
+            .data(land.features ? land.features : land)
+            .join('path')
+                .attr('d', (d) => {return path(d)});
+        pathElem.attr('filter', 'url(#firstGlow)');
+        appendGlow(landElem, 'firstGlow', p('innerGlow1'), p('outerGlow1'));
+        const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
+            .attr('href', `data:image/svg+xml,${encodeURIComponent(SVGO.optimize(landElem.node().outerHTML, svgoConfig).data)}`);
+            // .attr('href', `data:image/svg+xml,${encodeURIComponent(landElem.node().outerHTML)}`);
+            
+        const newSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        newSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        newSvg.innerHTML = landImage.node().outerHTML;
+        newSvg.style['pointer-events'] = 'none';
+        svg.node().appendChild(newSvg);
+    }
+
     drawCustomPaths(providedPaths, svg, projection);
-    appendGlow(svg, 'firstGlow', p('innerGlow1'), p('outerGlow1'));
+    // appendGlow(svg, 'firstGlow', p('innerGlow1'), p('outerGlow1'));
     appendGlow(svg, 'secondGlow', p('innerGlow2'), p('outerGlow2'));
     appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
     d3.select('#outline').style('fill', "url(#noise)");
@@ -414,35 +437,57 @@ function draw(simplified = false, _) {
         .attr('height', p('height'))
         .attr('rx', p('borderRadius'));
    
-    const map = document.getElementById('map')
+    const map = document.getElementById('static-svg-map');
     if(!map) return;
+    // const landElem = document.getElementById('land');
+    // console.log(landElem)
+    // console.log(encodeURIComponent(landElem.outerHTML))
+    tooltip.element = document.createElement('div');
+    container.node().appendChild(tooltip.element);
+    tooltip.element.style.display = 'none';
+    const mapBounds = map.getBoundingClientRect();
     map.addEventListener('mousemove', e => {
+        const parent = e.target.parentNode;
+        if (!parent?.hasAttribute("id")) return;
+        const ttBounds = tooltip.element.getBoundingClientRect();
+        let posX = e.clientX + 10, posY = e.clientY + 10;
+        if (ttBounds.width > 0) {
+            if (mapBounds.right - ttBounds.width < e.clientX) {
+                posX = e.clientX - ttBounds.width - 10;
+            }
+            if (mapBounds.bottom - ttBounds.height < e.clientY) {
+                posY = e.clientY - ttBounds.height - 10;
+            }
+        }
+        const groupId = parent.getAttribute('id').replace('-adm1', '');
         const shapeId = e.target.getAttribute('id');
-        if (shapeId && tooltip.shapeId === shapeId) {
-            tooltip.element.style.left = `${e.clientX + 10}px`;
-            tooltip.element.style.top = `${e.clientY + 10}px`;
+        if (!(groupId in tooltipTemplates)) {
+            tooltip.element.style.display = 'none';
+            tooltip.element.style.opacity = 0;
+        }
+        else if (shapeId && tooltip.shapeId === shapeId) {
+            tooltip.element.style.left = `${posX}px`;
+            tooltip.element.style.top = `${posY}px`;
+            tooltip.element.style.display = 'block';
+            tooltip.element.style.opacity = 1;
         }
         else {
-            if (tooltip.element) {
-                tooltip.element.remove();
-                tooltip.shapeId = null;
-            }
-            if (shapeId && e.target.classList.contains('country')) {
-                const data = zonesData['countries'].data.find(row => row['alpha-3'] === shapeId);
-                tooltip.element = instanciateTooltip(data, 'countries', e);
-                tooltip.shapeId = shapeId;
-                tooltip.element.setAttribute('id', 'tooltip');
-                container.node().appendChild(tooltip.element);
-            }
+            const idCol = groupId === 'countries' ? 'alpha-3' : 'shapeName';
+            const data = zonesData[groupId].data.find(row => row[idCol] === shapeId);
+            const tt = instanciateTooltip(data, groupId, e);
+            tooltip.element.replaceWith(tt);
+            tooltip.element = tt;
+            tooltip.shapeId = shapeId;
+            tooltip.element.style.left = `${posX}px`;
+            tooltip.element.style.top = `${posY}px`;
         }
     });
 }
 
 function instanciateTooltip(dataRow, groupId, event) {
     const tooltip = document.createElement('div');
-    if (!htmlPopupElem) return tooltip;
-    tooltip.innerHTML = tooltipTemplate[groupId].formatUnicorn(dataRow);
-    reportStyle(htmlPopupElem, tooltip);
+    tooltip.innerHTML = tooltipTemplates[groupId].formatUnicorn(dataRow);
+    reportStyle(htmlToElement(popupContents[groupId]), tooltip);
     tooltip.setAttribute('id', 'tooltip');
     if (event) {
         tooltip.style.left =    `${event.clientX + 10}px`;
@@ -450,6 +495,7 @@ function instanciateTooltip(dataRow, groupId, event) {
     }
     return tooltip;
 }
+
 
 function applyStyles() {
     // apply inline styles
@@ -517,111 +563,108 @@ function addPath() {
 }
 
 function exportSvg() {
-    // const finalSvg = svg.node();
-    // const defs = finalSvg.querySelector('defs');
-    const defs = svg.select('defs');
-    const renderedCss = exportStyleSheet('map-style');
-    defs.append('style').html(renderedCss + cssFonts);
-    // let str = "I have a cat, a dog, and a goat.";
-// str = str.replace(/\b(?:cat|dog|goat)\b/gi, matched => mapObj[matched]);
-// console.log(str);
-    // let regexExpr = '';
-    // for (let key of ['ab', 'cd']) {
-    //     if (regexExpr.length) regexExpr += '|';
-    //     regexExpr += `\{${key}\}`;
-    // }
-    // console.log(regexExpr);
-    const ttTemplate = getFinalTooltipTemplate('countries');
-    // console.log(tooltipTemplate)
-    // console.log(/\{\w+\}/g)
-    // console.log([...tooltipTemplate.matchAll(/\{(\w+)\}/g)])
-    let usedVars = [...ttTemplate.matchAll(/\{(\w+)\}/g)].map(group => {
-        return group[1];
-    });
-    usedVars = [...new Set(usedVars)];
-    const functionStr = ttTemplate.replaceAll(/\{(\w+)\}/gi, '${r.$1}');
-    // console.log(functionStr);
-    // const regex = new RegExp(regexExpr, "gi");
-    // console.log("coucou{ab}hehe{cd}".replace(regex, matched => mapObj[matched]));
-     // elem.innerHTML = \`${functionStr}\`;
-            // elem.firstChild.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
-    defs.append('script').html(`<![CDATA[
-    window.addEventListener('DOMContentLoaded', () => {
-        let tooltip = null;
-        let tooltipType = '';
-        function constructTooltip(r) {
-            const elem = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
-            elem.setAttribute('width', 1);
-            elem.setAttribute('height', 1);
-            const body = document.createElementNS('http://www.w3.org/1999/xhtml', 'body');
-            body.innerHTML = \`${functionStr}\`;
-            elem.append(body);
-            return elem;
-        }
-        document.firstChild.addEventListener('mouseover', (e) => {
-            const parent = e.target.parentNode;
-            if (!parent?.hasAttribute("id")) return;
-            const groupId = parent.getAttribute('id');
-            console.log(groupId);
-            tooltip = constructTooltip({name: 'test'});
-            tooltip.setAttribute('x', e.clientX);
-            tooltip.setAttribute('y', e.clientY);
-            tooltip.style.display = 'block';
-            tooltipType = groupId;
-            const lastChild = document.firstChild.lastChild;
-            console.log(lastChild.tagName)
-            if (lastChild.tagName === 'foreignObject') {
-                document.firstChild.lastChild.replaceWith(tooltip);
-            }
-            else {
-                document.firstChild.append(tooltip);
-            }
-        });
-
-        document.firstChild.addEventListener('mousemove', (e) => {
-            tooltip.setAttribute('x', e.clientX);
-            tooltip.setAttribute('y', e.clientY)
-        });
-        document.firstChild.addEventListener('mouseout', (e) => {
-            tooltip.style.display = 'none';
-        });
-        
-    });
-`);
-
-
-    // const svgExport = SVGO.optimize(finalSvg.outerHTML, svgoConfig).data;
-    // const renderedCss = exportStyleSheet();
-    // const exportParams = {
-    //     svgStr: svgExport,
-    //     commonCss: renderedCss,
-    //     addedCss: cssFonts,
-    //     tooltip: getFinalTooltipTemplate(),
-    // };
-    // const out = Mustache.render(exportTemplate, exportParams);
-    // console.log(renderedCss);
-    // download(out, 'text/plain', 'mySvg.js');
     const finalSvg = SVGO.optimize(svg.node().outerHTML, svgoConfig).data;
-    // console.log(finalSvg)
-    // let optimizedSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    
     const domParser = new DOMParser();
-
-    const optimizedSVG = domParser.parseFromString(finalSvg, 'text/html');
-    const finalDataByGroup = {};
-    console.log(zonesData);
+    const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
+    const finalDataByGroup = {data: {}, tooltips: {}};
     [...chosenCountries, 'countries'].forEach(groupId => {
+        const ttTemplate = getFinalTooltipTemplate(groupId);
+        let usedVars = [...ttTemplate.matchAll(/\{(\w+)\}/g)].map(group => {
+            return group[1];
+        });
+        usedVars = [...new Set(usedVars)];
+        const functionStr = ttTemplate.replaceAll(/\{(\w+)\}/gi, '${data.$1}');
+        finalDataByGroup.tooltips[groupId] = functionStr;
         const indexed = indexBy(zonesData[groupId].data, groupId === 'countries' ? 'alpha-3': 'shapeName');
-        const group = optimizedSVG.getElementById(groupId);
+        const containerId = groupId !== 'countries' ? groupId + '-adm1' : groupId;
+        const group = optimizedSVG.getElementById(containerId);
         const finalData = {};
         for (let child of group.children) {
             const id = child.getAttribute('id');
             if (!id) continue;
             finalData[id] = pick(indexed[id], usedVars);
         }
-        finalDataByGroup[groupId] = finalData;
+        finalDataByGroup.data[groupId] = finalData;
     });
-    // console.log(finalSvg)
-    download(finalSvg, 'text/plain', 'mySvg.svg');
+
+    const finalScript = `
+    <![CDATA[
+    window.addEventListener('DOMContentLoaded', () => {
+        const mapElement = document.getElementById('static-svg-map');
+        console.log(mapElement);
+        const tooltip = {shapeId: null, element: null};
+        tooltip.element = constructTooltip({}, '');
+        console.log(mapElement);
+        mapElement.append(tooltip.element);
+        tooltip.element.style.display = 'none';
+
+        const dataByGroup = ${JSON.stringify(finalDataByGroup)};
+        function constructTooltip(data, templateStr) {
+            if(!data) return;
+            const elem = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+            elem.setAttribute('width', 1);
+            elem.setAttribute('height', 1);
+            elem.style.overflow = 'visible';
+            const body = document.createElementNS('http://www.w3.org/1999/xhtml', 'body');
+            body.innerHTML = eval('\`' + templateStr + '\`' );
+            elem.append(body);
+            return elem;
+        }
+        
+        const mapBounds = mapElement.getBoundingClientRect();
+        mapElement.addEventListener('mousemove', (e) => {
+            const parent = e.target.parentNode;
+            if (!parent?.hasAttribute?.("id")) {
+                tooltip.element.style.display = 'none';
+                tooltip.element.style.opacity = 0;
+                return;
+            };
+            const ttBounds = tooltip.element.firstChild?.firstChild?.getBoundingClientRect();
+            let posX = e.clientX + 10, posY = e.clientY;
+            if (ttBounds?.width > 0) {
+                if (mapBounds.right - ttBounds.width < posX) {
+                    posX = e.clientX - ttBounds.width - 10;
+                }
+                if (mapBounds.bottom - ttBounds.height < posY) {
+                    posY = e.clientY - ttBounds.height - 10;
+                }
+            }
+            const groupId = parent.getAttribute('id').replace('-adm1', '');
+            const shapeId = e.target.getAttribute('id');
+            if (!(groupId in dataByGroup.data)) {
+                tooltip.element.style.display = 'none';
+                tooltip.element.style.opacity = 0;
+            }
+            else if (shapeId && tooltip.shapeId === shapeId) {
+                tooltip.element.setAttribute('x', posX);
+                tooltip.element.setAttribute('y', posY);
+                tooltip.element.style.display = 'block';
+                tooltip.element.style.opacity = 1;
+            }
+            else {
+                const data = dataByGroup.data[groupId][shapeId];
+                if (!data) {
+                    tooltip.element.style.display = 'none';
+                    return;
+                }
+                const tt = constructTooltip(data, dataByGroup.tooltips[groupId]);
+                tooltip.element.replaceWith(tt);
+                tooltip.element = tt;
+                tooltip.shapeId = shapeId;
+                tooltip.element.setAttribute('x', posX);
+                tooltip.element.setAttribute('y', posY);
+            }
+        });
+    });]]>`;
+    const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
+    scriptElem.innerHTML = finalScript;
+    optimizedSVG.firstChild.append(scriptElem);
+    const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
+    const renderedCss = exportStyleSheet('map-style');
+    styleElem.innerHTML = renderedCss + cssFonts;
+    optimizedSVG.firstChild.append(styleElem);
+    download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'mySvg.svg');
 }
 
 function getTooltipData(groupId, optimizedSvg) {
@@ -641,7 +684,7 @@ function styleSheetToText(sheet) {
     for (let r in rules) {
         styleTxt += rules[r].cssText;
     }
-    return styleTxt;
+    return styleTxt.replace(/undefined/g, '');
 }
 
 function exportStyleSheet() {
@@ -809,6 +852,12 @@ function defaultPopupContent(idCol) {
     `;
 }
 
+function defaultPopupFull(template) {
+    return `<div id="popup-preview" style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
+        ${template}
+    </div>`;
+}
+
 function editPopup(e) {
     const rect = e.target.getBoundingClientRect();
     styleEditor.open(e.target, rect.right, rect.bottom);
@@ -830,16 +879,18 @@ function reportStyleElem(ref, target) {
 }
 
 function getFinalTooltipTemplate(groupId) {
-    let finalTemplate = htmlPopupElem.cloneNode(true);
-    finalTemplate.innerHTML = tooltipTemplate[groupId];
-    reportStyle(htmlPopupElem, finalTemplate);
+    const finalReference = htmlToElement(popupContents[groupId]);
+    const finalTemplate = finalReference.cloneNode(true);
+    finalTemplate.innerHTML = tooltipTemplates[groupId];
+    reportStyle(finalReference, finalTemplate);
     return finalTemplate.outerHTML;
 }
 
-const popupContents = {};
-async function onTabChanged(e) {
-    // save changes made on the popup template
+function onTemplateChange() {
     popupContents[currentTab] = htmlPopupElem.outerHTML;
+}
+
+async function onTabChanged(e) {
     currentTab = e.detail.tab;
     await tick();
     if (e.detail.tab in popupContents) {
@@ -917,11 +968,11 @@ function addNewCountry(e) {
                     </div>
                     <div class="m-2">
                         <label for="templatePopup" class="form-label"> Popup template </label>
-                        <textarea class="form-control template-input" id="templatePopup" rows="3" bind:value={tooltipTemplate[tabTitle]}></textarea>
+                        <textarea class="form-control template-input" id="templatePopup" rows="3" bind:value={tooltipTemplates[tabTitle]} on:change={onTemplateChange}></textarea>
                     </div>
                     <div class="popup-preview">
-                        <div id="popup-preview" bind:this={htmlPopupElem} on:click={editPopup} style="padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
-                            {@html tooltipTemplate[tabTitle].formatUnicorn(zonesData?.[tabTitle]?.['data'][0])}
+                        <div id="popup-preview" bind:this={htmlPopupElem} on:click={editPopup} style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
+                            {@html tooltipTemplates[tabTitle].formatUnicorn(zonesData?.[tabTitle]?.['data'][0])}
                         </div>
                     </div>
                 </TabPanel>   

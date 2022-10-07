@@ -1,4 +1,4 @@
-#map, #canvas {
+#static-svg-map, #canvas {
     display: block;
     border-radius: {{Styling.Border.borderRadius}}px; 
 }
@@ -30,13 +30,14 @@
     stroke-width: 1px;
     fill: #ffffffff;
 }
+
 .country {
     stroke: #d1beb0;
     stroke-width: 2px;
     fill: #f3efec;
 }
 .country:hover {
-    fill: #fbbc0023;
+    fill: #f0e0e0;
 }
 .adm1 {
     stroke: #D1BEB038;
@@ -61,8 +62,4 @@
 
 #tooltip {
     position: absolute;
-}
-
-foreignObject {
-    overflow: visible;
 }
