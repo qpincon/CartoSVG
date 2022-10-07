@@ -6,13 +6,11 @@ import * as d3 from "d3";
 import SVGO from 'svgo/dist/svgo.browser';
 import Mustache from 'mustache';
 import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
+
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
-
 import MotionPathHelper from "./util/MotionPathHelper.js";
-
 import svgoConfig from './svgo.config';
 import cssTemplate from './templates/style.template.txt';
-// import exportTemplate from './templates/output_template.txt';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import { paramDefs, params} from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
@@ -26,6 +24,9 @@ import DataTable from './components/DataTable.svelte';
 import Modal from './components/Modal.svelte';
 import NestedAccordions from './components/NestedAccordions.svelte';
 import { Tabs, TabList, TabPanel, Tab } from './components/tabs/tabs.js';
+import { reportStyle } from './util/dom';
+import { exportSvg } from './svg/export';
+import { addTooltipListener} from './tooltip';
 
 const iso3DataById = indexBy(iso3Data, 'alpha-3');
 const resolvedAdm1 = {};
@@ -439,62 +440,9 @@ function draw(simplified = false, _) {
    
     const map = document.getElementById('static-svg-map');
     if(!map) return;
-    // const landElem = document.getElementById('land');
-    // console.log(landElem)
-    // console.log(encodeURIComponent(landElem.outerHTML))
-    tooltip.element = document.createElement('div');
-    container.node().appendChild(tooltip.element);
-    tooltip.element.style.display = 'none';
-    const mapBounds = map.getBoundingClientRect();
-    map.addEventListener('mousemove', e => {
-        const parent = e.target.parentNode;
-        if (!parent?.hasAttribute("id")) return;
-        const ttBounds = tooltip.element.getBoundingClientRect();
-        let posX = e.clientX + 10, posY = e.clientY + 10;
-        if (ttBounds.width > 0) {
-            if (mapBounds.right - ttBounds.width < e.clientX) {
-                posX = e.clientX - ttBounds.width - 10;
-            }
-            if (mapBounds.bottom - ttBounds.height < e.clientY) {
-                posY = e.clientY - ttBounds.height - 10;
-            }
-        }
-        const groupId = parent.getAttribute('id').replace('-adm1', '');
-        const shapeId = e.target.getAttribute('id');
-        if (!(groupId in tooltipTemplates)) {
-            tooltip.element.style.display = 'none';
-            tooltip.element.style.opacity = 0;
-        }
-        else if (shapeId && tooltip.shapeId === shapeId) {
-            tooltip.element.style.left = `${posX}px`;
-            tooltip.element.style.top = `${posY}px`;
-            tooltip.element.style.display = 'block';
-            tooltip.element.style.opacity = 1;
-        }
-        else {
-            const idCol = groupId === 'countries' ? 'alpha-3' : 'shapeName';
-            const data = zonesData[groupId].data.find(row => row[idCol] === shapeId);
-            const tt = instanciateTooltip(data, groupId, e);
-            tooltip.element.replaceWith(tt);
-            tooltip.element = tt;
-            tooltip.shapeId = shapeId;
-            tooltip.element.style.left = `${posX}px`;
-            tooltip.element.style.top = `${posY}px`;
-        }
-    });
+    addTooltipListener(map, tooltipTemplates, popupContents, zonesData);
 }
 
-function instanciateTooltip(dataRow, groupId, event) {
-    const tooltip = document.createElement('div');
-    tooltip.innerHTML = tooltipTemplates[groupId].formatUnicorn(dataRow);
-    reportStyle(htmlToElement(popupContents[groupId]), tooltip);
-    tooltip.setAttribute('id', 'tooltip');
-    if (event) {
-        tooltip.style.left =    `${event.clientX + 10}px`;
-        tooltip.style.top =     `${event.clientY + 10}px`;
-    }
-    return tooltip;
-}
 
 
 function applyStyles() {
@@ -560,142 +508,6 @@ function handleInputFont(e) {
 function addPath() {
     closeMenu();
     addingPath = true;
-}
-
-function exportSvg() {
-    const finalSvg = SVGO.optimize(svg.node().outerHTML, svgoConfig).data;
-    
-    const domParser = new DOMParser();
-    const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
-    const finalDataByGroup = {data: {}, tooltips: {}};
-    [...chosenCountries, 'countries'].forEach(groupId => {
-        const ttTemplate = getFinalTooltipTemplate(groupId);
-        let usedVars = [...ttTemplate.matchAll(/\{(\w+)\}/g)].map(group => {
-            return group[1];
-        });
-        usedVars = [...new Set(usedVars)];
-        const functionStr = ttTemplate.replaceAll(/\{(\w+)\}/gi, '${data.$1}');
-        finalDataByGroup.tooltips[groupId] = functionStr;
-        const indexed = indexBy(zonesData[groupId].data, groupId === 'countries' ? 'alpha-3': 'shapeName');
-        const containerId = groupId !== 'countries' ? groupId + '-adm1' : groupId;
-        const group = optimizedSVG.getElementById(containerId);
-        const finalData = {};
-        for (let child of group.children) {
-            const id = child.getAttribute('id');
-            if (!id) continue;
-            finalData[id] = pick(indexed[id], usedVars);
-        }
-        finalDataByGroup.data[groupId] = finalData;
-    });
-
-    const finalScript = `
-    <![CDATA[
-    window.addEventListener('DOMContentLoaded', () => {
-        const mapElement = document.getElementById('static-svg-map');
-        console.log(mapElement);
-        const tooltip = {shapeId: null, element: null};
-        tooltip.element = constructTooltip({}, '');
-        console.log(mapElement);
-        mapElement.append(tooltip.element);
-        tooltip.element.style.display = 'none';
-
-        const dataByGroup = ${JSON.stringify(finalDataByGroup)};
-        function constructTooltip(data, templateStr) {
-            if(!data) return;
-            const elem = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
-            elem.setAttribute('width', 1);
-            elem.setAttribute('height', 1);
-            elem.style.overflow = 'visible';
-            const body = document.createElementNS('http://www.w3.org/1999/xhtml', 'body');
-            body.innerHTML = eval('\`' + templateStr + '\`' );
-            elem.append(body);
-            return elem;
-        }
-        
-        const mapBounds = mapElement.getBoundingClientRect();
-        mapElement.addEventListener('mousemove', (e) => {
-            const parent = e.target.parentNode;
-            if (!parent?.hasAttribute?.("id")) {
-                tooltip.element.style.display = 'none';
-                tooltip.element.style.opacity = 0;
-                return;
-            };
-            const ttBounds = tooltip.element.firstChild?.firstChild?.getBoundingClientRect();
-            let posX = e.clientX + 10, posY = e.clientY;
-            if (ttBounds?.width > 0) {
-                if (mapBounds.right - ttBounds.width < posX) {
-                    posX = e.clientX - ttBounds.width - 10;
-                }
-                if (mapBounds.bottom - ttBounds.height < posY) {
-                    posY = e.clientY - ttBounds.height - 10;
-                }
-            }
-            const groupId = parent.getAttribute('id').replace('-adm1', '');
-            const shapeId = e.target.getAttribute('id');
-            if (!(groupId in dataByGroup.data)) {
-                tooltip.element.style.display = 'none';
-                tooltip.element.style.opacity = 0;
-            }
-            else if (shapeId && tooltip.shapeId === shapeId) {
-                tooltip.element.setAttribute('x', posX);
-                tooltip.element.setAttribute('y', posY);
-                tooltip.element.style.display = 'block';
-                tooltip.element.style.opacity = 1;
-            }
-            else {
-                const data = dataByGroup.data[groupId][shapeId];
-                if (!data) {
-                    tooltip.element.style.display = 'none';
-                    return;
-                }
-                const tt = constructTooltip(data, dataByGroup.tooltips[groupId]);
-                tooltip.element.replaceWith(tt);
-                tooltip.element = tt;
-                tooltip.shapeId = shapeId;
-                tooltip.element.setAttribute('x', posX);
-                tooltip.element.setAttribute('y', posY);
-            }
-        });
-    });]]>`;
-    const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
-    scriptElem.innerHTML = finalScript;
-    optimizedSVG.firstChild.append(scriptElem);
-    const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
-    const renderedCss = exportStyleSheet('map-style');
-    styleElem.innerHTML = renderedCss + cssFonts;
-    optimizedSVG.firstChild.append(styleElem);
-    download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'mySvg.svg');
-}
-
-function getTooltipData(groupId, optimizedSvg) {
-    const indexed = indexBy(zonesData[groupId].data, groupId === 'countries' ? 'alpha-3': 'shapeName');
-    const group = optimizedSvg.getElementById(groupId);
-    const finalData = {};
-    for (let child of group.children) {
-        const id = child.getAttribute('id');
-        if (!id) continue;
-        finalData[id] = pick(indexed[id], usedVars);
-    }
-}
-
-function styleSheetToText(sheet) {
-    let styleTxt = '';
-    const rules = sheet.cssRules;
-    for (let r in rules) {
-        styleTxt += rules[r].cssText;
-    }
-    return styleTxt.replace(/undefined/g, '');
-}
-
-function exportStyleSheet() {
-    const sheets = document.styleSheets;
-    for (let i in sheets) {
-        const rules = sheets[i].cssRules;
-        for (let r in rules) {
-            const selectorText = rules[r].selectorText;
-            if (selectorText?.includes("#paths path")) return styleSheetToText(sheets[i]);
-        }
-    }
 }
 
 function redraw(propName) {
@@ -864,20 +676,6 @@ function editPopup(e) {
 }
 
 
-function reportStyle(reference, target) {
-    const walkerRef = document.createTreeWalker(reference, NodeFilter.SHOW_ELEMENT); 
-    const walkerTarget = document.createTreeWalker(target, NodeFilter.SHOW_ELEMENT);
-    reportStyleElem(walkerRef.currentNode, walkerTarget.currentNode);
-    while (walkerRef.nextNode()) {
-        walkerTarget.nextNode();
-        reportStyleElem(walkerRef.currentNode, walkerTarget.currentNode);
-    }
-}
-
-function reportStyleElem(ref, target) {
-    target.setAttribute('style', ref.getAttribute('style'));
-}
-
 function getFinalTooltipTemplate(groupId) {
     const finalReference = htmlToElement(popupContents[groupId]);
     const finalTemplate = finalReference.cloneNode(true);
@@ -979,7 +777,7 @@ function addNewCountry(e) {
             {/if}     
             {/each}
         </Tabs>
-        <div class="m-2 btn btn-light" on:click={exportSvg}> Export </div>
+        <div class="m-2 btn btn-light" on:click={() => exportSvg(svg, p('width'), p('height'), popupContents, tooltipTemplates, chosenCountries, zonesData, cssFonts)}> Export </div>
     </aside>
     <div id="map-container"></div>
 </div>
