@@ -4,7 +4,7 @@
   "description": "Create easily some visuals ",
   "main": "index.js",
   "scripts": {
-    "serve": "npx webpack --mode=development --watch",
+    "dev": "npx webpack --mode=development --watch",
     "build": "npx webpack --mode=production"
   },
   "author": "Quentin Pinçon",
@@ -26,7 +26,7 @@
     "d3": "^7.6.1",
     "d3-geo-projection": "^4.0.0",
     "d3-zoom": "^3.0.0",
-    "inline-style-editor": "^1.1.3",
+    "inline-style-editor": "^1.2.0",
     "mustache": "^4.2.0",
     "parse-svg-path": "^0.1.2",
     "sass-loader": "^13.0.2",

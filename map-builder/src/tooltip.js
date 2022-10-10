@@ -41,6 +41,7 @@ function addTooltipListener(map, tooltipTemplates, popupContents, zonesData) {
                 tooltip.element.style.opacity = 1;
             }
             else {
+                e.target.parentNode.append(e.target);
                 const idCol = groupId === 'countries' ? 'alpha-3' : 'shapeName';
                 const data = zonesData[groupId].data.find(row => row[idCol] === shapeId);
                 if (!data) {

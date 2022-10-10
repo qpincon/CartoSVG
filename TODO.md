@@ -1,25 +1,25 @@
-- [ ] Two layers: "land" (outside) and adm(inside, hover possible, action on hover)
-- [ ] add "Context": countries
-- [ ] Add labels (from geojson properties) : give choice to select font + marker
+- [x] Two layers: "land" (outside) and adm(inside, hover possible, action on hover)
+- [x] add "Context": countries
+- [-] Add labels (from geojson properties) : give choice to select font + marker
 - [ ] "Save current geo params" -> localstorage. If defined, to moving on import new file
 - [x] Support import geojson
-- [ ] Create tooltips on hover: have a builder to chose properties on geometries
+- [x] Create tooltips on hover: have a builder to chose properties on geometries
 - [ ] Default themes (pirate map style, brand style...)
-- [ ] Add possibility to change background image (noise for now)
+- [-] Add possibility to change background image (noise for now)
 - [x] Import geojson instead of topojson
 - [x] Draw on canvas on move, using simplified geometries
 - [ ] Export with a level of precision
-- [ ] Export a JS file defining a class, to call on an element
-- [ ] Allow placing points (choosing from a set of shapes)
-    - [ ] Make the shape resizable / stylable with inline-style-editor (right click -> edit size + edit style)
-- [ ] Allow associating labels to those points
-- [ ] Allow customization of paths strokes
+- [-] Export a JS file defining a class, to call on an element
+- [x] Allow placing points (choosing from a set of shapes)
+    - [x] Make the shape resizable / stylable with inline-style-editor (right click -> edit size + edit style)
+- [x] Allow associating labels to those points
+- [x] Allow customization of paths strokes
 - [ ] Allow adding bubbles (projected or not)
     - [ ] Add "create bubble" on right click -> display radius, editable later on with inline-style-editor
     - [ ] Create tooltip for the bubbles (one for each bubble) 
-- [ ] Allow customizing the contour (no contour, size, border-type, color...)
+- [x] Allow customizing the contour (no contour, size, border-type, color...)
 - [x] Fix different sizes of container for SVG / canvas
-- [ ] Give choice of viewBox vs width/height
+- [x] Give choice of viewBox vs width/height
 - [x] If viewBox, always fill container, and get dynamic size for drawing with canvas
 - [x] If width/height, give control over width/height
 - [x] Fix change sea color not working
@@ -36,9 +36,10 @@
 - [x] Find a way to retain inline styles on redraw  
 - [x] Define <style> in <defs> in SVG directly  
 - [ ] Allow for ordering <land> div after/before countries/ADM1. If after, remove <SourceGraphic> from merge filter, otherwise retain it (for stroke)
-- [ ] Wrap "land" inside an inline <image> tag, inside a separate <svg> for FF performance (and maybe other browsers?)
+- [x] Wrap "land" inside an inline <image> tag, inside a separate <svg> for FF performance (and maybe other browsers?)
     - MUCH worse performance on chrome. Tried:
         - Move svg containing <image> on the outside: same
         - Same principle, using <img> tag: same
-    - Solution: will-change: opacity
- 
+    - Solution: will-change: opacity + <image>
+ - [ ] Instructions: how to tilt / rotate / zoom / drag
+ - [ ] Change zoom sensibility according to FOV

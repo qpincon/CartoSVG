@@ -45,7 +45,7 @@
                 </div>
             {:else if key in paramDefs}
                 {#if paramDefs[key].type == "range"}
-                    <div class="row mb-1">
+                    <div class="row">
                         <label for={`form-${key}`} class="col-4 col-form-label">
                             {camelCaseToSentence(key)}
                         </label>
@@ -88,7 +88,7 @@
                     </label>
                 </div>
             {:else if key.toLowerCase().includes('color')}
-                <div class="mb-1 row">
+                <div class="row">
                     <label for={`form-${key}`} class="col-form-label col-4">
                         {camelCaseToSentence(key)}
                     </label>
@@ -107,7 +107,7 @@
                     /> 
                 </div>
             {:else}
-                <div class="mb-1">
+                <div>
                     <label for={`form-${key}`} class="form-label">
                         {camelCaseToSentence(key)}
                     </label>

@@ -65,16 +65,16 @@ function exportSvg(svg, width, height, popupContents, tooltipTemplates, chosenCo
                 return;
             };
             const mapBounds = mapElement.getBoundingClientRect();
-            const transformX = mapBounds.width / width;
-            const transformY = mapBounds.height / height;
+            const transformX = width / mapBounds.width;
+            const transformY = height / mapBounds.height;
             const ttBounds = tooltip.element.firstChild?.firstChild?.getBoundingClientRect();
             let posX = (e.clientX - mapBounds.left + 10) * transformX, posY = (e.clientY - mapBounds.top + 10) * transformY;
             if (ttBounds?.width > 0) {
                 if (mapBounds.right - ttBounds.width < e.clientX + 10) {
-                    posX -= ttBounds.width + 10;
+                    posX = (e.clientX - mapBounds.left -ttBounds.width - 10) * transformX;
                 }
                 if (mapBounds.bottom - ttBounds.height < e.clientY + 10) {
-                    posY -=  ttBounds.height + 10;
+                    posY -= (e.clientY - mapBounds.height -ttBounds.height - 10) * transformY;
                 }
             }
             const groupId = parent.getAttribute('id').replace('-adm1', '');
@@ -90,6 +90,7 @@ function exportSvg(svg, width, height, popupContents, tooltipTemplates, chosenCo
                 tooltip.element.style.opacity = 1;
             }
             else {
+                parent.append(e.target);
                 const data = dataByGroup.data[groupId][shapeId];
                 if (!data) {
                     tooltip.element.style.display = 'none';

@@ -12,10 +12,10 @@ import MotionPathHelper from "./util/MotionPathHelper.js";
 import svgoConfig from './svgo.config';
 import cssTemplate from './templates/style.template.txt';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
-import { paramDefs, params} from './params';
+import { paramDefs, defaultParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
-import { download, sortBy, indexBy, pick, htmlToElement } from './util/common';
+import { download, sortBy, indexBy, htmlToElement } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import { setTransformScale } from './svg/svg';
 import { drawShapes } from './svg/shape';
@@ -25,9 +25,12 @@ import Modal from './components/Modal.svelte';
 import NestedAccordions from './components/NestedAccordions.svelte';
 import { Tabs, TabList, TabPanel, Tab } from './components/tabs/tabs.js';
 import { reportStyle } from './util/dom';
+import { saveState, getState } from './util/save';
 import { exportSvg } from './svg/export';
 import { addTooltipListener} from './tooltip';
 
+let params = {...defaultParams};
+console.log(params);
 const iso3DataById = indexBy(iso3Data, 'alpha-3');
 const resolvedAdm1 = {};
 const countriesAdm1 = require.context('./assets/layers/adm1/', false, /\..*json$/, 'lazy');
@@ -96,36 +99,44 @@ let projection = null;
 let svg = null;
 let addingPath = false;
 let currentPath = [];
+
+// ====== State =======
 let providedPaths = [];
 let providedShapes = []; // {name, coords, scale, id}
 let chosenCountries = [];
-const menuStates = {
-    chosingPoint:      false,
-    pointSelected:     false,
-    addingLabel:       false,
-};
-const inlineProps = {
+let inlineProps = {
     longitude: 15,
     latitude: 36,
     altitude: 1000,
     rotation: 0,
     tilt: 25,
 }
+let providedFonts = [];
+let cssFonts;
+let shapeCount = 0;
+let inlineStyles = {}; // elemID -> prop -> value
+let zonesData = {}; // key => {data (list), provided (bool)}
+let lastUsedLabelFont = "Luminari"
+
+// ==== End state =====
+
+const menuStates = {
+    chosingPoint:      false,
+    pointSelected:     false,
+    addingLabel:       false,
+};
 let editedLabelId;
 let textInput;
 let typedText = "";
-const inlineStyles = {}; // elemID -> prop -> value
-let lastUsedLabelFont = "Luminari"
 let styleEditor;
 let contextualMenu;
-let zonesData = {}; // key => {data (list), provided (bool)}
 let showModal = false;
-let tooltip = {currentId: null, element: null};
 let htmlPopupElem;;
 let tooltipTemplates = {countries: defaultPopupContent('name')};
 let currentTab = 'countries';
 const popupContents = {countries: defaultPopupFull(tooltipTemplates['countries'])};
 onMount(() => {
+    restoreState();
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
             if (htmlPopupElem.contains(target)) {
@@ -145,7 +156,8 @@ onMount(() => {
         getAdditionalElems: (el) => {
             if (el.classList.contains('adm1')) {
                 const parentCountry = el.parentNode.getAttribute('id').replace('-adm1', '');
-                const countryElem = document.getElementById(parentCountry);
+                const parentCountryIso3 = iso3Data.find(row => row.name === parentCountry)['alpha-3'];
+                const countryElem = document.getElementById(parentCountryIso3);
                 return [countryElem];
             }
             return [];
@@ -175,6 +187,7 @@ onMount(() => {
     contextualMenu.style.position = 'absolute';
     const container = d3.select('#map-container');
     container.call(d3.drag()
+        .filter((e) => !e.button)   // Remove ctrlKey
         .on("drag", dragged)
         .on('start', () => {
             if (menuStates.addingLabel) validateLabel();
@@ -206,7 +219,6 @@ function zoomed(event) {
 
 const sensitivity = 75;
 function dragged(event) {
-    console.log(event.sourceEvent)
     if (event.sourceEvent.shiftKey) {
         inlineProps.tilt += event.dy / 10;
     }
@@ -228,7 +240,6 @@ function dragged(event) {
 }
 
 function draw(simplified = false, _) {
-    // console.log((new Error()));
     for (const country of chosenCountries) {
         if (!(country in resolvedAdm1)) {
             tooltipTemplates[country] = defaultPopupContent('shapeName');
@@ -377,16 +388,13 @@ function draw(simplified = false, _) {
         }
         groupData.push({ name: 'countries', data: countries, id: (prop) => prop['alpha-3'], props: [], class: 'country', filter: null });
     }
-    // if (p('showLand')) {
-    //     groupData.push({ name: 'land', data: land, id: (prop) => prop['id'], props: [], class: 'land', filter: 'firstGlow' });
-    // }
     // if (providedBorders && params.providedBorders.show)
     //     groupData.push({ name: 'provided-borders', data: [providedBorders], id: null, props: [], class: 'provided-borders', filter: params.providedBorders.filter });
     // if (provided && params.provided.show)
     //     groupData.push({ name: 'provided', data: provided, id: null, props: [], class: 'provided', filter: null });
-    // for (const country of chosenCountries) {
-    //     groupData.push({ name: `${country}-adm1`, data: resolvedAdm1[country], id: (prop) => prop.shapeName, props: [], class: 'adm1', filter: null });
-    // }
+    for (const country of chosenCountries) {
+        groupData.push({ name: `${country}-adm1`, data: resolvedAdm1[country], id: (prop) => prop.shapeName, props: [], class: 'adm1', filter: null });
+    }
     groupData.push({ name: 'points-labels', data: [], id: null, props: [], class: null, filter: null });
     const groups = svg.selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
     function drawPaths(data) {
@@ -415,17 +423,15 @@ function draw(simplified = false, _) {
         appendGlow(landElem, 'firstGlow', p('innerGlow1'), p('outerGlow1'));
         const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
             .attr('href', `data:image/svg+xml,${encodeURIComponent(SVGO.optimize(landElem.node().outerHTML, svgoConfig).data)}`);
-            // .attr('href', `data:image/svg+xml,${encodeURIComponent(landElem.node().outerHTML)}`);
             
         const newSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         newSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
         newSvg.innerHTML = landImage.node().outerHTML;
         newSvg.style['pointer-events'] = 'none';
-        svg.node().appendChild(newSvg);
+        svg.node().insertBefore(newSvg, document.getElementById('points-labels'));
     }
 
     drawCustomPaths(providedPaths, svg, projection);
-    // appendGlow(svg, 'firstGlow', p('innerGlow1'), p('outerGlow1'));
     appendGlow(svg, 'secondGlow', p('innerGlow2'), p('outerGlow2'));
     appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
     d3.select('#outline').style('fill', "url(#noise)");
@@ -443,7 +449,25 @@ function draw(simplified = false, _) {
     addTooltipListener(map, tooltipTemplates, popupContents, zonesData);
 }
 
+function save() {
+    saveState({params, inlineProps, cssFonts, providedFonts, 
+        providedShapes, providedPaths, chosenCountries, 
+        inlineStyles, shapeCount, zonesData, lastUsedLabelFont
+    });
+}
 
+function restoreState(givenState) {
+    let state;
+    if (givenState) {
+        state = givenState;
+    }
+    else state = getState();
+    if (!state) return;
+    ({  params, inlineProps, cssFonts, providedFonts, 
+        providedShapes, providedPaths, chosenCountries, 
+        inlineStyles, shapeCount, zonesData, lastUsedLabelFont
+    } = state);
+}
 
 function applyStyles() {
     // apply inline styles
@@ -457,6 +481,7 @@ function applyStyles() {
             else elem.style[cssProp] = cssValue;
         });
     }));
+    save();
 }
 // function handleInput(e) {
 //     const file = e.target.files[0];
@@ -480,8 +505,6 @@ function applyStyles() {
 //     reader.readAsText(file);
 // }
 
-let providedFonts = [];
-let cssFonts;
 function fontsToCss(fonts) {
     cssFonts = fonts.map(({name, content}) => {
         return `@font-face {
@@ -601,7 +624,6 @@ function showMenu(e) {
     contextualMenu.style.top = e.pageY + "px";
 }
 
-let shapeCount = 0;
 function addShape(shapeName) {
     const shapeId = `${shapeName}-${shapeCount++}`;
     providedShapes.push({name: shapeName, pos: openContextMenuInfo.position, scale: 1, id:shapeId});
@@ -675,15 +697,6 @@ function editPopup(e) {
     styleEditor.open(e.target, rect.right, rect.bottom);
 }
 
-
-function getFinalTooltipTemplate(groupId) {
-    const finalReference = htmlToElement(popupContents[groupId]);
-    const finalTemplate = finalReference.cloneNode(true);
-    finalTemplate.innerHTML = tooltipTemplates[groupId];
-    reportStyle(finalReference, finalTemplate);
-    return finalTemplate.outerHTML;
-}
-
 function onTemplateChange() {
     popupContents[currentTab] = htmlPopupElem.outerHTML;
 }
@@ -702,6 +715,32 @@ function addNewCountry(e) {
     chosenCountries = chosenCountries;
     draw(false);
 }
+
+function saveProject() {
+    const state = {params, inlineProps, cssFonts, providedFonts, 
+        providedShapes, providedPaths, chosenCountries, 
+        inlineStyles, shapeCount, zonesData, lastUsedLabelFont
+    };
+    download(JSON.stringify(state), 'text/json', 'project.mapbuilder');
+}
+
+function loadProject(e) {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+        try {
+            const providedState = JSON.parse(reader.result);
+            restoreState(providedState);
+            save();
+            draw();
+        } catch(e) {
+            console.log(e);
+            console.error('Unable to parse provided file. Should be valid JSON.');
+        }
+    });
+    reader.readAsText(file);    
+}
+
 </script>
 
 <svelte:head>
@@ -759,11 +798,6 @@ function addNewCountry(e) {
                         <DataTable data={zonesData?.[tabTitle]?.['data']} idCol='alpha-3'> </DataTable>
                     </div>
                     <div class="mx-2 btn btn-outline-primary" on:click={() => exportJson(zonesData?.[tabTitle]?.['data'])}> Export JSON </div>
-                    
-                    <div class="w-100 px-2 my-3 row">
-                        <label for="fontinput" class="col-form-label col-4">Font file</label>
-                        <input class="form-control col" type="file" id="fontinput" accept=".ttf,.woff" on:change={handleInputFont}>
-                    </div>
                     <div class="m-2">
                         <label for="templatePopup" class="form-label"> Popup template </label>
                         <textarea class="form-control template-input" id="templatePopup" rows="3" bind:value={tooltipTemplates[tabTitle]} on:change={onTemplateChange}></textarea>
@@ -777,7 +811,20 @@ function addNewCountry(e) {
             {/if}     
             {/each}
         </Tabs>
-        <div class="m-2 btn btn-light" on:click={() => exportSvg(svg, p('width'), p('height'), popupContents, tooltipTemplates, chosenCountries, zonesData, cssFonts)}> Export </div>
+        <div class="m-2 btn btn-light">
+            <label for="fontinput" >Add font</label>
+            <input type="file" id="fontinput" accept=".ttf,.woff,.woff2" on:change={handleInputFont}>
+        </div>
+        <div class="m-2 btn btn-light" on:click={() => exportSvg(svg, p('width'), p('height'), popupContents, tooltipTemplates, chosenCountries, zonesData, cssFonts)}>
+            Export 
+        </div>
+        <div class="m-2 btn btn-light" on:click={saveProject}>
+            Save project
+        </div>
+        <div class="m-2 btn btn-light">
+            <label for="project-import">Load project</label>
+            <input id="project-import" type="file" accept=".mapbuilder" on:change={loadProject}>
+        </div>
     </aside>
     <div id="map-container"></div>
 </div>
@@ -817,6 +864,11 @@ function addNewCountry(e) {
   opacity: 0;
   position: absolute;
   height: 38px;
+  width: 4rem;
+}
+
+input[type="file"] {
+    display: none;
 }
 
 </style>

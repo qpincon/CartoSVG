@@ -1,4 +1,4 @@
-const params = {
+let defaultParams = {
     "General": {
         width: 550,
         height: 600,
@@ -26,7 +26,6 @@ const params = {
             outerGlow2: {blur: 4, strength: 3, color: '#ffffffff'},
         },
     },
-
 }
 
 const paramDefs = {
@@ -53,10 +52,5 @@ const paramBounds = {
     graticuleStep: [0.1, 10],
     strokeWidth: [0.1, 5],
 };
-const filterOptions = {
-    none: '',
-    firstGlow: 'firstGlow',
-    secondGlow: 'secondGlow',
-};
 
-export {params, paramDefs, paramBounds, filterOptions};
+export {defaultParams, paramDefs, paramBounds };
