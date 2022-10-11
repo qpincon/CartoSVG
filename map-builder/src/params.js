@@ -33,24 +33,12 @@ const paramDefs = {
     height:         {type: 'range', min: 100, max: 800},
     fieldOfView:    {type: 'range', min: 1, max: 180},
     blur:           {type: 'range', min: 0.5, max: 10, step: 0.1},
-    strength:       {type: 'range', min: 0.1, max: 10, step: 0.1},
+    strength:       {type: 'range', min: 0.1, max: 6, step: 0.1},
     graticuleStep:  {type: 'range', min: 0.1, max: 10, step: 0.1},
+    borderRadius:   {type: 'range', min: 0, max: 20},
+    borderWidth:    {type: 'range', min: 0, max: 10},
     filter:         {type: 'select', choices: ['none', 'firstGlow', 'secondGlow']}
 };
 
-const paramBounds = {
-    width: [200, 1500],
-    height: [300, 1600],
-    longitude: [-180, 180],
-    latitude: [-90, 90],
-    rotation: [-180, 180],
-    tilt: [0, 90],
-    altitude: [100, 10000],
-    fieldOfView: [1, 180],
-    blur: [0.5, 10],
-    strength: [0.1, 10],
-    graticuleStep: [0.1, 10],
-    strokeWidth: [0.1, 5],
-};
 
-export {defaultParams, paramDefs, paramBounds };
+export {defaultParams, paramDefs };

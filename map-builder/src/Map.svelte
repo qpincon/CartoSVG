@@ -13,7 +13,7 @@ import svgoConfig from './svgo.config';
 import cssTemplate from './templates/style.template.txt';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import { paramDefs, defaultParams } from './params';
-import { appendBgPattern, appendGlow } from './svg/svgDefs';
+import { appendBgPattern, appendGlow, frontFilter, frontFilterTest } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
 import { download, sortBy, indexBy, htmlToElement } from './util/common';
 import * as shapes from './svg/shapeDefs';
@@ -30,7 +30,6 @@ import { exportSvg } from './svg/export';
 import { addTooltipListener} from './tooltip';
 
 let params = {...defaultParams};
-console.log(params);
 const iso3DataById = indexBy(iso3Data, 'alpha-3');
 const resolvedAdm1 = {};
 const countriesAdm1 = require.context('./assets/layers/adm1/', false, /\..*json$/, 'lazy');
@@ -71,7 +70,7 @@ const p = (propName, obj = params) => findProp(propName, obj);
 const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView'];
 const earthRadius = 6371;
 const degrees = 180 / Math.PI;
-const offCanvasPx = 5;
+const offCanvasPx = 10;
 let timeoutId;
 let countries = null;
 let land = null;
@@ -116,7 +115,9 @@ let cssFonts;
 let shapeCount = 0;
 let inlineStyles = {}; // elemID -> prop -> value
 let zonesData = {}; // key => {data (list), provided (bool)}
-let lastUsedLabelFont = "Luminari"
+let lastUsedLabelFont = "Luminari";
+let tooltipTemplates = {countries: defaultPopupContent('name')};
+let popupContents = {countries: defaultPopupFull(tooltipTemplates['countries'])};
 
 // ==== End state =====
 
@@ -132,9 +133,8 @@ let styleEditor;
 let contextualMenu;
 let showModal = false;
 let htmlPopupElem;;
-let tooltipTemplates = {countries: defaultPopupContent('name')};
 let currentTab = 'countries';
-const popupContents = {countries: defaultPopupFull(tooltipTemplates['countries'])};
+
 onMount(() => {
     restoreState();
     styleEditor = new InlineStyleEditor({
@@ -242,8 +242,10 @@ function dragged(event) {
 function draw(simplified = false, _) {
     for (const country of chosenCountries) {
         if (!(country in resolvedAdm1)) {
-            tooltipTemplates[country] = defaultPopupContent('shapeName');
-            popupContents[country] = defaultPopupFull(tooltipTemplates[country]);
+            if (!(country in tooltipTemplates)) {
+                tooltipTemplates[country] = defaultPopupContent('shapeName');
+                popupContents[country] = defaultPopupFull(tooltipTemplates[country]);
+            }
             countriesAdm1(availableCountriesAdm1[country]).then(resolved => {
                 resolvedAdm1[country] = topojson.feature(resolved, resolved.objects.country);
                 if (!(country in zonesData) && !zonesData?.[country]?.provided) {
@@ -446,17 +448,43 @@ function draw(simplified = false, _) {
    
     const map = document.getElementById('static-svg-map');
     if(!map) return;
+    frontFilter(svg);
+    svg.attr('filter', 'url(#front-filter)');
     addTooltipListener(map, tooltipTemplates, popupContents, zonesData);
 }
 
 function save() {
     saveState({params, inlineProps, cssFonts, providedFonts, 
         providedShapes, providedPaths, chosenCountries, 
-        inlineStyles, shapeCount, zonesData, lastUsedLabelFont
+        inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
+        tooltipTemplates, popupContents
     });
 }
 
-function restoreState(givenState) {
+function resetState() {
+    params = {...defaultParams};
+    providedPaths = [];
+    providedShapes = [];
+    chosenCountries = [];
+    inlineProps = {
+        longitude: 15,
+        latitude: 36,
+        altitude: 1000,
+        rotation: 0,
+        tilt: 25,
+    }
+    providedFonts = [];
+    cssFonts;
+    shapeCount = 0;
+    inlineStyles = {};
+    zonesData = {};
+    lastUsedLabelFont = "Luminari";
+    tooltipTemplates = {countries: defaultPopupContent('name')};
+    popupContents = {countries: defaultPopupFull(tooltipTemplates['countries'])};
+    draw();
+}
+
+async function restoreState(givenState) {
     let state;
     if (givenState) {
         state = givenState;
@@ -465,7 +493,8 @@ function restoreState(givenState) {
     if (!state) return;
     ({  params, inlineProps, cssFonts, providedFonts, 
         providedShapes, providedPaths, chosenCountries, 
-        inlineStyles, shapeCount, zonesData, lastUsedLabelFont
+        inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
+        tooltipTemplates, popupContents,
     } = state);
 }
 
@@ -520,7 +549,6 @@ function handleInputFont(e) {
     const fileName = file.name.split('.')[0];
     const reader = new FileReader();
     reader.addEventListener('load', () => {
-        console.log(reader.result);
         const newFont = {name: fileName, content: reader.result}
         providedFonts.push(newFont);
         providedFonts = providedFonts;
@@ -594,7 +622,7 @@ function validateLabel() {
 function drawAndSetupShapes() {
     const container = document.getElementById('points-labels');
     if (!container) return;
-    drawShapes(providedShapes, container, projection);
+    drawShapes(providedShapes, container, projection, save);
     d3.select(container).on('dblclick', e => {
         const target = e.target;
         const targetId = target.getAttribute('id');
@@ -668,7 +696,6 @@ function handleDataImport(e, key) {
     const file = e.target.files[0];
     const reader = new FileReader();
     reader.addEventListener('load', () => {
-        console.log(reader.result);
         try {
             const parsed = sortBy(JSON.parse(reader.result), 'alpha-3');
             zonesData[key] = {data: parsed, provided:true };
@@ -681,7 +708,7 @@ function handleDataImport(e, key) {
 
 function defaultPopupContent(idCol) {
     return `<div>
-    <span> Country: {${idCol}}</span>
+    <span> ${idCol === 'name' ? 'Country' : 'Region'}: {${idCol}}</span>
 </div>
     `;
 }
@@ -734,7 +761,6 @@ function loadProject(e) {
             save();
             draw();
         } catch(e) {
-            console.log(e);
             console.error('Unable to parse provided file. Should be valid JSON.');
         }
     });
@@ -776,7 +802,6 @@ function loadProject(e) {
                 {#each ['countries', ...chosenCountries] as tabTitle }
                     <Tab on:change={onTabChanged} tabTitle={tabTitle}> </Tab>
                 {/each}
-                <!-- <Tab changeOnClick={false}> -->
                 <div class="nav-item">
                     <select role="button" id='countrySelect' on:change={addNewCountry}>
                         {#each Object.keys(availableCountriesAdm1) as country}
@@ -785,14 +810,13 @@ function loadProject(e) {
                     </select>
                     <span class="nav-link"> ➕ </span>
                 </div>
-                <!-- </Tab> -->
             </TabList>
             {#each ['countries', ...chosenCountries] as tabTitle }
             {#if zonesData?.[tabTitle]?.['data']}
-            <TabPanel>
-                    <div class="w-100 px-2 my-3 row">
-                        <label for="data-input-json" class="col-form-label col-4">Import data</label>
-                        <input class="form-control col" type="file" id="data-input-json" accept=".json" on:change={(e) => handleDataImport(e, 'countries')}>
+                <TabPanel>
+                    <div>
+                        <label for="data-input-json" class="m-2 btn btn-light">Import data for {tabTitle} </label>
+                        <input id="data-input-json" type="file" accept=".mapbuilder" on:change={(e) => handleDataImport(e, 'countries')}>
                     </div>
                     <div class="data-table mb-2" on:click={() => (showModal = true)}>
                         <DataTable data={zonesData?.[tabTitle]?.['data']} idCol='alpha-3'> </DataTable>
@@ -803,7 +827,7 @@ function loadProject(e) {
                         <textarea class="form-control template-input" id="templatePopup" rows="3" bind:value={tooltipTemplates[tabTitle]} on:change={onTemplateChange}></textarea>
                     </div>
                     <div class="popup-preview">
-                        <div id="popup-preview" bind:this={htmlPopupElem} on:click={editPopup} style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
+                        <div id={`popup-preview-${tabTitle}`} bind:this={htmlPopupElem} on:click={editPopup} style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
                             {@html tooltipTemplates[tabTitle].formatUnicorn(zonesData?.[tabTitle]?.['data'][0])}
                         </div>
                     </div>
@@ -811,19 +835,24 @@ function loadProject(e) {
             {/if}     
             {/each}
         </Tabs>
-        <div class="m-2 btn btn-light">
-            <label for="fontinput" >Add font</label>
-            <input type="file" id="fontinput" accept=".ttf,.woff,.woff2" on:change={handleInputFont}>
-        </div>
-        <div class="m-2 btn btn-light" on:click={() => exportSvg(svg, p('width'), p('height'), popupContents, tooltipTemplates, chosenCountries, zonesData, cssFonts)}>
-            Export 
-        </div>
-        <div class="m-2 btn btn-light" on:click={saveProject}>
-            Save project
-        </div>
-        <div class="m-2 btn btn-light">
-            <label for="project-import">Load project</label>
-            <input id="project-import" type="file" accept=".mapbuilder" on:change={loadProject}>
+        <div class="d-flex flex-wrap">
+            <div>
+                <label for="fontinput" class="m-2 btn btn-light">Add font</label>
+                <input type="file" id="fontinput" accept=".ttf,.woff,.woff2" on:change={handleInputFont}>
+            </div>
+            <div class="m-2 btn btn-light" on:click={() => exportSvg(svg, p('width'), p('height'), popupContents, tooltipTemplates, chosenCountries, zonesData, cssFonts)}>
+                Export 
+            </div>
+            <div class="m-2 btn btn-light" on:click={saveProject}>
+                Save project
+            </div>
+            <div class="m-2 btn btn-light" on:click={resetState}>
+                Reset
+            </div>
+            <div>
+                <label class="m-2 btn btn-light" for="project-import">Load project</label>
+                <input id="project-import" type="file" accept=".mapbuilder" on:change={loadProject}>
+            </div>
         </div>
     </aside>
     <div id="map-container"></div>

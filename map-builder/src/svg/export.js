@@ -71,10 +71,10 @@ function exportSvg(svg, width, height, popupContents, tooltipTemplates, chosenCo
             let posX = (e.clientX - mapBounds.left + 10) * transformX, posY = (e.clientY - mapBounds.top + 10) * transformY;
             if (ttBounds?.width > 0) {
                 if (mapBounds.right - ttBounds.width < e.clientX + 10) {
-                    posX = (e.clientX - mapBounds.left -ttBounds.width - 10) * transformX;
+                    posX = (e.clientX - mapBounds.left - ttBounds.width - 10) * transformX;
                 }
                 if (mapBounds.bottom - ttBounds.height < e.clientY + 10) {
-                    posY -= (e.clientY - mapBounds.height -ttBounds.height - 10) * transformY;
+                    posY = (e.clientY - mapBounds.top - ttBounds.height - 10) * transformY;
                 }
             }
             const groupId = parent.getAttribute('id').replace('-adm1', '');

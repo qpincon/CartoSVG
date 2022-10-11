@@ -41,8 +41,13 @@ const config = {
                 },
             },
             {
-                test: /\.(svg|png|xlsx|csv)$/,
+                test: /\.(svg|png|xlsx|jpg|csv)$/,
                 type: 'asset/resource',
+            },
+            {
+                test: /\.(svg|png|jpg)$/,
+                resourceQuery: /inline/,
+                type: 'asset/inline',
             },
             {
                 test: /\.(txt)$/,

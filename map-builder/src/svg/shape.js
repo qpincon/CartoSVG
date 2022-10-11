@@ -4,7 +4,7 @@ import { createSvgFromPart, setTransformTranslate, getTranslateFromTransform } f
 import * as shapes from './shapeDefs';
 
 let currentlyDragging;
-function drawShapes(shapeDefinitions, container, projection) {
+function drawShapes(shapeDefinitions, container, projection, dragCb) {
     if (!container) return;
     container.innerHTML = '';
     shapeDefinitions.forEach((shapeDef) => {
@@ -41,6 +41,7 @@ function drawShapes(shapeDefinitions, container, projection) {
             const [x, y] = getTranslateFromTransform(currentlyDragging);
             pointDef.pos = projection.invert([x, y]);
             currentlyDragging = null;
+            dragCb();
         })
     );
 }
