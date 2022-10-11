@@ -2,6 +2,7 @@
 	import { getContext } from 'svelte';
 	import { TABS } from './Tabs.svelte';
     import { createEventDispatcher } from 'svelte';
+    let tabBtn;
 
 	export const tab = {};
     export let tabTitle;
@@ -11,7 +12,8 @@
 	registerTab(tab);
 
 	const dispatch = createEventDispatcher();
-    function changeTab() {
+    function changeTab(e) {
+        if (e.target !== tabBtn) return;
         if ($selectedTab === tab) return;
 		dispatch('change', {
             tab: tabTitle
@@ -22,9 +24,10 @@
 </script>
 
 
-<li role="button" class="nav-item" on:click="{changeTab}">
-    <a class:active="{$selectedTab === tab}" class="nav-link">
+<li role="button" class="nav-item d-flex align-items-center">
+    <a bind:this={tabBtn} class:active="{$selectedTab === tab}" class="nav-link" on:click={changeTab}>
         {#if tabTitle} { tabTitle } {/if}
         <slot></slot>
     </a>
+    
 </li>

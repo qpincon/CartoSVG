@@ -106,4 +106,7 @@
     .modal {
         display: block;
     }
+    .modal-dialog {
+        --bs-modal-width: 50%;
+    }
 </style>

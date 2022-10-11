@@ -239,21 +239,20 @@ function dragged(event) {
     redraw('longitude');
 }
 
-function draw(simplified = false, _) {
+async function draw(simplified = false, _) {
     for (const country of chosenCountries) {
         if (!(country in resolvedAdm1)) {
-            if (!(country in tooltipTemplates)) {
-                tooltipTemplates[country] = defaultPopupContent('shapeName');
-                popupContents[country] = defaultPopupFull(tooltipTemplates[country]);
-            }
-            countriesAdm1(availableCountriesAdm1[country]).then(resolved => {
-                resolvedAdm1[country] = topojson.feature(resolved, resolved.objects.country);
-                if (!(country in zonesData) && !zonesData?.[country]?.provided) {
-                    zonesData[country] = {data: sortBy(resolvedAdm1[country].features.map(f => f.properties), 'shapeName')};
-                }
-                draw(simplified);
-            });
+            const resolved = await countriesAdm1(availableCountriesAdm1[country]);
+            resolvedAdm1[country] = topojson.feature(resolved, resolved.objects.country);
+            draw(simplified);
             return;
+        }
+        if (!(country in tooltipTemplates)) {
+            tooltipTemplates[country] = defaultPopupContent('shapeName');
+            popupContents[country] = defaultPopupFull(tooltipTemplates[country]);
+        }
+        if (!(country in zonesData) && !zonesData?.[country]?.provided) {
+            zonesData[country] = {data: sortBy(resolvedAdm1[country].features.map(f => f.properties), 'shapeName')};
         }
     }
     const snyderP = 1.0 + inlineProps.altitude / earthRadius;
@@ -448,8 +447,8 @@ function draw(simplified = false, _) {
    
     const map = document.getElementById('static-svg-map');
     if(!map) return;
-    frontFilter(svg);
-    svg.attr('filter', 'url(#front-filter)');
+    // frontFilter(svg);
+    // svg.attr('filter', 'url(#front-filter)');
     addTooltipListener(map, tooltipTemplates, popupContents, zonesData);
 }
 
@@ -740,7 +739,13 @@ async function onTabChanged(e) {
 function addNewCountry(e) {
     chosenCountries.push(e.target.value);
     chosenCountries = chosenCountries;
-    draw(false);
+    e.target.selectedIndex = null;
+    draw();
+}
+
+function deleteCountry(country) {
+    chosenCountries = chosenCountries.filter(x => x !== country);
+    draw();
 }
 
 function saveProject() {
@@ -800,7 +805,11 @@ function loadProject(e) {
         <Tabs>
             <TabList>
                 {#each ['countries', ...chosenCountries] as tabTitle }
-                    <Tab on:change={onTabChanged} tabTitle={tabTitle}> </Tab>
+                    <Tab on:change={onTabChanged} tabTitle={tabTitle}>
+                        {#if tabTitle !== 'countries' && tabTitle !== "land"}
+                            <span role="button" on:click={() => deleteCountry(tabTitle)}> ✕ </span>
+                        {/if}
+                    </Tab>
                 {/each}
                 <div class="nav-item">
                     <select role="button" id='countrySelect' on:change={addNewCountry}>
@@ -819,7 +828,7 @@ function loadProject(e) {
                         <input id="data-input-json" type="file" accept=".mapbuilder" on:change={(e) => handleDataImport(e, 'countries')}>
                     </div>
                     <div class="data-table mb-2" on:click={() => (showModal = true)}>
-                        <DataTable data={zonesData?.[tabTitle]?.['data']} idCol='alpha-3'> </DataTable>
+                        <DataTable data={zonesData?.[tabTitle]?.['data']}> </DataTable>
                     </div>
                     <div class="mx-2 btn btn-outline-primary" on:click={() => exportJson(zonesData?.[tabTitle]?.['data'])}> Export JSON </div>
                     <div class="m-2">
@@ -858,7 +867,7 @@ function loadProject(e) {
     <div id="map-container"></div>
 </div>
 <Modal open={showModal} onClosed={() => onModalClose()}>
-    <DataTable data={zonesData?.['countries']?.['data']} idCol='alpha-3'> </DataTable>
+    <DataTable data={zonesData?.[currentTab]?.['data']} > </DataTable>
 </Modal>
 <div>
     <!-- <div class="file m-4">
