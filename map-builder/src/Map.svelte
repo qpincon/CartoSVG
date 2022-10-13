@@ -23,13 +23,12 @@ import iso3Data from './assets/data/iso3_filtered.json';
 import DataTable from './components/DataTable.svelte';
 import Modal from './components/Modal.svelte';
 import NestedAccordions from './components/NestedAccordions.svelte';
-import { Tabs, TabList, TabPanel, Tab } from './components/tabs/tabs.js';
 import { reportStyle } from './util/dom';
 import { saveState, getState } from './util/save';
 import { exportSvg } from './svg/export';
 import { addTooltipListener} from './tooltip';
 
-let params = {...defaultParams};
+let params = JSON.parse(JSON.stringify(defaultParams));
 const iso3DataById = indexBy(iso3Data, 'alpha-3');
 const resolvedAdm1 = {};
 const countriesAdm1 = require.context('./assets/layers/adm1/', false, /\..*json$/, 'lazy');
@@ -134,6 +133,7 @@ let contextualMenu;
 let showModal = false;
 let htmlPopupElem;;
 let currentTab = 'countries';
+let orderedTabs = ['countries'];
 
 onMount(() => {
     restoreState();
@@ -448,23 +448,24 @@ async function draw(simplified = false, _) {
     const map = document.getElementById('static-svg-map');
     if(!map) return;
     // frontFilter(svg);
-    // svg.attr('filter', 'url(#front-filter)');
+    // svg.attr('filter', 'url(#frontJSON.parse(JSON.stringify({...defaultParams}))-filter)');
     addTooltipListener(map, tooltipTemplates, popupContents, zonesData);
 }
 
 function save() {
     saveState({params, inlineProps, cssFonts, providedFonts, 
-        providedShapes, providedPaths, chosenCountries, 
+        providedShapes, providedPaths, chosenCountries, orderedTabs,
         inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
         tooltipTemplates, popupContents
     });
 }
 
 function resetState() {
-    params = {...defaultParams};
+    params = JSON.parse(JSON.stringify(defaultParams));
     providedPaths = [];
     providedShapes = [];
     chosenCountries = [];
+    orderedTabs = ['countries'];
     inlineProps = {
         longitude: 15,
         latitude: 36,
@@ -483,7 +484,7 @@ function resetState() {
     draw();
 }
 
-async function restoreState(givenState) {
+function restoreState(givenState) {
     let state;
     if (givenState) {
         state = givenState;
@@ -491,10 +492,11 @@ async function restoreState(givenState) {
     else state = getState();
     if (!state) return;
     ({  params, inlineProps, cssFonts, providedFonts, 
-        providedShapes, providedPaths, chosenCountries, 
+        providedShapes, providedPaths, chosenCountries, orderedTabs,
         inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
         tooltipTemplates, popupContents,
     } = state);
+    
 }
 
 function applyStyles() {
@@ -725,13 +727,15 @@ function editPopup(e) {
 
 function onTemplateChange() {
     popupContents[currentTab] = htmlPopupElem.outerHTML;
+    save(); 
 }
 
-async function onTabChanged(e) {
-    currentTab = e.detail.tab;
+
+async function onTabChanged(newTabTitle) {
+    currentTab = newTabTitle;
     await tick();
-    if (e.detail.tab in popupContents) {
-        const tmpElem = htmlToElement(popupContents[e.detail.tab]);
+    if (newTabTitle in popupContents) {
+        const tmpElem = htmlToElement(popupContents[newTabTitle]);
         reportStyle(tmpElem, htmlPopupElem);
     }
 }
@@ -739,12 +743,15 @@ async function onTabChanged(e) {
 function addNewCountry(e) {
     chosenCountries.push(e.target.value);
     chosenCountries = chosenCountries;
+    orderedTabs.push(e.target.value);
+    orderedTabs = orderedTabs;
     e.target.selectedIndex = null;
     draw();
 }
 
 function deleteCountry(country) {
     chosenCountries = chosenCountries.filter(x => x !== country);
+    orderedTabs = orderedTabs.filter(x => x !== country);
     draw();
 }
 
@@ -770,6 +777,33 @@ function loadProject(e) {
         }
     });
     reader.readAsText(file);    
+}
+
+let hoveringTab = false;
+let dragStartIndex = 0;
+
+const drop = (event, target) => {
+  event.dataTransfer.dropEffect = 'move'; 
+  const start = parseInt(event.dataTransfer.getData("text/plain"));
+  const newList = orderedTabs;
+
+  if (start < target) {
+    newList.splice(target + 1, 0, newList[start]);
+    newList.splice(start, 1);
+  } else {
+    newList.splice(target, 0, newList[start]);
+    newList.splice(start + 1, 1);
+  }
+  orderedTabs = newList;
+  hoveringTab = null;
+}
+
+const dragstart = (event, i) => {
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.dropEffect = 'move';
+  const start = i;
+  dragStartIndex = i;
+  event.dataTransfer.setData('text/plain', start);
 }
 
 </script>
@@ -802,48 +836,55 @@ function loadProject(e) {
 <div class="d-flex p-3">
     <aside id="menu" class="border me-2">
         <NestedAccordions sections={params} paramDefs={paramDefs} on:change={handleChangeProp} ></NestedAccordions>
-        <Tabs>
-            <TabList>
-                {#each ['countries', ...chosenCountries] as tabTitle }
-                    <Tab on:change={onTabChanged} tabTitle={tabTitle}>
-                        {#if tabTitle !== 'countries' && tabTitle !== "land"}
-                            <span role="button" on:click={() => deleteCountry(tabTitle)}> ✕ </span>
-                        {/if}
-                    </Tab>
-                {/each}
-                <div class="nav-item">
-                    <select role="button" id='countrySelect' on:change={addNewCountry}>
-                        {#each Object.keys(availableCountriesAdm1) as country}
-                            <option value={country}> {country} </option>
-                        {/each}
-                    </select>
-                    <span class="nav-link"> ➕ </span>
-                </div>
-            </TabList>
-            {#each ['countries', ...chosenCountries] as tabTitle }
-            {#if zonesData?.[tabTitle]?.['data']}
-                <TabPanel>
-                    <div>
-                        <label for="data-input-json" class="m-2 btn btn-light">Import data for {tabTitle} </label>
-                        <input id="data-input-json" type="file" accept=".mapbuilder" on:change={(e) => handleDataImport(e, 'countries')}>
-                    </div>
-                    <div class="data-table mb-2" on:click={() => (showModal = true)}>
-                        <DataTable data={zonesData?.[tabTitle]?.['data']}> </DataTable>
-                    </div>
-                    <div class="mx-2 btn btn-outline-primary" on:click={() => exportJson(zonesData?.[tabTitle]?.['data'])}> Export JSON </div>
-                    <div class="m-2">
-                        <label for="templatePopup" class="form-label"> Popup template </label>
-                        <textarea class="form-control template-input" id="templatePopup" rows="3" bind:value={tooltipTemplates[tabTitle]} on:change={onTemplateChange}></textarea>
-                    </div>
-                    <div class="popup-preview">
-                        <div id={`popup-preview-${tabTitle}`} bind:this={htmlPopupElem} on:click={editPopup} style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
-                            {@html tooltipTemplates[tabTitle].formatUnicorn(zonesData?.[tabTitle]?.['data'][0])}
-                        </div>
-                    </div>
-                </TabPanel>   
-            {/if}     
+        <ul class="nav nav-tabs">
+            {#each orderedTabs as tabTitle, index (tabTitle) }
+            <li class="nav-item d-flex align-items-center"
+                draggable={true}
+                on:dragstart={event => dragstart(event, index)}
+                on:drop|preventDefault={event => drop(event, index)}
+                ondragover="return false"
+                on:dragenter={() => hoveringTab = index}
+                class:is-dnd-hovering-right={hoveringTab === index && index > dragStartIndex}
+                class:is-dnd-hovering-left={hoveringTab === index && index < dragStartIndex}>
+                <a href="javascript:;"
+                class:active={currentTab === tabTitle}
+                class="nav-link"
+                on:click={() => onTabChanged(tabTitle)}>
+                    {tabTitle}
+                </a>
+                {#if tabTitle !== 'countries' && tabTitle !== "land"}
+                    <span role="button" class="delete-tab" on:click={() => deleteCountry(tabTitle)}> ✕ </span>
+                {/if}
             {/each}
-        </Tabs>
+            
+            <li class="nav-item">
+                <select role="button" id='countrySelect' on:change={addNewCountry}>
+                    {#each Object.keys(availableCountriesAdm1) as country}
+                        <option value={country}> {country} </option>
+                    {/each}
+                </select>
+                <span class="nav-link"> ➕ </span>
+            </li>
+        </ul>
+        {#if zonesData?.[currentTab]?.['data']}
+                <div>
+                    <label for="data-input-json" class="m-2 btn btn-light"> Import data for {currentTab} </label>
+                    <input id="data-input-json" type="file" accept=".mapbuilder" on:change={(e) => handleDataImport(e, 'countries')}>
+                </div>
+                <div class="data-table mb-2" on:click={() => (showModal = true)}>
+                    <DataTable data={zonesData?.[currentTab]?.['data']}> </DataTable>
+                </div>
+                <div class="mx-2 btn btn-outline-primary" on:click={() => exportJson(zonesData?.[currentTab]?.['data'])}> Export JSON </div>
+                <div class="m-2">
+                    <label for="templatePopup" class="form-label"> Popup template </label>
+                    <textarea class="form-control template-input" id="templatePopup" rows="3" bind:value={tooltipTemplates[currentTab]} on:change={onTemplateChange}></textarea>
+                </div>
+                <div class="popup-preview">
+                    <div id={`popup-preview-${currentTab}`} bind:this={htmlPopupElem} on:click={editPopup} style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
+                        {@html tooltipTemplates[currentTab].formatUnicorn(zonesData?.[currentTab]?.['data'][0])}
+                    </div>
+                </div>
+        {/if}     
         <div class="d-flex flex-wrap">
             <div>
                 <label for="fontinput" class="m-2 btn btn-light">Add font</label>
@@ -909,4 +950,15 @@ input[type="file"] {
     display: none;
 }
 
+.is-dnd-hovering-right {
+    border-right: 2px solid blue;
+}
+.is-dnd-hovering-left {
+    border-left: 2px solid blue;
+}
+.delete-tab {
+    &:hover {
+        color: #bbdde4;
+    }
+}
 </style>

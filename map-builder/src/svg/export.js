@@ -34,7 +34,6 @@ function exportSvg(svg, width, height, popupContents, tooltipTemplates, chosenCo
     <![CDATA[
     window.addEventListener('DOMContentLoaded', () => {
         const width = ${width}, height = ${height};
-        console.log(width, height);
         const mapElement = document.getElementById('static-svg-map');
         const tooltip = {shapeId: null, element: null};
         tooltip.element = constructTooltip({}, '');
@@ -58,6 +57,9 @@ function exportSvg(svg, width, height, popupContents, tooltipTemplates, chosenCo
             tooltip.element.style.opacity = 0;
         });
         mapElement.addEventListener('mousemove', (e) => {
+            onMouseMove(e);
+        });
+        function onMouseMove(e) {
             const parent = e.target.parentNode;
             if (!parent?.hasAttribute?.("id")) {
                 tooltip.element.style.display = 'none';
@@ -69,6 +71,9 @@ function exportSvg(svg, width, height, popupContents, tooltipTemplates, chosenCo
             const transformY = height / mapBounds.height;
             const ttBounds = tooltip.element.firstChild?.firstChild?.getBoundingClientRect();
             let posX = (e.clientX - mapBounds.left + 10) * transformX, posY = (e.clientY - mapBounds.top + 10) * transformY;
+            let popupVisibleOpacity = 1;
+            const groupId = parent.getAttribute('id').replace('-adm1', '');
+            const shapeId = e.target.getAttribute('id');
             if (ttBounds?.width > 0) {
                 if (mapBounds.right - ttBounds.width < e.clientX + 10) {
                     posX = (e.clientX - mapBounds.left - ttBounds.width - 10) * transformX;
@@ -77,8 +82,12 @@ function exportSvg(svg, width, height, popupContents, tooltipTemplates, chosenCo
                     posY = (e.clientY - mapBounds.top - ttBounds.height - 10) * transformY;
                 }
             }
-            const groupId = parent.getAttribute('id').replace('-adm1', '');
-            const shapeId = e.target.getAttribute('id');
+            else if (groupId in dataByGroup.data) {
+                popupVisibleOpacity = 0;
+                setTimeout(() => {
+                    onMouseMove(e);
+                }, 0);
+            }
             if (!(groupId in dataByGroup.data)) {
                 tooltip.element.style.display = 'none';
                 tooltip.element.style.opacity = 0;
@@ -87,7 +96,7 @@ function exportSvg(svg, width, height, popupContents, tooltipTemplates, chosenCo
                 tooltip.element.setAttribute('x', posX);
                 tooltip.element.setAttribute('y', posY);
                 tooltip.element.style.display = 'block';
-                tooltip.element.style.opacity = 1;
+                tooltip.element.style.opacity = popupVisibleOpacity;
             }
             else {
                 parent.append(e.target);
@@ -102,8 +111,9 @@ function exportSvg(svg, width, height, popupContents, tooltipTemplates, chosenCo
                 tooltip.shapeId = shapeId;
                 tooltip.element.setAttribute('x', posX);
                 tooltip.element.setAttribute('y', posY);
+                tooltip.element.style.opacity = popupVisibleOpacity;
             }
-        });
+        }
     });]]>`;
     const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
     scriptElem.innerHTML = finalScript;
@@ -122,7 +132,6 @@ function getFinalTooltipTemplate(groupId, popupContents, tooltipTemplates) {
     reportStyle(finalReference, finalTemplate);
     return finalTemplate.outerHTML;
 }
-
 
 function styleSheetToText(sheet) {
     let styleTxt = '';

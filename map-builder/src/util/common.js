@@ -7,6 +7,21 @@ function download(content, mimeType, filename) {
     a.click();
 }
 
+function debounce(func, wait, immediate = false) {
+    let timeout;
+    return function() {
+        const context = this, args = arguments;
+        const later = function() {
+            timeout = null;
+            if (!immediate) func.apply(context, args);
+        };
+        const callNow = immediate && !timeout;
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+        if (callNow) func.apply(context, args);
+    };
+};
+
 function capitalizeFirstLetter(str) {
     return str[0].toUpperCase() + str.slice(1);
 }
@@ -54,4 +69,4 @@ function sortBy(data, key) {
     });
 }
 
-export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement };
+export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce };

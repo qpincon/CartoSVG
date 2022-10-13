@@ -43,3 +43,4 @@
     - Solution: will-change: opacity + <image>
  - [ ] Instructions: how to tilt / rotate / zoom / drag
  - [ ] Change zoom sensibility according to FOV
+ - [ ] Animate object along path
