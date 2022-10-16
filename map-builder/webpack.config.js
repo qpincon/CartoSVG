@@ -41,13 +41,37 @@ const config = {
                 },
             },
             {
-                test: /\.(svg|png|xlsx|jpg|csv)$/,
+                test: /\.(png|xlsx|jpg|csv)$/,
                 type: 'asset/resource',
             },
             {
-                test: /\.(svg|png|jpg)$/,
+                test: /\.(png|jpg)$/,
                 resourceQuery: /inline/,
                 type: 'asset/inline',
+            },
+            {
+                test: /\.svg$/,
+                oneOf: [
+                    {
+                        resourceQuery: /inline/,
+                        type: 'asset/source',
+                        use: [
+                            {
+                                loader: 'svgo-loader',
+                                options: {},
+                            },
+                        ],
+                    },
+                    {
+                        type: 'asset/inline',
+                        use: [
+                            {
+                                loader: 'svgo-loader',
+                                options: {},
+                            },
+                        ],
+                    }
+                ]
             },
             {
                 test: /\.(txt)$/,

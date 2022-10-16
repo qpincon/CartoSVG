@@ -2,7 +2,7 @@ import * as d3 from "d3";
 import bg from '../assets/img/bg.png?inline';
 import plaid from '../assets/img/plaid.jpg';
 
-function appendGlow(selection, id="glows",
+function appendGlow(selection, id="glows", displaySource = false,
                     innerParams = {blur: 2, strength: 1, color: "#7c490e"},
                     outerParams = {blur: 4, strength: 1, color: '#998'}) {
     const colorInner = d3.rgb(innerParams.color);
@@ -70,7 +70,7 @@ function appendGlow(selection, id="glows",
     // Merge
     const merge = filter.append('feMerge');
     merge.append('feMergeNode').attr('in', 'OUTGLOW');
-    // merge.append('feMergeNode').attr('in', 'SourceGraphic');
+    if(displaySource) merge.append('feMergeNode').attr('in', 'SourceGraphic');
     merge.append('feMergeNode').attr('in', 'INGLOW');
     filter.append(() => merge.node());
 
@@ -100,6 +100,22 @@ function appendBgPattern(selection, id, seaColor, backgroundNoise = false, image
             .attr('width', imageSize).attr('height', imageSize);
     }
     defs.append(() => pattern.node());
+}
+
+
+function appendClip(selection, width, height, rectRadius) {
+    // let defs = selection.select('defs');
+    // if (defs.empty()) defs = selection.append('defs')
+    const existing = d3.select('#clipMapBorder');
+    if (!existing.empty()) existing.remove();
+    const clip = selection.append('clipPath')
+        .attr('id', "clipMapBorder")
+        .attr('clipPathUnits', 'userSpaceOnUse');
+
+    clip.append('rect')
+        .attr('width', width)
+        .attr('height', height)
+        .attr('rx', rectRadius);
 }
 
 function frontFilter(selection) {
@@ -166,4 +182,4 @@ function frontFilterTest(selection) {
 
 }
 
-export { appendGlow, appendBgPattern, frontFilter, frontFilterTest }; 
+export { appendGlow, appendBgPattern, frontFilter, frontFilterTest, appendClip }; 

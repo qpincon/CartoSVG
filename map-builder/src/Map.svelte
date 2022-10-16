@@ -9,11 +9,11 @@ import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-s
 
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
 import MotionPathHelper from "./util/MotionPathHelper.js";
-import svgoConfig from './svgo.config';
+import svgoConfig from './svgoExport.config';
 import cssTemplate from './templates/style.template.txt';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import { paramDefs, defaultParams } from './params';
-import { appendBgPattern, appendGlow, frontFilter, frontFilterTest } from './svg/svgDefs';
+import { appendBgPattern, appendGlow, frontFilter, frontFilterTest, appendClip } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
 import { download, sortBy, indexBy, htmlToElement } from './util/common';
 import * as shapes from './svg/shapeDefs';
@@ -23,10 +23,19 @@ import iso3Data from './assets/data/iso3_filtered.json';
 import DataTable from './components/DataTable.svelte';
 import Modal from './components/Modal.svelte';
 import NestedAccordions from './components/NestedAccordions.svelte';
+import Icon from './components/Icon.svelte';
 import { reportStyle } from './util/dom';
 import { saveState, getState } from './util/save';
+import { svgToPng } from './svg/toPng';
 import { exportSvg } from './svg/export';
 import { addTooltipListener} from './tooltip';
+
+const iconsReq = require.context('./assets/img/.?inline', false, /\.svg$/);
+const icons = iconsReq.keys().reduce((acc, iconFile) => {
+    const name = iconFile.match(/\w+/)[0]; // remove extension
+    acc[name] = iconsReq(iconFile); 
+    return acc;
+}, {});
 
 let params = JSON.parse(JSON.stringify(defaultParams));
 const iso3DataById = indexBy(iso3Data, 'alpha-3');
@@ -115,8 +124,8 @@ let shapeCount = 0;
 let inlineStyles = {}; // elemID -> prop -> value
 let zonesData = {}; // key => {data (list), provided (bool)}
 let lastUsedLabelFont = "Luminari";
-let tooltipTemplates = {countries: defaultPopupContent('name')};
-let popupContents = {countries: defaultPopupFull(tooltipTemplates['countries'])};
+let tooltipTemplates = {countries: defaultTooltipContent('name')};
+let tooltipContents = {countries: defaultTooltipFull(tooltipTemplates['countries'])};
 
 // ==== End state =====
 
@@ -131,16 +140,16 @@ let typedText = "";
 let styleEditor;
 let contextualMenu;
 let showModal = false;
-let htmlPopupElem;;
+let htmltooltipElem;;
 let currentTab = 'countries';
-let orderedTabs = ['countries'];
+let orderedTabs = ['countries', 'land'];
 
 onMount(() => {
     restoreState();
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
-            if (htmlPopupElem.contains(target)) {
-                popupContents[currentTab] = htmlPopupElem.outerHTML;
+            if (htmltooltipElem.contains(target)) {
+                tooltipContents[currentTab] = htmltooltipElem.outerHTML;
             }
             if (eventType === 'inline') {
                 if (target.hasAttribute('id')) {
@@ -158,6 +167,7 @@ onMount(() => {
                 const parentCountry = el.parentNode.getAttribute('id').replace('-adm1', '');
                 const parentCountryIso3 = iso3Data.find(row => row.name === parentCountry)['alpha-3'];
                 const countryElem = document.getElementById(parentCountryIso3);
+                if (!countryElem) return [];
                 return [countryElem];
             }
             return [];
@@ -239,7 +249,17 @@ function dragged(event) {
     redraw('longitude');
 }
 
+// without 'countries' if unchecked
+let computedOrderedTabs = [];
 async function draw(simplified = false, _) {
+    computedOrderedTabs = orderedTabs.filter(x => x === 'countries' ? p('showCountries'): true);
+    if (computedOrderedTabs.length === 1 && computedOrderedTabs[0] === 'land') currentTab = null;
+    else if (computedOrderedTabs.length > 0 && currentTab === null) {
+        let i = 0;
+        while (computedOrderedTabs[i] === 'land') {
+            currentTab = computedOrderedTabs[++i];
+        }
+    }
     for (const country of chosenCountries) {
         if (!(country in resolvedAdm1)) {
             const resolved = await countriesAdm1(availableCountriesAdm1[country]);
@@ -248,19 +268,20 @@ async function draw(simplified = false, _) {
             return;
         }
         if (!(country in tooltipTemplates)) {
-            tooltipTemplates[country] = defaultPopupContent('shapeName');
-            popupContents[country] = defaultPopupFull(tooltipTemplates[country]);
+            tooltipTemplates[country] = defaultTooltipContent('shapeName');
+            tooltipContents[country] = defaultTooltipFull(tooltipTemplates[country]);
         }
         if (!(country in zonesData) && !zonesData?.[country]?.provided) {
             zonesData[country] = {data: sortBy(resolvedAdm1[country].features.map(f => f.properties), 'shapeName')};
         }
     }
+    const width = p('width'), height = p('height');
     const snyderP = 1.0 + inlineProps.altitude / earthRadius;
     const dY = inlineProps.altitude * Math.sin(inlineProps.tilt / degrees);
     const dZ = inlineProps.altitude * Math.cos(inlineProps.tilt / degrees);
     const visibleYextent = 2 * dZ * Math.tan(0.5 * p('fieldOfView') / degrees);
-    const yShift = dY * p('height') / visibleYextent;
-    const scale = earthRadius * p('height') / visibleYextent;
+    const yShift = dY * 600 / visibleYextent;
+    const scale = earthRadius * 600 / visibleYextent;
     const tilt = inlineProps.tilt / degrees;
     const alpha = Math.acos(snyderP * Math.cos(tilt) * 0.999);
     const clipDistance = d3.geoClipCircle(Math.acos(1 / snyderP) - 1e-6);
@@ -302,14 +323,15 @@ async function draw(simplified = false, _) {
 
     const container = d3.select('#map-container');
     container.html('');
+    const offCanvasWithBorder = offCanvasPx - (p('borderWidth')/2);
     projection = geoSatellite()
         .scale(scale)
-        .translate([((p('width') / 2)), (yShift + p('height') / 2)])
+        .translate([((width / 2)), (yShift + height / 2)])
         .rotate([-inlineProps.longitude, -inlineProps.latitude, inlineProps.rotation])
         .tilt(inlineProps.tilt)
         .distance(snyderP)
         .preclip(preclip)
-        .postclip(d3.geoClipRectangle(-offCanvasPx, -offCanvasPx, p('width') + offCanvasPx, p('height') + offCanvasPx))
+        .postclip(d3.geoClipRectangle(-offCanvasWithBorder, -offCanvasWithBorder, width + offCanvasWithBorder, height + offCanvasWithBorder))
         .precision(0.1);
    
     const outline = {type: "Sphere"};
@@ -317,9 +339,9 @@ async function draw(simplified = false, _) {
     if (!p('useGraticule')) graticule.coordinates = [];
     if (simplified) {
         let canvas = container.select('#canvas');
-        if (canvas.empty()) canvas = container.append('canvas').attr('id', 'canvas').attr('width', p('width')).attr('height', p('height'));
+        if (canvas.empty()) canvas = container.append('canvas').attr('id', 'canvas').attr('width', width).attr('height', height);
         const context = canvas.node().getContext('2d');
-        context.clearRect(0, 0, p('width'), p('height'));
+        context.clearRect(0, 0, width, height);
         path = d3.geoPath(projection, context);
         context.fillStyle = "#88d";
         context.beginPath(), path(simplified ? simpleLand : land), context.fill();
@@ -338,16 +360,18 @@ async function draw(simplified = false, _) {
 
 
     if (p('useViewBox')) {
-        svg.attr('viewBox', `0 0 ${p('width')} ${p('height')}`);
+        svg.attr('viewBox', `0 0 ${width} ${height}`);
     }
     else {
-        svg.attr('width', `${p('width') }`)
-        .attr('height', `${p('height')}`)
+        svg.attr('width', `${width }`)
+        .attr('height', `${height}`)
     }
-    container.style('width', `${p('width')}px`).style('height', `${p('height')}px`);
+    
+    container.style('width', `${width}px`).style('height', `${height}px`);
     
     path = d3.geoPath(projection);
     svg.html('');
+    appendClip(svg, width, height, p('borderRadius'));
     svg.on('contextmenu', function(e) {
         e.preventDefault();
         showMenu(e);
@@ -383,22 +407,27 @@ async function draw(simplified = false, _) {
     const groupData = [];
     groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
     groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
-    if (p('showCountries') && countries) {
-        if (!('countries' in zonesData) && !zonesData?.['countries']?.provided) {
-            zonesData['countries'] = {data: sortBy(countries.features.map(f => f.properties), 'alpha-3')};
+    computedOrderedTabs.forEach((layer, i) => {
+        if (layer === 'countries' && p('showCountries') && countries) {
+            if (!('countries' in zonesData) && !zonesData?.['countries']?.provided) {
+                zonesData['countries'] = {data: sortBy(countries.features.map(f => f.properties), 'alpha-3')};
+            }
+            groupData.push({ name: 'countries', data: countries, id: (prop) => prop['alpha-3'], props: [], class: 'country', filter: null });
         }
-        groupData.push({ name: 'countries', data: countries, id: (prop) => prop['alpha-3'], props: [], class: 'country', filter: null });
-    }
-    // if (providedBorders && params.providedBorders.show)
-    //     groupData.push({ name: 'provided-borders', data: [providedBorders], id: null, props: [], class: 'provided-borders', filter: params.providedBorders.filter });
-    // if (provided && params.provided.show)
-    //     groupData.push({ name: 'provided', data: provided, id: null, props: [], class: 'provided', filter: null });
-    for (const country of chosenCountries) {
-        groupData.push({ name: `${country}-adm1`, data: resolvedAdm1[country], id: (prop) => prop.shapeName, props: [], class: 'adm1', filter: null });
-    }
+        if (layer === 'land' && p('showLand')) groupData.push({name: 'landImg', showSource: i === 0});
+        // selected country
+        else {
+            groupData.push({ name: `${layer}-adm1`, data: resolvedAdm1[layer], id: (prop) => prop.shapeName, props: [], class: 'adm1', filter: null });
+        }
+    });
+
     groupData.push({ name: 'points-labels', data: [], id: null, props: [], class: null, filter: null });
-    const groups = svg.selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
+    // const groups = svg.selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
+    const groups = svg.append('svg')
+        .selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
+        // .attr('clip-path', 'url(#clipMapBorder)')
     function drawPaths(data) {
+        if (data.name === 'landImg') return appendLandImage.call(this, data.showSource);
         if (!data.data) return;
         const pathElem = d3.select(this).style('will-change', 'opacity').selectAll('path')
             .data(data.data.features ? data.data.features : data.data)
@@ -413,27 +442,8 @@ async function draw(simplified = false, _) {
 
     groups.each(drawPaths);
 
-    if (p('showLand')) {
-        const landElem = d3.create('svg')
-            .attr('xmlns', "http://www.w3.org/2000/svg");
-        const pathElem = landElem.selectAll('path')
-            .data(land.features ? land.features : land)
-            .join('path')
-                .attr('d', (d) => {return path(d)});
-        pathElem.attr('filter', 'url(#firstGlow)');
-        appendGlow(landElem, 'firstGlow', p('innerGlow1'), p('outerGlow1'));
-        const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
-            .attr('href', `data:image/svg+xml,${encodeURIComponent(SVGO.optimize(landElem.node().outerHTML, svgoConfig).data)}`);
-            
-        const newSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        newSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        newSvg.innerHTML = landImage.node().outerHTML;
-        newSvg.style['pointer-events'] = 'none';
-        svg.node().insertBefore(newSvg, document.getElementById('points-labels'));
-    }
-
     drawCustomPaths(providedPaths, svg, projection);
-    appendGlow(svg, 'secondGlow', p('innerGlow2'), p('outerGlow2'));
+    appendGlow(svg, 'secondGlow', false, p('innerGlow2'), p('outerGlow2'));
     appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
     d3.select('#outline').style('fill', "url(#noise)");
     commonCss = Mustache.render(cssTemplate, params);
@@ -441,22 +451,46 @@ async function draw(simplified = false, _) {
 
     svg.append('rect')
         .attr('id', 'frame')
-        .attr('width', p('width'))
-        .attr('height', p('height'))
+        .attr('width', width)
+        .attr('height', height)
         .attr('rx', p('borderRadius'));
-   
+
     const map = document.getElementById('static-svg-map');
     if(!map) return;
-    // frontFilter(svg);
-    // svg.attr('filter', 'url(#frontJSON.parse(JSON.stringify({...defaultParams}))-filter)');
-    addTooltipListener(map, tooltipTemplates, popupContents, zonesData);
+    
+    addTooltipListener(map, tooltipTemplates, tooltipContents, zonesData);
+}
+
+function appendLandImage(showSource) {
+    const landElem = d3.create('svg')
+        .attr('xmlns', "http://www.w3.org/2000/svg");
+    if (showSource) {
+        landElem.attr('fill', 'white');
+        // .attr('stroke', 'brown')
+        // .attr('stroke-width', '3');
+    }
+    const pathElem = landElem.selectAll('path')
+        .data(land.features ? land.features : land)
+        .join('path')
+            .attr('d', (d) => {return path(d)});
+    pathElem.attr('filter', 'url(#firstGlow)');
+    appendGlow(landElem, 'firstGlow', showSource, p('innerGlow1'), p('outerGlow1'));
+    const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
+        .attr('href', `data:image/svg+xml,${encodeURIComponent(SVGO.optimize(landElem.node().outerHTML, svgoConfig).data)}`);
+        // .attr('href', `data:image/svg+xml;utf8,${landElem.node().outerHTML}`);
+        // .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(landElem.node().outerHTML, svgoConfig).data}`);
+        
+    d3.select(this).html(landImage.node().outerHTML)
+        .style('pointer-events', 'none')
+        .style('will-change', 'opacity');
+        // .attr('clip-path', 'url(#clipMapBorder)');
 }
 
 function save() {
     saveState({params, inlineProps, cssFonts, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
         inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
-        tooltipTemplates, popupContents
+        tooltipTemplates, tooltipContents
     });
 }
 
@@ -465,7 +499,7 @@ function resetState() {
     providedPaths = [];
     providedShapes = [];
     chosenCountries = [];
-    orderedTabs = ['countries'];
+    orderedTabs = ['countries', 'land'];
     inlineProps = {
         longitude: 15,
         latitude: 36,
@@ -479,8 +513,8 @@ function resetState() {
     inlineStyles = {};
     zonesData = {};
     lastUsedLabelFont = "Luminari";
-    tooltipTemplates = {countries: defaultPopupContent('name')};
-    popupContents = {countries: defaultPopupFull(tooltipTemplates['countries'])};
+    tooltipTemplates = {countries: defaultTooltipContent('name')};
+    tooltipContents = {countries: defaultTooltipFull(tooltipTemplates['countries'])};
     draw();
 }
 
@@ -494,9 +528,33 @@ function restoreState(givenState) {
     ({  params, inlineProps, cssFonts, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
         inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
-        tooltipTemplates, popupContents,
-    } = state);
-    
+        tooltipTemplates, tooltipContents,
+    } = state);   
+}
+
+function saveProject() {
+    const state = {params, inlineProps, cssFonts, providedFonts, 
+        providedShapes, providedPaths, chosenCountries, orderedTabs,
+        inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
+        tooltipTemplates, tooltipContents
+    };
+    download(JSON.stringify(state), 'text/json', 'project.mapbuilder');
+}
+
+function loadProject(e) {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+        try {
+            const providedState = JSON.parse(reader.result);
+            restoreState(providedState);
+            save();
+            draw();
+        } catch(e) {
+            console.error('Unable to parse provided file. Should be valid JSON.');
+        }
+    });
+    reader.readAsText(file);    
 }
 
 function applyStyles() {
@@ -707,26 +765,26 @@ function handleDataImport(e, key) {
     reader.readAsText(file);
 }
 
-function defaultPopupContent(idCol) {
+function defaultTooltipContent(idCol) {
     return `<div>
     <span> ${idCol === 'name' ? 'Country' : 'Region'}: {${idCol}}</span>
 </div>
     `;
 }
 
-function defaultPopupFull(template) {
-    return `<div id="popup-preview" style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
+function defaultTooltipFull(template) {
+    return `<div id="tooltip-preview" style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
         ${template}
     </div>`;
 }
 
-function editPopup(e) {
+function edittooltip(e) {
     const rect = e.target.getBoundingClientRect();
     styleEditor.open(e.target, rect.right, rect.bottom);
 }
 
 function onTemplateChange() {
-    popupContents[currentTab] = htmlPopupElem.outerHTML;
+    tooltipContents[currentTab] = htmltooltipElem.outerHTML;
     save(); 
 }
 
@@ -734,9 +792,9 @@ function onTemplateChange() {
 async function onTabChanged(newTabTitle) {
     currentTab = newTabTitle;
     await tick();
-    if (newTabTitle in popupContents) {
-        const tmpElem = htmlToElement(popupContents[newTabTitle]);
-        reportStyle(tmpElem, htmlPopupElem);
+    if (newTabTitle in tooltipContents) {
+        const tmpElem = htmlToElement(tooltipContents[newTabTitle]);
+        reportStyle(tmpElem, htmltooltipElem);
     }
 }
 
@@ -755,55 +813,38 @@ function deleteCountry(country) {
     draw();
 }
 
-function saveProject() {
-    const state = {params, inlineProps, cssFonts, providedFonts, 
-        providedShapes, providedPaths, chosenCountries, 
-        inlineStyles, shapeCount, zonesData, lastUsedLabelFont
-    };
-    download(JSON.stringify(state), 'text/json', 'project.mapbuilder');
-}
-
-function loadProject(e) {
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.addEventListener('load', () => {
-        try {
-            const providedState = JSON.parse(reader.result);
-            restoreState(providedState);
-            save();
-            draw();
-        } catch(e) {
-            console.error('Unable to parse provided file. Should be valid JSON.');
-        }
-    });
-    reader.readAsText(file);    
-}
 
 let hoveringTab = false;
 let dragStartIndex = 0;
 
-const drop = (event, target) => {
-  event.dataTransfer.dropEffect = 'move'; 
-  const start = parseInt(event.dataTransfer.getData("text/plain"));
-  const newList = orderedTabs;
+function drop(event, target) {
+    event.dataTransfer.dropEffect = 'move'; 
+    const newList = orderedTabs;
 
-  if (start < target) {
-    newList.splice(target + 1, 0, newList[start]);
-    newList.splice(start, 1);
-  } else {
-    newList.splice(target, 0, newList[start]);
-    newList.splice(start + 1, 1);
-  }
-  orderedTabs = newList;
-  hoveringTab = null;
+    if (dragStartIndex < target) {
+        newList.splice(target + 1, 0, newList[dragStartIndex]);
+        newList.splice(dragStartIndex, 1);
+    } else {
+        newList.splice(target, 0, newList[dragStartIndex]);
+        newList.splice(dragStartIndex + 1, 1);
+    }
+    orderedTabs = newList;
+    hoveringTab = null;
+    draw();
 }
 
-const dragstart = (event, i) => {
-  event.dataTransfer.effectAllowed = 'move';
-  event.dataTransfer.dropEffect = 'move';
-  const start = i;
-  dragStartIndex = i;
-  event.dataTransfer.setData('text/plain', start);
+function dragstart(event, i, prevent = false) {
+    if (prevent) {
+        return event.preventDefault();
+    }
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.dropEffect = 'move';
+    dragStartIndex = i;
+}
+
+function exportRaster() {
+    const optimized = exportSvg(svg, p('width'), p('height'), tooltipContents, tooltipTemplates, chosenCountries, zonesData, cssFonts, false);
+    svgToPng('data:image/svg+xml;base64,' + window.btoa(optimized), p('width'), p('height'));
 }
 
 </script>
@@ -837,24 +878,27 @@ const dragstart = (event, i) => {
     <aside id="menu" class="border me-2">
         <NestedAccordions sections={params} paramDefs={paramDefs} on:change={handleChangeProp} ></NestedAccordions>
         <ul class="nav nav-tabs">
-            {#each orderedTabs as tabTitle, index (tabTitle) }
+            {#each computedOrderedTabs as tabTitle, index (tabTitle) }
             <li class="nav-item d-flex align-items-center"
-                draggable={true}
-                on:dragstart={event => dragstart(event, index)}
+                draggable={tabTitle === "land"}
+                on:dragstart={event => dragstart(event, index, tabTitle !== "land")}
                 on:drop|preventDefault={event => drop(event, index)}
                 ondragover="return false"
                 on:dragenter={() => hoveringTab = index}
                 class:is-dnd-hovering-right={hoveringTab === index && index > dragStartIndex}
-                class:is-dnd-hovering-left={hoveringTab === index && index < dragStartIndex}>
+                class:is-dnd-hovering-left={hoveringTab === index && index < dragStartIndex}
+                class:grabbable={tabTitle === 'land'}>
                 <a href="javascript:;"
                 class:active={currentTab === tabTitle}
-                class="nav-link"
+                class:disabled={tabTitle === 'land'}
+                class="nav-link d-flex align-items-center"
                 on:click={() => onTabChanged(tabTitle)}>
+                    {#if tabTitle === "land"} <Icon svg={icons['draggable']}/> {/if}
                     {tabTitle}
+                    {#if tabTitle !== 'countries' && tabTitle !== "land"}
+                        <span role="button" class="delete-tab" on:click={() => deleteCountry(tabTitle)}> ✕ </span>
+                    {/if}
                 </a>
-                {#if tabTitle !== 'countries' && tabTitle !== "land"}
-                    <span role="button" class="delete-tab" on:click={() => deleteCountry(tabTitle)}> ✕ </span>
-                {/if}
             {/each}
             
             <li class="nav-item">
@@ -867,31 +911,37 @@ const dragstart = (event, i) => {
             </li>
         </ul>
         {#if zonesData?.[currentTab]?.['data']}
-                <div>
-                    <label for="data-input-json" class="m-2 btn btn-light"> Import data for {currentTab} </label>
-                    <input id="data-input-json" type="file" accept=".mapbuilder" on:change={(e) => handleDataImport(e, 'countries')}>
-                </div>
-                <div class="data-table mb-2" on:click={() => (showModal = true)}>
-                    <DataTable data={zonesData?.[currentTab]?.['data']}> </DataTable>
-                </div>
-                <div class="mx-2 btn btn-outline-primary" on:click={() => exportJson(zonesData?.[currentTab]?.['data'])}> Export JSON </div>
-                <div class="m-2">
-                    <label for="templatePopup" class="form-label"> Popup template </label>
-                    <textarea class="form-control template-input" id="templatePopup" rows="3" bind:value={tooltipTemplates[currentTab]} on:change={onTemplateChange}></textarea>
-                </div>
-                <div class="popup-preview">
-                    <div id={`popup-preview-${currentTab}`} bind:this={htmlPopupElem} on:click={editPopup} style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
+            <div>
+                <label for="data-input-json" class="m-2 btn btn-light"> Import data for {currentTab} </label>
+                <input id="data-input-json" type="file" accept=".mapbuilder" on:change={(e) => handleDataImport(e, 'countries')}>
+            </div>
+            <div class="data-table mb-2" on:click={() => (showModal = true)}>
+                <DataTable data={zonesData?.[currentTab]?.['data']}> </DataTable>
+            </div>
+            <div class="mx-2 btn btn-outline-primary" on:click={() => exportJson(zonesData?.[currentTab]?.['data'])}> Export JSON </div>
+            <div class="m-2">
+                <label for="templatetooltip" class="form-label"> tooltip template </label>
+                <textarea class="form-control template-input" id="templatetooltip" rows="3" bind:value={tooltipTemplates[currentTab]} on:change={onTemplateChange}></textarea>
+            </div>
+            <div class="mx-2 d-flex align-items-center">
+                <label for="tooltip-preview-{currentTab}"> Example tooltip: </label>
+                <div class="tooltip-preview">
+                    <div id="tooltip-preview-{currentTab}" bind:this={htmltooltipElem} on:click={edittooltip} style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
                         {@html tooltipTemplates[currentTab].formatUnicorn(zonesData?.[currentTab]?.['data'][0])}
                     </div>
                 </div>
+            </div>
         {/if}     
         <div class="d-flex flex-wrap">
             <div>
-                <label for="fontinput" class="m-2 btn btn-light">Add font</label>
+                <label for="fontinput" class="m-2 btn btn-light"> <Icon svg={icons['font']}/> Add font</label>
                 <input type="file" id="fontinput" accept=".ttf,.woff,.woff2" on:change={handleInputFont}>
             </div>
-            <div class="m-2 btn btn-light" on:click={() => exportSvg(svg, p('width'), p('height'), popupContents, tooltipTemplates, chosenCountries, zonesData, cssFonts)}>
-                Export 
+            <div class="m-2 btn btn-light" on:click={() => exportSvg(svg, p('width'), p('height'), tooltipContents, tooltipTemplates, chosenCountries, zonesData, cssFonts)}>
+                <Icon fillColor="none" svg={icons['download']}/> Download SVG 
+            </div>
+            <div class="m-2 btn btn-light" on:click={() => exportRaster()}>
+                Download raster
             </div>
             <div class="m-2 btn btn-light" on:click={saveProject}>
                 Save project
@@ -932,7 +982,7 @@ const dragstart = (event, i) => {
     max-height: 10rem;
     overflow-y: scroll;
 }
-.popup-preview {
+.tooltip-preview {
     padding: 10px;
 }
 #map-container {
@@ -951,14 +1001,17 @@ input[type="file"] {
 }
 
 .is-dnd-hovering-right {
-    border-right: 2px solid blue;
+    border-right: 3px solid black;
 }
 .is-dnd-hovering-left {
-    border-left: 2px solid blue;
+    border-left: 3px solid black;
 }
 .delete-tab {
     &:hover {
-        color: #bbdde4;
+        color: #67777a;
     }
+}
+.grabbable {
+    cursor: grab !important;
 }
 </style>

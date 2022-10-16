@@ -1,6 +1,9 @@
 #static-svg-map, #canvas {
     display: block;
-    border-radius: {{Styling.Border.borderRadius}}px; 
+    height: auto;
+}
+#static-svg-map, #static-svg-map > svg {
+    border-radius: {{Styling.Border.borderRadius}}px;
 }
 #frame {
     fill: none;
