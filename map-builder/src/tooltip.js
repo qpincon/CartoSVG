@@ -2,7 +2,7 @@
 import { reportStyle } from './util/dom';
 import { htmlToElement } from './util/common';
 
-function addTooltipListener(map, tooltipTemplates, tooltipContents, zonesData) {
+function addTooltipListener(map, tooltipDefs, zonesData) {
     const tooltip = {shapeId: null, element: document.createElement('div')};
     map.append(tooltip.element);
     tooltip.element.style.display = 'none';
@@ -11,18 +11,20 @@ function addTooltipListener(map, tooltipTemplates, tooltipContents, zonesData) {
         tooltip.element.style.opacity = 0;
     });
     map.addEventListener('mousemove', (e) => {
-        onMouseMove(e, map, tooltipTemplates, tooltipContents, zonesData, tooltip);
+        onMouseMove(e, map, tooltipDefs, zonesData, tooltip);
     });
 }
 
-function onMouseMove(e, map, tooltipTemplates, tooltipContents, zonesData, tooltip) {
+function hideTooltip(tooltip) {
+    tooltip.element.style.display = 'none';
+    tooltip.element.style.opacity = 0;
+}
+
+function onMouseMove(e, map, tooltipDefs, zonesData, tooltip) {
     const parent = e.target.parentNode;
-    if (!parent?.hasAttribute?.("id")) {
-        tooltip.element.style.display = 'none';
-        tooltip.element.style.opacity = 0;
-        return;
-    };
+    if (!parent?.hasAttribute?.("id")) return hideTooltip(tooltip);
     const groupId = parent.getAttribute('id').replace('-adm1', '');
+    if (!tooltipDefs?.[groupId]?.enabled) return hideTooltip(tooltip);
     const shapeId = e.target.getAttribute('id');
     const mapBounds = map.getBoundingClientRect();
     const ttBounds = tooltip.element.firstChild?.firstChild?.getBoundingClientRect();
@@ -39,12 +41,11 @@ function onMouseMove(e, map, tooltipTemplates, tooltipContents, zonesData, toolt
     else if(groupId in zonesData) {
         tooltipVisibleOpacity = 0;
         setTimeout(() => {
-            onMouseMove(e, map, tooltipTemplates, tooltipContents, zonesData, tooltip);
+            onMouseMove(e, map, tooltipDefs, zonesData, tooltip);
         }, 0);
     }
     if (!(groupId in zonesData)) {
-        tooltip.element.style.display = 'none';
-        tooltip.element.style.opacity = 0;
+        hideTooltip(tooltip);
     }
     else if (shapeId && tooltip.shapeId === shapeId) {
         tooltip.element.setAttribute('x', posX);
@@ -61,7 +62,7 @@ function onMouseMove(e, map, tooltipTemplates, tooltipContents, zonesData, toolt
             tooltip.element.style.opacity = 0;
             return;
         }
-        const tt = instanciateTooltip(data, groupId, tooltipTemplates, tooltipContents);
+        const tt = instanciateTooltip(data, groupId, tooltipDefs);
         tooltip.element.replaceWith(tt);
         tooltip.element = tt;
         tooltip.shapeId = shapeId;
@@ -71,7 +72,7 @@ function onMouseMove(e, map, tooltipTemplates, tooltipContents, zonesData, toolt
     }
 }
 
-function instanciateTooltip(dataRow, groupId, tooltipTemplates, tooltipContents) {
+function instanciateTooltip(dataRow, groupId, tooltipDefs) {
     if (!dataRow) return;
     const elem = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
     elem.setAttribute('width', 1);
@@ -79,8 +80,8 @@ function instanciateTooltip(dataRow, groupId, tooltipTemplates, tooltipContents)
     elem.style.overflow = 'visible';
     const body = document.createElementNS('http://www.w3.org/1999/xhtml', 'body');
     const tooltip = document.createElement('div');
-    tooltip.innerHTML = tooltipTemplates?.[groupId]?.formatUnicorn(dataRow) || '';
-    reportStyle(htmlToElement(tooltipContents?.[groupId] || ''), tooltip);
+    tooltip.innerHTML = tooltipDefs?.[groupId]?.template?.formatUnicorn(dataRow) || '';
+    reportStyle(htmlToElement(tooltipDefs?.[groupId]?.content || ''), tooltip);
     body.innerHTML = tooltip.outerHTML;
     elem.append(body);
     return elem;

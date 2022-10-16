@@ -124,8 +124,14 @@ let shapeCount = 0;
 let inlineStyles = {}; // elemID -> prop -> value
 let zonesData = {}; // key => {data (list), provided (bool)}
 let lastUsedLabelFont = "Luminari";
-let tooltipTemplates = {countries: defaultTooltipContent('name')};
-let tooltipContents = {countries: defaultTooltipFull(tooltipTemplates['countries'])};
+
+let tooltipDefs = {
+    countries: {
+        template: defaultTooltipContent('name'),
+        content: defaultTooltipFull(defaultTooltipContent('name')),
+        enabled: false,
+    }
+};
 
 // ==== End state =====
 
@@ -140,7 +146,7 @@ let typedText = "";
 let styleEditor;
 let contextualMenu;
 let showModal = false;
-let htmltooltipElem;;
+let htmlTooltipElem;
 let currentTab = 'countries';
 let orderedTabs = ['countries', 'land'];
 
@@ -148,8 +154,8 @@ onMount(() => {
     restoreState();
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
-            if (htmltooltipElem.contains(target)) {
-                tooltipContents[currentTab] = htmltooltipElem.outerHTML;
+            if (htmlTooltipElem.contains(target)) {
+                tooltipDefs[currentTab].content = htmlTooltipElem.outerHTML;
             }
             if (eventType === 'inline') {
                 if (target.hasAttribute('id')) {
@@ -161,6 +167,7 @@ onMount(() => {
                     else inlineStyles[elemId] = {[cssProp]: value};
                 }
             }
+            save();
         },
         getAdditionalElems: (el) => {
             if (el.classList.contains('adm1')) {
@@ -252,13 +259,16 @@ function dragged(event) {
 // without 'countries' if unchecked
 let computedOrderedTabs = [];
 async function draw(simplified = false, _) {
-    computedOrderedTabs = orderedTabs.filter(x => x === 'countries' ? p('showCountries'): true);
-    if (computedOrderedTabs.length === 1 && computedOrderedTabs[0] === 'land') currentTab = null;
+    computedOrderedTabs = orderedTabs.filter(x => {
+        if (x === 'countries') return p('showCountries');
+        if (x === 'land') return p('showLand');
+        return true;
+    });
+    if (!computedOrderedTabs.length || (computedOrderedTabs.length === 1 && computedOrderedTabs[0] === 'land')) currentTab = null;
     else if (computedOrderedTabs.length > 0 && currentTab === null) {
         let i = 0;
-        while (computedOrderedTabs[i] === 'land') {
-            currentTab = computedOrderedTabs[++i];
-        }
+        while (computedOrderedTabs[i] === 'land') ++i;
+        currentTab = computedOrderedTabs[i];
     }
     for (const country of chosenCountries) {
         if (!(country in resolvedAdm1)) {
@@ -267,9 +277,13 @@ async function draw(simplified = false, _) {
             draw(simplified);
             return;
         }
-        if (!(country in tooltipTemplates)) {
-            tooltipTemplates[country] = defaultTooltipContent('shapeName');
-            tooltipContents[country] = defaultTooltipFull(tooltipTemplates[country]);
+        if (!(country in tooltipDefs)) {
+            const contentTemplate = defaultTooltipContent('shapeName');
+            tooltipDefs[country] = {
+                template: contentTemplate,
+                content: defaultTooltipFull(contentTemplate),
+                enabled: false,
+            }
         }
         if (!(country in zonesData) && !zonesData?.[country]?.provided) {
             zonesData[country] = {data: sortBy(resolvedAdm1[country].features.map(f => f.properties), 'shapeName')};
@@ -336,7 +350,7 @@ async function draw(simplified = false, _) {
    
     const outline = {type: "Sphere"};
     const graticule = d3.geoGraticule().step([p('graticuleStep'), p('graticuleStep')])();
-    if (!p('useGraticule')) graticule.coordinates = [];
+    if (!p('showGraticule')) graticule.coordinates = [];
     if (simplified) {
         let canvas = container.select('#canvas');
         if (canvas.empty()) canvas = container.append('canvas').attr('id', 'canvas').attr('width', width).attr('height', height);
@@ -371,7 +385,7 @@ async function draw(simplified = false, _) {
     
     path = d3.geoPath(projection);
     svg.html('');
-    appendClip(svg, width, height, p('borderRadius'));
+    // appendClip(svg, width, height, p('borderRadius'));
     svg.on('contextmenu', function(e) {
         e.preventDefault();
         showMenu(e);
@@ -424,8 +438,8 @@ async function draw(simplified = false, _) {
     groupData.push({ name: 'points-labels', data: [], id: null, props: [], class: null, filter: null });
     // const groups = svg.selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
     const groups = svg.append('svg')
-        .selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
         // .attr('clip-path', 'url(#clipMapBorder)')
+        .selectAll('g').data(groupData).join('svg').attr('id', d => d.name);
     function drawPaths(data) {
         if (data.name === 'landImg') return appendLandImage.call(this, data.showSource);
         if (!data.data) return;
@@ -458,7 +472,7 @@ async function draw(simplified = false, _) {
     const map = document.getElementById('static-svg-map');
     if(!map) return;
     
-    addTooltipListener(map, tooltipTemplates, tooltipContents, zonesData);
+    addTooltipListener(map, tooltipDefs, zonesData);
 }
 
 function appendLandImage(showSource) {
@@ -490,7 +504,7 @@ function save() {
     saveState({params, inlineProps, cssFonts, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
         inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
-        tooltipTemplates, tooltipContents
+        tooltipDefs
     });
 }
 
@@ -513,8 +527,12 @@ function resetState() {
     inlineStyles = {};
     zonesData = {};
     lastUsedLabelFont = "Luminari";
-    tooltipTemplates = {countries: defaultTooltipContent('name')};
-    tooltipContents = {countries: defaultTooltipFull(tooltipTemplates['countries'])};
+    tooltipDefs = {
+        countries: {
+            template: defaultTooltipContent('name'),
+            content: defaultTooltipFull(defaultTooltipContent('name')),
+        }
+    };
     draw();
 }
 
@@ -528,7 +546,7 @@ function restoreState(givenState) {
     ({  params, inlineProps, cssFonts, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
         inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
-        tooltipTemplates, tooltipContents,
+        tooltipDefs,
     } = state);   
 }
 
@@ -536,7 +554,7 @@ function saveProject() {
     const state = {params, inlineProps, cssFonts, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
         inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
-        tooltipTemplates, tooltipContents
+        tooltipDefs
     };
     download(JSON.stringify(state), 'text/json', 'project.mapbuilder');
 }
@@ -778,13 +796,13 @@ function defaultTooltipFull(template) {
     </div>`;
 }
 
-function edittooltip(e) {
+function editTooltip(e) {
     const rect = e.target.getBoundingClientRect();
     styleEditor.open(e.target, rect.right, rect.bottom);
 }
 
 function onTemplateChange() {
-    tooltipContents[currentTab] = htmltooltipElem.outerHTML;
+    tooltipDefs[currentTab].content = htmlTooltipElem.outerHTML;
     save(); 
 }
 
@@ -792,13 +810,14 @@ function onTemplateChange() {
 async function onTabChanged(newTabTitle) {
     currentTab = newTabTitle;
     await tick();
-    if (newTabTitle in tooltipContents) {
-        const tmpElem = htmlToElement(tooltipContents[newTabTitle]);
-        reportStyle(tmpElem, htmltooltipElem);
+    if (tooltipDefs[newTabTitle].enabled) {
+        const tmpElem = htmlToElement(tooltipDefs[newTabTitle].content);
+        reportStyle(tmpElem, htmlTooltipElem);
     }
 }
 
 function addNewCountry(e) {
+    if (chosenCountries.includes(e.target.value)) return;
     chosenCountries.push(e.target.value);
     chosenCountries = chosenCountries;
     orderedTabs.push(e.target.value);
@@ -843,7 +862,7 @@ function dragstart(event, i, prevent = false) {
 }
 
 function exportRaster() {
-    const optimized = exportSvg(svg, p('width'), p('height'), tooltipContents, tooltipTemplates, chosenCountries, zonesData, cssFonts, false);
+    const optimized = exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, cssFonts, false);
     svgToPng('data:image/svg+xml;base64,' + window.btoa(optimized), p('width'), p('height'));
 }
 
@@ -919,38 +938,46 @@ function exportRaster() {
                 <DataTable data={zonesData?.[currentTab]?.['data']}> </DataTable>
             </div>
             <div class="mx-2 btn btn-outline-primary" on:click={() => exportJson(zonesData?.[currentTab]?.['data'])}> Export JSON </div>
-            <div class="m-2">
-                <label for="templatetooltip" class="form-label"> tooltip template </label>
-                <textarea class="form-control template-input" id="templatetooltip" rows="3" bind:value={tooltipTemplates[currentTab]} on:change={onTemplateChange}></textarea>
+            <div class="mx-2 form-check">
+                <input
+                    type="checkbox" class="form-check-input" id='showTooltip' bind:checked={tooltipDefs[currentTab].enabled}
+                />
+                <label for='showTooltip' class="form-check-label"> Show tooltip on hover </label>
             </div>
-            <div class="mx-2 d-flex align-items-center">
-                <label for="tooltip-preview-{currentTab}"> Example tooltip: </label>
-                <div class="tooltip-preview">
-                    <div id="tooltip-preview-{currentTab}" bind:this={htmltooltipElem} on:click={edittooltip} style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
-                        {@html tooltipTemplates[currentTab].formatUnicorn(zonesData?.[currentTab]?.['data'][0])}
+            {#if tooltipDefs[currentTab].enabled}
+                <div class="m-2">
+                    <label for="templatetooltip" class="form-label"> Tooltip template </label>
+                    <textarea class="form-control template-input" id="templatetooltip" rows="3" bind:value={tooltipDefs[currentTab].template} on:change={onTemplateChange}></textarea>
+                </div>
+                <div class="mx-2 d-flex align-items-center">
+                    <label for="tooltip-preview-{currentTab}"> Example tooltip: <br> (click to update style) </label>
+                    <div class="tooltip-preview">
+                        <div id="tooltip-preview-{currentTab}" bind:this={htmlTooltipElem} on:click={editTooltip} style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
+                            {@html tooltipDefs[currentTab].template.formatUnicorn(zonesData?.[currentTab]?.['data'][0])}
+                        </div>
                     </div>
                 </div>
-            </div>
+            {/if}
         {/if}     
         <div class="d-flex flex-wrap">
             <div>
-                <label for="fontinput" class="m-2 btn btn-light"> <Icon svg={icons['font']}/> Add font</label>
+                <label for="fontinput" class="m-2 d-flex align-items-center btn btn-light"> <Icon svg={icons['font']}/> Add font</label>
                 <input type="file" id="fontinput" accept=".ttf,.woff,.woff2" on:change={handleInputFont}>
             </div>
-            <div class="m-2 btn btn-light" on:click={() => exportSvg(svg, p('width'), p('height'), tooltipContents, tooltipTemplates, chosenCountries, zonesData, cssFonts)}>
+            <div class="d-flex align-items-center m-2 btn btn-light" on:click={() => exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, cssFonts)}>
                 <Icon fillColor="none" svg={icons['download']}/> Download SVG 
             </div>
             <div class="m-2 btn btn-light" on:click={() => exportRaster()}>
-                Download raster
+                <Icon fillColor="none" svg={icons['download']}/> Download raster
             </div>
-            <div class="m-2 btn btn-light" on:click={saveProject}>
-                Save project
+            <div class="d-flex align-items-center m-2 btn btn-light" on:click={saveProject}>
+                <Icon fillColor="none" svg={icons['save']}/> Save project
             </div>
             <div class="m-2 btn btn-light" on:click={resetState}>
-                Reset
+                <Icon svg={icons['reset']}/> Reset
             </div>
             <div>
-                <label class="m-2 btn btn-light" for="project-import">Load project</label>
+                <label class="d-flex align-items-center m-2 btn btn-light" for="project-import"> <Icon svg={icons['restore']}/> Load project</label>
                 <input id="project-import" type="file" accept=".mapbuilder" on:change={loadProject}>
             </div>
         </div>

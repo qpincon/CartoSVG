@@ -13,7 +13,7 @@ let defaultParams = {
         },
         showLand: true,
         showCountries: true,
-        useGraticule: true,
+        showGraticule: true,
         graticuleStep: 3,
         seaColor: "#dce7f8ff",
         backgroundNoise: true,

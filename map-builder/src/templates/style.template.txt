@@ -3,6 +3,7 @@
     height: auto;
 }
 #static-svg-map, #static-svg-map > svg {
+    //clip-path: inset(0% 0% 0% 0% round 15px);
     border-radius: {{Styling.Border.borderRadius}}px;
 }
 #frame {

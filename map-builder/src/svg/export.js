@@ -4,7 +4,7 @@ import svgoConfig from '../svgoExport.config';
 import { indexBy, pick, download } from '../util/common';
 import { reportStyle } from '../util/dom';
 
-function exportSvg(svg, width, height, tooltipContents, tooltipTemplates, chosenCountries, zonesData, cssFonts, downloadExport=true) {
+function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, cssFonts, downloadExport=true) {
     const finalSvg = SVGO.optimize(svg.node().outerHTML, svgoConfig).data;
     
     const domParser = new DOMParser();
@@ -13,8 +13,8 @@ function exportSvg(svg, width, height, tooltipContents, tooltipTemplates, chosen
     [...chosenCountries, 'countries'].forEach(groupId => {
         const containerId = groupId !== 'countries' ? groupId + '-adm1' : groupId;
         const group = optimizedSVG.getElementById(containerId);
-        if (!group) return;
-        const ttTemplate = getFinalTooltipTemplate(groupId, tooltipContents, tooltipTemplates);
+        if (!group || !tooltipDefs[groupId].enabled) return;
+        const ttTemplate = getFinalTooltipTemplate(groupId, tooltipDefs);
         let usedVars = [...ttTemplate.matchAll(/\{(\w+)\}/g)].map(group => {
             return group[1];
         });
@@ -54,20 +54,19 @@ function exportSvg(svg, width, height, tooltipContents, tooltipTemplates, chosen
             elem.append(body);
             return elem;
         }
-        mapElement.addEventListener('mouseleave', (e) => {
-            tooltip.element.style.display = 'none';
-            tooltip.element.style.opacity = 0;
-        });
+        mapElement.addEventListener('mouseleave', hideTooltip);
         mapElement.addEventListener('mousemove', (e) => {
             onMouseMove(e);
         });
+
+        function hideTooltip() {
+            tooltip.element.style.display = 'none';
+            tooltip.element.style.opacity = 0;
+        }
+
         function onMouseMove(e) {
             const parent = e.target.parentNode;
-            if (!parent?.hasAttribute?.("id")) {
-                tooltip.element.style.display = 'none';
-                tooltip.element.style.opacity = 0;
-                return;
-            };
+            if (!parent?.hasAttribute?.("id")) return hideTooltip();
             const mapBounds = frameElement.getBoundingClientRect();
             const transformX = width / mapBounds.width;
             const transformY = height / mapBounds.height;
@@ -91,8 +90,7 @@ function exportSvg(svg, width, height, tooltipContents, tooltipTemplates, chosen
                 }, 0);
             }
             if (!(groupId in dataByGroup.data)) {
-                tooltip.element.style.display = 'none';
-                tooltip.element.style.opacity = 0;
+                hideTooltip();
             }
             else if (shapeId && tooltip.shapeId === shapeId) {
                 tooltip.element.setAttribute('x', posX);
@@ -128,10 +126,10 @@ function exportSvg(svg, width, height, tooltipContents, tooltipTemplates, chosen
     download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'mySvg.svg');
 }
 
-function getFinalTooltipTemplate(groupId, tooltipContents, tooltipTemplates) {
-    const finalReference = htmlToElement(tooltipContents[groupId]);
+function getFinalTooltipTemplate(groupId, tooltipDefs) {
+    const finalReference = htmlToElement(tooltipDefs[groupId].content);
     const finalTemplate = finalReference.cloneNode(true);
-    finalTemplate.innerHTML = tooltipTemplates[groupId];
+    finalTemplate.innerHTML = tooltipDefs[groupId].template;
     reportStyle(finalReference, finalTemplate);
     return finalTemplate.outerHTML;
 }
