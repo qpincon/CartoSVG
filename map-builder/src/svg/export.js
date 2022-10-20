@@ -4,9 +4,12 @@ import svgoConfig from '../svgoExport.config';
 import { indexBy, pick, download } from '../util/common';
 import { reportStyle } from '../util/dom';
 
-function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, cssFonts, downloadExport=true) {
+
+const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`
+
+function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, cssFonts, onExported, downloadExport=true) {
+    svg.select('foreignObject').remove();
     const finalSvg = SVGO.optimize(svg.node().outerHTML, svgoConfig).data;
-    
     const domParser = new DOMParser();
     const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
     const finalDataByGroup = {data: {}, tooltips: {}};
@@ -34,6 +37,7 @@ function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, 
     const finalScript = `
     <![CDATA[
     window.addEventListener('DOMContentLoaded', () => {
+        const parser = new DOMParser();
         const width = ${width}, height = ${height};
         const mapElement = document.getElementById('static-svg-map');
         const frameElement = document.getElementById('frame');
@@ -49,9 +53,8 @@ function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, 
             elem.setAttribute('width', 1);
             elem.setAttribute('height', 1);
             elem.style.overflow = 'visible';
-            const body = document.createElementNS('http://www.w3.org/1999/xhtml', 'body');
-            body.innerHTML = eval('\`' + templateStr + '\`' );
-            elem.append(body);
+            const parsed = parser.parseFromString(eval('\`' + templateStr + '\`' ), 'text/html').querySelector('body');
+            elem.appendChild(parsed);
             return elem;
         }
         mapElement.addEventListener('mouseleave', hideTooltip);
@@ -116,9 +119,11 @@ function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, 
         }
     });]]>`;
     const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
-    const renderedCss = exportStyleSheet('map-style');
+    let renderedCss = exportStyleSheet('map-style');
+    renderedCss = renderedCss.replaceAll(/rgb\(.*?\)/g, rgb2hex);
     styleElem.innerHTML = renderedCss + cssFonts;
     optimizedSVG.firstChild.append(styleElem);
+    onExported();
     if (!downloadExport) return optimizedSVG.firstChild.outerHTML;
     const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
     scriptElem.innerHTML = finalScript;

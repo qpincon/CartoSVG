@@ -109,4 +109,7 @@
     .modal-dialog {
         --bs-modal-width: 50%;
     }
+    .modal-content {
+        overflow-x: scroll;
+    }
 </style>

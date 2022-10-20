@@ -32,6 +32,7 @@ function camelCaseToSentence(str) {
 }
 
 function htmlToElement(html) {
+    if (!html) return;
     var template = document.createElement('template');
     html = html.trim(); // Never return a text node of whitespace as the result
     template.innerHTML = html;
@@ -69,4 +70,14 @@ function sortBy(data, key) {
     });
 }
 
-export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce };
+function getNumericCols(jsonData) {
+    const numericCols = new Set(Object.keys(jsonData[0]));
+    for (let row of jsonData) {
+        if (!numericCols.size) return [];
+        Object.entries(row).forEach(([key, value]) => {
+            if (numericCols.has(key) && typeof(value) !== 'number') numericCols.delete(key);
+        });
+    }
+    return [...numericCols];
+}
+export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce, getNumericCols };

@@ -30,7 +30,6 @@ function drawShapes(shapeDefinitions, container, projection, dragCb) {
             dragging = true;
             const [x, y] = getTranslateFromTransform(currentlyDragging);
             setTransformTranslate(currentlyDragging, `translate(${x + event.dx} ${y + event.dy})`);
-            // setTransformTranslate(currentlyDragging, `translate(${event.x} ${event.y})`);
         })
         .on('start', (e) => currentlyDragging = e.sourceEvent.target)
         .on('end', (e) => {

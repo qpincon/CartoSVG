@@ -125,9 +125,6 @@
 </div>
 
 <style scoped >
-    .range-label {
-        min-width: 2rem;
-    }
     .color-preview {
         width: 2rem;
         height: 2rem;

@@ -1,4 +1,3 @@
-// let tooltip = {currentId: null, element: null};
 import { reportStyle } from './util/dom';
 import { htmlToElement } from './util/common';
 

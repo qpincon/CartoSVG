@@ -24,7 +24,7 @@
 - [x] If width/height, give control over width/height
 - [x] Fix change sea color not working
 - [ ] Add spinner on loading (geosjon / font)
-- [ ] Fix dragging created paths
+- [x] Fix dragging created paths
 - [ ] Display labels using projection (how?)
 - [ ] Add credits to:
     - geoboundaries
@@ -44,4 +44,7 @@
  - [ ] Instructions: how to tilt / rotate / zoom / drag
  - [ ] Change zoom sensibility according to FOV
  - [ ] Animate object along path
- - [ ] Clip path instead of border-radius, not working for viewBox
+ - [ ] Clip path instead of border-radius, not working for viewBox (will drop)
+ - [ ] Add validation on imported data (alpha-3 / shapeName)
+ - [ ] Add conversion of final CSS rgb(x y z) => #hex
+ - [ ] Format tooltip when containing decimal values

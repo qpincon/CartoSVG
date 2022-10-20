@@ -36,15 +36,13 @@ $accordion-button-bg:                     tint-color($component-active-bg, 90%);
 @import "bootstrap/scss/accordion";
 @import "bootstrap/scss/dropdown";
 @import "bootstrap/scss/buttons";
+@import "bootstrap/scss/button-group";
 @import "bootstrap/scss/modal";
 @import "bootstrap/scss/close";
 
 // @import "bootstrap/scss/grid";
 @import "bootstrap/scss/helpers";
 @import "bootstrap/scss/type";
-// @import "bootstrap/scss/toasts";
-// @import "bootstrap/scss/close";
-// @import "bootstrap/scss/pagination";
 
 // 7. Optionally include utilities API last to generate classes based on the Sass map in `_utilities.scss`
 @import "bootstrap/scss/utilities/api";
@@ -71,4 +69,8 @@ html {
 }
 .accordion-item .picker_editor {
     display: none;
+}
+
+.range-label {
+    min-width: 2rem;
 }
