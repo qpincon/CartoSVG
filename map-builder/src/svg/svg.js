@@ -37,7 +37,7 @@ function setTransformScale(el, scaleStr) {
 function getTranslateFromTransform(el) {
     const existingTransform = el.getAttribute('transform');
     if (!existingTransform) return null;
-    const matched = existingTransform.match(/([0-9\.]+) ([0-9\.]+)/);
+    const matched = existingTransform.match(/([\-0-9\.]+),? ([\-0-9\.]+)/);
     if (matched.length === 3) return [parseInt(matched[1]), parseInt(matched[2])];
     return null;
 }

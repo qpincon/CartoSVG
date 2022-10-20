@@ -60,6 +60,19 @@ function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, 
         mapElement.addEventListener('mouseleave', hideTooltip);
         mapElement.addEventListener('mousemove', (e) => {
             onMouseMove(e);
+            const parent = e.target.parentNode;
+            if (e.target.tagName === 'path' && parent.tagName === 'g') {
+                if(e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
+                parent.append(e.target);
+            } 
+        });
+
+        mapElement.addEventListener('mouseout', (e) => {
+            const previousPos = e.target.previousPos;
+            if (previousPos) {
+                const parent = e.target.parentNode;
+                parent.insertBefore(e.target, parent.children[previousPos]);
+            }
         });
 
         function hideTooltip() {

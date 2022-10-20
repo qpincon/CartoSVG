@@ -11,6 +11,19 @@ function addTooltipListener(map, tooltipDefs, zonesData) {
     });
     map.addEventListener('mousemove', (e) => {
         onMouseMove(e, map, tooltipDefs, zonesData, tooltip);
+        const parent = e.target.parentNode;
+        if (e.target.tagName === 'path' && parent.tagName === 'g') {
+            if(e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
+            parent.append(e.target);
+        } 
+    });
+    map.addEventListener('mouseout', (e) => {
+        const previousPos = e.target.previousPos;
+        if (previousPos) {
+            const parent = e.target.parentNode;
+            parent.insertBefore(e.target, parent.children[previousPos]);
+            delete e.target.previousPos;
+        }
     });
 }
 
@@ -53,7 +66,6 @@ function onMouseMove(e, map, tooltipDefs, zonesData, tooltip) {
         tooltip.element.style.opacity = tooltipVisibleOpacity;
     }
     else {
-        e.target.parentNode.append(e.target);
         const idCol = groupId === 'countries' ? 'alpha-3' : 'shapeName';
         const data = zonesData[groupId].data.find(row => row[idCol] === shapeId);
         if (!data) {

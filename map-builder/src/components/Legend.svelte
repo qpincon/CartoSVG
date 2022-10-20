@@ -20,6 +20,14 @@
 
     // dispatch event on each change
     function sendChange(e) {
+        const id = e.target.getAttribute('id')
+        if (id === 'vhSwitchV') {
+            definition.rectHeight = definition.rectWidth = 30;
+        }
+        else if (id === 'vhSwitchH' && !categorical) {
+            definition.rectHeight = 20;
+            definition.rectWidth = 70;
+        }
         dispatch("change", {});
     }
 </script>
@@ -75,17 +83,4 @@
         min="10"
         max="100"
     />
-    <div class="row g-3 align-items-center">
-        <div class="col-auto">
-            <label for="legendTitle" class="col-form-label">Legend title</label>
-        </div>
-        <div class="col-auto">
-            <input
-                type="text"
-                id="legendTitle"
-                class="form-control"
-                bind:value={definition.title}
-            />
-        </div>
-    </div>
 </form>

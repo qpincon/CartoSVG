@@ -1,0 +1,182 @@
+[
+	{
+		"shapeName": "Abruzzo",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B21559980",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Pasta",
+		"population": 83693
+	},
+	{
+		"shapeName": "Basilicata",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B90067714",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Pasta",
+		"population": 93693
+	},
+	{
+		"shapeName": "Calabria",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B13201117",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Lasagna",
+		"population": 100693
+	},
+	{
+		"shapeName": "Campania",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B41184188",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Pasta",
+		"population": 87693
+	},
+	{
+		"shapeName": "Emilia-Romagna",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B16769007",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Pasta",
+		"population": 153693
+	},
+	{
+		"shapeName": "Friuli Venezia Giulia",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B35490994",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Pizza",
+		"population": 184693
+	},
+	{
+		"shapeName": "Lazio",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B40737626",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Pizza",
+		"population": 81693
+	},
+	{
+		"shapeName": "Liguria",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B60860247",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Pasta",
+		"population": 23693
+	},
+	{
+		"shapeName": "Lombardia",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B51462447",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Pizza",
+		"population": 197093
+	},
+	{
+		"shapeName": "Marche",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B71526225",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Pizza",
+		"population": 293693
+	},
+	{
+		"shapeName": "Molise",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B9873014",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Tiramisu",
+		"population": 87693
+	},
+	{
+		"shapeName": "Piemonte",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B6746688",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Tiramisu",
+		"population": 47693
+	},
+	{
+		"shapeName": "Puglia",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B30366135",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Tiramisu",
+		"population": 107693
+	},
+	{
+		"shapeName": "Sardegna",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B18689942",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Lasagna",
+		"population": 37693
+	},
+	{
+		"shapeName": "Sicilia",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B23023710",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Lasagna",
+		"population": 45693
+	},
+	{
+		"shapeName": "Toscana",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B58761566",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Pasta",
+		"population": 81693
+	},
+	{
+		"shapeName": "Trentino-Alto Adige",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B35488848",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Pizza",
+		"population": 127693
+	},
+	{
+		"shapeName": "Umbria",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B13919098",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Lasagna",
+		"population": 92693
+	},
+	{
+		"shapeName": "Valle D'Aosta",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B12110529",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Tiramisu",
+		"population": 257693
+	},
+	{
+		"shapeName": "Veneto",
+		"Level": "ADM1",
+		"shapeID": "ITA-ADM1-99219370B94639346",
+		"shapeGroup": "ITA",
+		"shapeType": "ADM1",
+		"Favorite Dish": "Mozarella",
+		"population": 142693
+	}
+]

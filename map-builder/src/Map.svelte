@@ -119,8 +119,9 @@ const defaultLegendDef =  {
     significantDigits: 3,
     maxWidth: 200,
     direction: 'v',
-    title: 'Hello',
+    title: null,
     sampleHtml: null,
+    changes: {},
 };
 const defaultColorDef = {
     enabled: false,
@@ -128,7 +129,7 @@ const defaultColorDef = {
     colorColumn: null,
     colorPalette: null,
     nbBreaks: 5,
-    legend: {enabled: false},
+    legendEnabled: false,
 };
 
 // ====== State =======
@@ -141,13 +142,14 @@ let inlineProps = {
     altitude: 1000,
     rotation: 0,
     tilt: 25,
-}
+};
+
 let providedFonts = [];
 let cssFonts;
 let shapeCount = 0;
 let inlineStyles = {}; // elemID -> prop -> value
 let zonesData = {}; // key => {data (list), provided (bool), numericCols (list)}
-let lastUsedLabelFont = "Luminari";
+let lastUsedLabelProps = {};
 
 let tooltipDefs = {
     countries: {
@@ -160,7 +162,7 @@ let tooltipDefs = {
 let colorDataDefs = {
     countries: {...defaultColorDef}
 };
-let legendDefs = {countries: {...defaultLegendDef}};
+let legendDefs = {countries: JSON.parse(JSON.stringify(defaultLegendDef))};
 // ==== End state =====
 
 const menuStates = {
@@ -183,8 +185,8 @@ onMount(() => {
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
             if (legendSample && legendSample.contains(target) && cssProp !== 'fill') {
-                colorizeAndLegend();
                 legendDefs[currentTab].sampleHtml = legendSample.outerHTML;
+                colorizeAndLegend();
             }
             else if (htmlTooltipElem && htmlTooltipElem.contains(target)) {
                 tooltipDefs[currentTab].content = htmlTooltipElem.outerHTML;
@@ -192,8 +194,8 @@ onMount(() => {
             else if (eventType === 'inline') {
                 if (target.hasAttribute('id')) {
                     const elemId = target.getAttribute('id');
-                    if (elemId.includes('label') && cssProp === 'font-family') {
-                        lastUsedLabelFont = value;
+                    if (elemId.includes('label')) {
+                        lastUsedLabelProps[cssProp] = value;
                     }
                     if (elemId in inlineStyles) inlineStyles[elemId][cssProp] = value;
                     else inlineStyles[elemId] = {[cssProp]: value};
@@ -245,20 +247,19 @@ onMount(() => {
         })
     );
     const zoom = d3.zoom().on('zoom', zoomed).on('start', () => closeMenu());
-    zoom.scaleBy(container, altScale.invert(inlineProps.altitude));
     container.call(zoom);
 });
 
-const altScale = d3.scaleLinear().domain([1, 0]).range([100, 10000]);
+let altScale = d3.scaleLinear().domain([1, 0]).range([100, 10000]);
 function zoomed(event) {
     if (!event.sourceEvent) return;
     if (!projection) return;
-    if (event.transform.k > 0.01 && event.transform.k < 1.0) {
-        const newAltitude = altScale(event.transform.k);
-        inlineProps.altitude = newAltitude;
+    if (event.transform.k > 0.00001 && event.transform.k < 1.0) {
+        const newAltitude = Math.round(altScale(event.transform.k));
+        params["General"].altitude = newAltitude;
     }
-    else if (event.transform.k < 0.01) {
-        event.transform.k = 0.01;
+    else if (event.transform.k < 0.00001) {
+        event.transform.k = 0.00001;
     }
     else {
         event.transform.k  = 1.0;
@@ -317,7 +318,7 @@ async function draw(simplified = false, _) {
                 enabled: false,
             };
             colorDataDefs[country] = {...defaultColorDef};
-            legendDefs[country] = {...defaultLegendDef};
+            legendDefs[country] = JSON.parse(JSON.stringify(defaultLegendDef));
         }
         if (!(country in zonesData) && !zonesData?.[country]?.provided) {
             const data = sortBy(resolvedAdm1[country].features.map(f => f.properties), 'shapeName');
@@ -328,11 +329,18 @@ async function draw(simplified = false, _) {
             };
         }
     }
-    const width = p('width'), height = p('height');
-    const snyderP = 1.0 + inlineProps.altitude / earthRadius;
-    const dY = inlineProps.altitude * Math.sin(inlineProps.tilt / degrees);
-    const dZ = inlineProps.altitude * Math.cos(inlineProps.tilt / degrees);
-    const visibleYextent = 2 * dZ * Math.tan(0.5 * p('fieldOfView') / degrees);
+    const fov = p('fieldOfView');
+    // 
+    const width = p('width'), height = p('height'), altitude = p('altitude');
+    const snyderP = 1.0 + altitude / earthRadius;
+    const dY = altitude * Math.sin(inlineProps.tilt / degrees);
+    const dZ = altitude * Math.cos(inlineProps.tilt / degrees);
+    const fovExtent = Math.tan(0.5 * fov / degrees);
+    const visibleYextent = 2 * dZ * fovExtent;
+    const altRange = [(1/fovExtent) * 500, (1/fovExtent) * 9000];
+    altScale = d3.scaleLinear().domain([1, 0]).range(altRange);
+    if (altitude < altScale[0]) { altitude = altScale[0]; redraw('altitude');}
+    if (altitude > altScale[1]) { altitude = altScale[1]; redraw('altitude');}
     const yShift = dY * 600 / visibleYextent;
     const scale = earthRadius * 600 / visibleYextent;
     const tilt = inlineProps.tilt / degrees;
@@ -502,7 +510,6 @@ async function draw(simplified = false, _) {
     appendGlow(svg, 'secondGlow', false, p('innerGlow2'), p('outerGlow2'));
     appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
     d3.select('#outline').style('fill', "url(#noise)");
-    drawAndSetupShapes();
     colorizeAndLegend();
     computeCss();
     svg.append('rect')
@@ -510,7 +517,7 @@ async function draw(simplified = false, _) {
         .attr('width', width)
         .attr('height', height)
         .attr('rx', p('borderRadius'));
-
+    drawAndSetupShapes();
     const map = document.getElementById('static-svg-map');
     if(!map) return;
     
@@ -548,7 +555,7 @@ function appendLandImage(showSource) {
 function save() {
     saveState({params, inlineProps, cssFonts, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
-        inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
+        inlineStyles, shapeCount, zonesData, lastUsedLabelProps,
         tooltipDefs, colorDataDefs, legendDefs,
     });
 }
@@ -572,7 +579,7 @@ function resetState() {
     shapeCount = 0;
     inlineStyles = {};
     zonesData = {};
-    lastUsedLabelFont = "Luminari";
+    lastUsedLabelProps = {};
     tooltipDefs = {
         countries: {
             template: defaultTooltipContent('name'),
@@ -582,7 +589,7 @@ function resetState() {
     colorDataDefs = {
         countries: {...defaultColorDef}
     };
-    legendDefs = {countries: {...defaultLegendDef}};
+    legendDefs = {countries: JSON.parse(JSON.stringify(defaultLegendDef))};
     draw();
 }
 
@@ -595,15 +602,17 @@ function restoreState(givenState) {
     if (!state) return;
     ({  params, inlineProps, cssFonts, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
-        inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
+        inlineStyles, shapeCount, zonesData, lastUsedLabelProps,
         tooltipDefs, colorDataDefs, legendDefs,
-    } = state);   
+    } = state);
+    const tabsWoLand = orderedTabs.filter(x => x !== 'land');
+    if (tabsWoLand.length) onTabChanged(tabsWoLand[0]);   
 }
 
 function saveProject() {
     const state = {params, inlineProps, cssFonts, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
-        inlineStyles, shapeCount, zonesData, lastUsedLabelFont,
+        inlineStyles, shapeCount, zonesData, lastUsedLabelProps,
         tooltipDefs, colorDataDefs, legendDefs,
     };
     download(JSON.stringify(state), 'text/json', 'project.mapbuilder');
@@ -633,6 +642,9 @@ function applyStyles() {
         Object.entries(style).forEach(([cssProp, cssValue]) => {
             if (cssProp === 'scale') {
                 setTransformScale(elem, `scale(${cssValue})`);
+            }
+            else if (cssProp === 'bringtofront') {
+                elem.parentNode.append(elem);
             }
             else elem.style[cssProp] = cssValue;
         });
@@ -742,7 +754,7 @@ function validateLabel() {
         else {
             const labelId = `label-${shapeCount++}`;
             providedShapes.push({pos: openContextMenuInfo.position, scale: 1, id: labelId, text: typedText});
-            inlineStyles[labelId] = { 'font-family': lastUsedLabelFont};
+            inlineStyles[labelId] = {...lastUsedLabelProps};
         }
         typedText = '';
     }
@@ -882,7 +894,7 @@ async function onTabChanged(newTabTitle) {
         const tmpElem = htmlToElement(tooltipDefs[newTabTitle].content);
         reportStyle(tmpElem, htmlTooltipElem);
     }
-    if (colorDataDefs[newTabTitle].legend.enabled) {
+    if (colorDataDefs[newTabTitle].legendEnabled) {
         const tmpElem = htmlToElement(legendDefs[newTabTitle].sampleHtml);
         reportStyle(tmpElem, legendSample);
     }
@@ -992,10 +1004,12 @@ let sampleLegend = {
 }
 async function colorizeAndLegend() {
     legendDefs = legendDefs;
-    await tick();
+    const legendEntries = d3.select('#svg-map-legend');
+    if (!legendEntries.empty()) legendEntries.remove();
+    const legendSelection = svg.append('g').attr('id', 'svg-map-legend');
     Object.entries(colorDataDefs).forEach(([tab, dataColorDef]) => {
         if (!dataColorDef.enabled) {
-            dataColorDef.legend.enabled = false;
+            dataColorDef.legendEnabled = false;
             colorsCss[tab] = '';
             computeCss();
             if (displayedLegend[tab]) displayedLegend[tab].remove();
@@ -1023,19 +1037,22 @@ async function colorizeAndLegend() {
         const legendColors = getLegendColors(dataColorDef, tab, scale);
         if (!legendColors) return;
         if (tab === currentTab) sampleLegend = {color: legendColors[0][0], text: legendColors[0][1]};
-        displayedLegend[tab] = drawLegend(svg, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', htmlToElement(legendDefs[tab].sampleHtml));
+        const sampleElem = htmlToElement(legendDefs[tab].sampleHtml);
+        displayedLegend[tab] = drawLegend(legendSelection, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', sampleElem, tab);
     });
     computeCss();
+    applyStyles();
 }
 
 // ==== Legend === 
 
 function getLegendColors(dataColorDef, tab, scale) {
-    if (!dataColorDef.legend.enabled) {
+    if (!dataColorDef.legendEnabled) {
         if (displayedLegend[tab]) displayedLegend[tab].remove();
         return;
     }
-    if (legendDefs[tab].sampleHtml === null) legendDefs[tab].sampleHtml = legendSample.outerHTML;
+    if (legendSample && legendDefs[tab].sampleHtml === null) legendDefs[tab].sampleHtml = legendSample.outerHTML;
+    if (legendDefs[tab].title === null) legendDefs[tab].title = dataColorDef.colorColumn;
     let threshValues;
     const data = zonesData[tab].data.map(row => row[dataColorDef.colorColumn]);
     let formatter = (x) => x;
@@ -1053,7 +1070,7 @@ function getLegendColors(dataColorDef, tab, scale) {
         acc.push([scale(cur), formatter(cur)]);
         return acc;
     }, []);
-    if (legendDefs[tab].direction === 'h') return legendColors.reverse();
+    if (legendDefs[tab].direction === 'v') return legendColors.reverse();
     return legendColors;
 }
 </script>
@@ -1196,15 +1213,15 @@ function getLegendColors(dataColorDef, tab, scale) {
                     <div class="mx-2 form-check">
                         <input
                             type="checkbox" class="form-check-input" id='showLegend' 
-                            bind:checked={curDataDefs.legend.enabled}
+                            bind:checked={colorDataDefs[currentTab].legendEnabled}
                             on:change={colorizeAndLegend}
                         />
                         <label for='showLegend' class="form-check-label"> Show legend </label>
                     </div>
                 {/if}
-            {#if curDataDefs.legend.enabled}
+            {#if curDataDefs.legendEnabled}
                 <Legend definition={legendDefs[currentTab]} on:change={colorizeAndLegend} categorical={colorDataDefs[currentTab].colorScale === 'category'}/>
-                <svg width="100%" height="100">
+                <svg width="100%" height={legendDefs[currentTab].rectHeight + 20}>
                     <g bind:this={legendSample}>
                         <rect x="10" y="10" width={legendDefs[currentTab].rectWidth} 
                             height={legendDefs[currentTab].rectHeight} 

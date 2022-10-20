@@ -4,6 +4,7 @@ let defaultParams = {
         height: 600,
         useViewBox: false,
         fieldOfView: 50,
+        altitude: 1000,
     },
     "Styling": {
         "Border": {
@@ -32,6 +33,7 @@ const paramDefs = {
     width:          {type: 'range', min: 100, max: 800},
     height:         {type: 'range', min: 100, max: 800},
     fieldOfView:    {type: 'range', min: 1, max: 180},
+    altitude:       {type: 'range', min: 1, max: 300000},
     blur:           {type: 'range', min: 0.5, max: 10, step: 0.1},
     strength:       {type: 'range', min: 0.1, max: 6, step: 0.1},
     graticuleStep:  {type: 'range', min: 0.1, max: 10, step: 0.1},
