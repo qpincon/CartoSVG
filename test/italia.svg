@@ -1,4 +1,4 @@
-<svg height="764" version="1.1" width="696" xmlns="http://www.w3.org/2000/svg" xlinkstyle="overflow: hidden; position: absolute; top: 0px; left: 0px; z-index: 5;">
+<svg height="764" version="1.1" width="696" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xlinkstyle="overflow: hidden; position: absolute; top: 0px; left: 0px; z-index: 5;">
     <desc>Created with kartograph 0.8.7 and Raphaël 2.1.0</desc>
     <defs>
         <pattern id="A239C5AF-E3FE-4516-9CCD-07CC9138E9A1" x="0" y="0" patternUnits="userSpaceOnUse" height="100" width="100" patternTransform="matrix(1,0,0,1,0,0) translate(348.4390380169747,-5.999999999999943)">
@@ -420,4 +420,87 @@
     <path style="" fill="none" stroke="#000000" d="M395.2893016046081,673.403942107874S408.8414532605541,616.4182691869709,476.913661639638,613.9337272256757S501.04704225081593,580.1054366239557,520.4404306533856,527.8182601373811S500.5469771942032,493.6282584997631,522.694039995027,437.65087053957427L522.694039995027,437.65087053957427" class="ferry"></path>
     <path style="" fill="none" stroke="#000000" d="M522.694039995027,437.65087053957427S323.026063352818,583.0801479716567,223.3418060454456,555.8750365996235S88.15436723646239,551.7705366720869,91.89061418484229,510.72399748583916" class="ferry"></path>
     <image x="0" y="0" width="15" height="8" preserveAspectRatio="none" xlink:href="ship.png" style="" transform="matrix(0.9387,-0.3448,0.3448,0.9387,326.7614,537.179)"></image>
+    <style>
+        #map {
+            border: 2px solid #745C1B;
+            background: #fff url(/img/noise.png);
+            border-radius: 5px;
+        }
+        
+        svg path { stroke-linejoin: round }
+        
+        svg .sea { 
+            fill: #fff;
+            stroke-width: .25px; 
+        }
+        
+        svg .graticule {
+            fill: none;
+            stroke-width: .2px;
+        }
+        svg .bg, svg .bgback {
+            stroke: none;
+            fill: #fff;
+            fill-opacity: 1;
+        }
+        svg .bgstroke {
+            stroke: #7C5B27;
+            stroke-width:.7px;
+            fill:none;
+        }
+        svg .context {
+            stroke: #D1BEB0;
+            stroke-opacity: .3;
+            fill: #D1BEB0;
+            fill-opacity: .23;
+        }
+        svg .fg {
+            stroke: #cbb;
+            stroke-opacity: 1;
+            stroke-dasharray: 3,5;
+            fill: #fff;
+            fill-opacity: 0;
+        }
+        svg .fg:hover {
+            fill: #eda;
+            fill-opacity: .37;
+        }
+        svg .dotMarker {
+            stroke: #330;
+            stroke-opacity: .8;
+            fill: #ff7;
+            fill-opacity: .2;
+        }
+        svg .dotMarker:hover {
+            stroke: #000;
+            fill: #ff3;
+            fill-opacity: .7;
+        }
+        svg .ferry {
+            stroke-opacity: .5;
+            stroke-dasharray: 3,4;
+        }
+        
+        @font-face {
+            font-family: 'AquilineTwoRegular';
+            src: url('AquilineTwo-webfont.eot');
+            src: url('AquilineTwo-webfont.eot?#iefix') format('embedded-opentype'),
+                 url('AquilineTwo-webfont.woff') format('woff'),
+                 url('AquilineTwo-webfont.ttf') format('truetype'),
+                 url('AquilineTwo-webfont.svg#AquilineTwoRegular') format('svg');
+            font-weight: normal;
+            font-style: normal;
+        
+        }
+        
+        .k-layer-toggle h2 {
+            margin: 20px 0 10px;
+            font-size: 20px;
+        }
+        .k-layer-toggle label {
+            margin-left: 3px;
+        }
+        
+        
+    </style>
 </svg>

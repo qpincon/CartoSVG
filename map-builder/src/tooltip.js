@@ -14,7 +14,7 @@ function addTooltipListener(map, tooltipDefs, zonesData) {
         const parent = e.target.parentNode;
         if (e.target.tagName === 'path' && parent.tagName === 'g') {
             if(e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
-            parent.append(e.target);
+            if (e.target !== parent.lastElementChild) parent.append(e.target);
         } 
     });
     map.addEventListener('mouseout', (e) => {

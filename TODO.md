@@ -41,10 +41,15 @@
         - Move svg containing <image> on the outside: same
         - Same principle, using <img> tag: same
     - Solution: will-change: opacity + <image>
- - [ ] Instructions: how to tilt / rotate / zoom / drag
- - [ ] Change zoom sensibility according to FOV
- - [ ] Animate object along path
- - [ ] Clip path instead of border-radius, not working for viewBox (will drop)
- - [ ] Add validation on imported data (alpha-3 / shapeName)
- - [ ] Add conversion of final CSS rgb(x y z) => #hex
- - [ ] Format tooltip when containing decimal values
+- [ ] Instructions: how to tilt / rotate / zoom / drag
+- [ ] Change zoom sensibility according to FOV
+- [ ] Animate object along path
+- [ ] Clip path instead of border-radius, not working for viewBox (will drop)
+- [ ] Add validation on imported data (alpha-3 / shapeName)
+- [ ] Add conversion of final CSS rgb(x y z) => #hex
+- [ ] Format tooltip when containing decimal values
+- [ ] Remove imported fonts
+- [ ] On delete country, delete legend + color def (+ else ?)
+- [ ] Export button => popup modal to select
+    - [ ] No redraw on resize
+    - [ ] Choice between "font(s) will be included in final file" & "best between embed font / transform text to paths"

@@ -1,17 +1,109 @@
-import { htmlToElement } from '../util/common';
 import SVGO from 'svgo/dist/svgo.browser';
 import svgoConfig from '../svgoExport.config';
-import { indexBy, pick, download } from '../util/common';
-import { reportStyle } from '../util/dom';
+import svgoConfigText from '../svgoExportText.config';
 
+import TextToSVG from 'text-to-svg';
+// import paper from 'paper';
+// paper.setup([1000, 1000]);
+import { htmlToElement } from '../util/common';
+import { indexBy, pick, download } from '../util/common';
+import { reportStyle, fontsToCss } from '../util/dom';
+const domParser = new DOMParser();
 
 const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`
 
-function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, cssFonts, onExported, downloadExport=true) {
-    svg.select('foreignObject').remove();
-    const finalSvg = SVGO.optimize(svg.node().outerHTML, svgoConfig).data;
-    const domParser = new DOMParser();
+const domBaselineToBaseline = {
+    hanging: "top",
+    auto: "middle",
+    middle: "middle",
+    "text-top": "bottom"
+};
+const anchorToAnchor = {
+    left: 'left', 
+    middle: 'center',
+    right: 'right'
+};
+function replaceTextsWithPaths(svgElem, transformedTexts) {
+    const texts = Array.from(svgElem.querySelectorAll('text'));
+    texts.forEach(textElem => {
+        const fontFamily = textElem.style['font-family'];
+        const text = textElem.textContent.trim();
+        const transformed = transformedTexts[fontFamily][text];
+        if (!transformed) return;
+        const pathElem = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        pathElem.setAttribute('d', transformed);
+        pathElem.setAttribute('transform', textElem.getAttribute('transform'));
+        reportStyle(textElem, pathElem);
+        textElem.replaceWith(pathElem);
+        // textElem.parentElement.append(pathElem);
+    });
+}
+
+async function inlineFontVsPath(svgElem, providedFonts) {
+    let nbFontChars = 0; 
+    let nbPathChars = 0;
+    const transformedTexts = {};
+    const defaultStyles = getComputedStyle(document.body);
+    await Promise.all(providedFonts.map(({name, content}) => {
+        transformedTexts[name] = {};
+        nbFontChars += content.length;
+        const texts = Array.from(svgElem.querySelectorAll('text'));
+        return new Promise(resolve => { 
+            TextToSVG.load(content, function(err, textToSVG) {
+                texts.forEach(textElem => {
+                    const fontFamily = textElem.style['font-family'] || defaultStyles.getPropertyValue('font-family');
+                    console.log(defaultStyles.getPropertyValue('font-size'));
+                    if (fontFamily === name) {
+                        const text = textElem.textContent.trim();
+                        const anchor = anchorToAnchor[textElem.getAttribute('text-anchor')] || 'left';
+                        const baseline = domBaselineToBaseline[textElem.getAttribute('dominant-baseline')] || 'baseline';
+                        const options = {
+                            x: textElem.getAttribute('x') || 0,
+                            y: textElem.getAttribute('y') || 0,
+                            fontSize: parseInt(textElem.style['font-size'] || defaultStyles.getPropertyValue('font-size')),
+                            anchor: `${anchor} ${baseline}`
+                        };
+                        let path = textToSVG.getD(text, options);
+                        const tmpSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                        const tmpPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        tmpPath.setAttribute('d', path);
+                        tmpSvg.append(tmpPath);
+                        const optimized = domParser.parseFromString(SVGO.optimize(tmpSvg.outerHTML, svgoConfigText).data, 'image/svg+xml');
+                        path = optimized.querySelector('path').getAttribute('d');
+                        transformedTexts[name][text] = path;
+                        nbPathChars += path.length;
+                        // const paperPath = new paper.Path(path);
+                        // paperPath.simplify(1);
+                        // console.log(paperPath.pathData)
+                    }
+                });
+                resolve();
+            });
+        });
+    }));
+    console.log('font chars=', nbFontChars);
+    console.log('path chars=', nbPathChars);
+    const pathIsBetter = nbPathChars + 10000  < nbFontChars;
+    if (pathIsBetter) {
+        replaceTextsWithPaths(svgElem, transformedTexts);
+        return true;
+    }
+    return false;
+}
+
+async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, providedFonts, downloadExport=true) {
+    // svg.select('foreignObject').remove();
+    const fo = svg.select('foreignObject').node();
+    if (fo) document.body.append(fo);
+    // const clonedSvg = svg.node().cloneNode(true);
+    // document.body.append(clonedSvg);
+    const svgNode = svg.node();
+    const cssFonts = fontsToCss(providedFonts);
+    
+    const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig).data;
+    if (fo) svg.node().append(fo);
     const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
+    const pathIsBetter = await inlineFontVsPath(optimizedSVG.firstChild, providedFonts);
     const finalDataByGroup = {data: {}, tooltips: {}};
     [...chosenCountries, 'countries'].forEach(groupId => {
         const containerId = groupId !== 'countries' ? groupId + '-adm1' : groupId;
@@ -36,7 +128,7 @@ function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, 
 
     const finalScript = `
     <![CDATA[
-    window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener('DOMContentLoaded', () => {
         const parser = new DOMParser();
         const width = ${width}, height = ${height};
         const mapElement = document.getElementById('static-svg-map');
@@ -45,6 +137,13 @@ function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, 
         tooltip.element = constructTooltip({}, '');
         mapElement.append(tooltip.element);
         tooltip.element.style.display = 'none';
+            
+        let resizeTimeout;
+        const contentSvg = mapElement.firstChild;
+        window.addEventListener('resize', e => {
+            contentSvg.style.display = "none"; clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => { contentSvg.style.display = 'block' }, 100);
+        });
 
         const dataByGroup = ${JSON.stringify(finalDataByGroup)};
         function constructTooltip(data, templateStr) {
@@ -62,8 +161,8 @@ function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, 
             onMouseMove(e);
             const parent = e.target.parentNode;
             if (e.target.tagName === 'path' && parent.tagName === 'g') {
-                if(e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
-                parent.append(e.target);
+                if (e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
+                if (e.target !== parent.lastElementChild) parent.append(e.target);
             } 
         });
 
@@ -134,9 +233,8 @@ function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, 
     const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
     let renderedCss = exportStyleSheet('map-style');
     renderedCss = renderedCss.replaceAll(/rgb\(.*?\)/g, rgb2hex);
-    styleElem.innerHTML = renderedCss + cssFonts;
+    styleElem.innerHTML = pathIsBetter ? renderedCss : renderedCss + cssFonts;
     optimizedSVG.firstChild.append(styleElem);
-    onExported();
     if (!downloadExport) return optimizedSVG.firstChild.outerHTML;
     const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
     scriptElem.innerHTML = finalScript;

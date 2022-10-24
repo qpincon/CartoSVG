@@ -1,5 +1,6 @@
 const path = require('path');
 const sveltePreprocess = require('svelte-preprocess');
+const NodePolyfillPlugin = require("node-polyfill-webpack-plugin")
 
 const config = {
     entry: {
@@ -83,6 +84,9 @@ const config = {
             }
         ],
     },
+    plugins: [
+        new NodePolyfillPlugin()
+      ]
 };
 
 module.exports = config;

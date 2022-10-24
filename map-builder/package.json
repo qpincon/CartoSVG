@@ -25,11 +25,15 @@
     "d3-geo-projection": "^4.0.0",
     "inline-style-editor": "^1.2.11",
     "mustache": "^4.2.0",
+    "node-polyfill-webpack-plugin": "^2.0.1",
+    "paper": "^0.12.16",
     "parse-svg-path": "^0.1.2",
     "sass-loader": "^13.0.2",
     "style-loader": "^3.3.1",
+    "svg-text-to-path": "^1.1.5",
     "svgo": "^2.8.0",
     "svgo-loader": "^3.0.1",
+    "text-to-svg": "^3.1.5",
     "topojson-client": "^3.1.0",
     "vanilla-picker": "^2.12.1"
   }

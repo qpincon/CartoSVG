@@ -13,4 +13,13 @@ function reportStyleElem(ref, target) {
     target.setAttribute('style', ref.getAttribute('style'));
 }
 
-export { reportStyle };
+function fontsToCss(fonts) {
+    return fonts.map(({name, content}) => {
+        return `@font-face {
+            font-family: ${name};
+            src: url("${content}");
+        }`;
+    }).join('\n') || '';
+}
+
+export { reportStyle, fontsToCss };

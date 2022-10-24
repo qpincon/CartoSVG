@@ -28,7 +28,7 @@ import Modal from './components/Modal.svelte';
 import NestedAccordions from './components/NestedAccordions.svelte';
 import Icon from './components/Icon.svelte';
 import RangeInput from './components/RangeInput.svelte';
-import { reportStyle } from './util/dom';
+import { reportStyle, fontsToCss } from './util/dom';
 import { saveState, getState } from './util/save';
 import { svgToPng } from './svg/toPng';
 import { exportSvg } from './svg/export';
@@ -419,7 +419,6 @@ async function draw(simplified = false, _) {
         .attr('xmlns:xlink', "http://www.w3.org/1999/xlink")
         .attr('id', 'static-svg-map');
 
-
     if (p('useViewBox')) {
         svg.attr('viewBox', `0 0 ${width} ${height}`);
     }
@@ -677,15 +676,8 @@ function openEditor(e) {
 //     reader.readAsText(file);
 // }
 
-function fontsToCss(fonts) {
-    cssFonts = fonts.map(({name, content}) => {
-        return `@font-face {
-            font-family: "${name}";
-            src: url("${content}");
-        }`;
-    }).join('\n') || '';
-}
-$: fontsToCss(providedFonts);
+
+$: cssFonts = fontsToCss(providedFonts);
 
 function handleInputFont(e) {
     const file = e.target.files[0];
@@ -949,7 +941,7 @@ function dragstart(event, i, prevent = false) {
 // === Export as PNG behaviour ===
 
 function exportRaster() {
-    const optimized = exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, cssFonts, draw, false);
+    const optimized = exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, providedFonts, false);
     svgToPng('data:image/svg+xml;base64,' + window.btoa(optimized), p('width'), p('height'));
 }
 
@@ -1241,7 +1233,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                 <input type="file" id="fontinput" accept=".ttf,.woff,.woff2" on:change={handleInputFont}>
             </div>
             <div class="d-flex align-items-center m-2 btn btn-light"
-                on:click={() => exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, cssFonts, draw)}>
+                on:click={() => exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, providedFonts)}>
                 <Icon fillColor="none" svg={icons['download']}/> Download SVG 
             </div>
             <div class="m-2 btn btn-light" on:click={() => exportRaster()}>
