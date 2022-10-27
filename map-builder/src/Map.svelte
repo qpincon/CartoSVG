@@ -4,34 +4,32 @@ import { geoSatellite } from 'd3-geo-projection';
 import * as topojson from 'topojson-client';
 import * as d3 from "d3";
 import SVGO from 'svgo/dist/svgo.browser';
-import Mustache from 'mustache';
 import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
 
 // https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
 import MotionPathHelper from "./util/MotionPathHelper.js";
 import svgoConfig from './svgoExport.config';
-import cssTemplate from './templates/style.template.txt';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import { paramDefs, defaultParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
-import { download, sortBy, indexBy, htmlToElement, getNumericCols } from './util/common';
+import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import { setTransformScale } from './svg/svg';
 import { drawShapes } from './svg/shape';
 import iso3Data from './assets/data/iso3_filtered.json';
 import DataTable from './components/DataTable.svelte';
 import Legend from './components/Legend.svelte';
-
+import defaultBaseCss from './assets/pagestyle.css?inline';
 import { drawLegend } from './svg/legend';
 import Modal from './components/Modal.svelte';
 import NestedAccordions from './components/NestedAccordions.svelte';
 import Icon from './components/Icon.svelte';
 import RangeInput from './components/RangeInput.svelte';
-import { reportStyle, fontsToCss } from './util/dom';
+import { reportStyle, fontsToCss, exportStyleSheet } from './util/dom';
 import { saveState, getState } from './util/save';
 import { svgToPng } from './svg/toPng';
-import { exportSvg } from './svg/export';
+import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
 
 const iconsReq = require.context('./assets/img/.?inline', false, /\.svg$/);
@@ -87,7 +85,6 @@ let timeoutId;
 let countries = null;
 let land = null;
 let simpleLand = null;
-let commonCss = null;
 let openContextMenuInfo;
 const adm0Land = import('./assets/layers/world_adm0_simplified.topojson')
     .then(({default:topoAdm0}) => {
@@ -133,6 +130,7 @@ const defaultColorDef = {
 };
 
 // ====== State =======
+let baseCss = defaultBaseCss;
 let providedPaths = [];
 let providedShapes = []; // {name, coords, scale, id}
 let chosenCountries = [];
@@ -145,11 +143,11 @@ let inlineProps = {
 };
 
 let providedFonts = [];
-let cssFonts;
 let shapeCount = 0;
 let inlineStyles = {}; // elemID -> prop -> value
 let zonesData = {}; // key => {data (list), provided (bool), numericCols (list)}
-let lastUsedLabelProps = {};
+let zonesFilter = {'land': '1'};
+let lastUsedLabelProps = {'font-size': '14px'};
 
 let tooltipDefs = {
     countries: {
@@ -165,6 +163,8 @@ let colorDataDefs = {
 let legendDefs = {countries: JSON.parse(JSON.stringify(defaultLegendDef))};
 // ==== End state =====
 
+let cssFonts;
+let commonCss;
 const menuStates = {
     chosingPoint:      false,
     pointSelected:     false,
@@ -176,11 +176,18 @@ let typedText = "";
 let styleEditor;
 let contextualMenu;
 let showModal = false;
+let showExportConfirm = false;
+let exportForm;
 let htmlTooltipElem;
 let currentTab = 'countries';
 let orderedTabs = ['countries', 'land'];
 
+let commonStyleSheetElem;
+
 onMount(() => {
+    initTooltips();
+    commonStyleSheetElem = document.createElement('style');
+    document.head.appendChild(commonStyleSheetElem);
     restoreState();
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
@@ -468,6 +475,7 @@ async function draw(simplified = false, _) {
     groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
     groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
     computedOrderedTabs.forEach((layer, i) => {
+        const filter = zonesFilter[layer] ? `glow${zonesFilter[layer]}` : null;
         if (layer === 'countries' && p('showCountries') && countries) {
             if (!('countries' in zonesData) && !zonesData?.['countries']?.provided) {
                 const data = sortBy(countries.features.map(f => f.properties), 'alpha-3')
@@ -476,12 +484,12 @@ async function draw(simplified = false, _) {
                     numericCols: getNumericCols(data),
                 };
             }
-            groupData.push({ name: 'countries', data: countries, id: 'alpha-3', props: [], class: 'country', filter: null });
+            groupData.push({ name: 'countries', data: countries, id: 'alpha-3', props: [], class: 'country', filter: filter });
         }
         if (layer === 'land' && p('showLand')) groupData.push({name: 'landImg', showSource: i === 0});
         // selected country
-        else {
-            groupData.push({ name: `${layer}-adm1`, data: resolvedAdm1[layer], id: 'shapeName', props: [], class: 'adm1', filter: null });
+        else if (layer !== 'countries') {
+            groupData.push({ name: `${layer}-adm1`, data: resolvedAdm1[layer], id: 'shapeName', props: [], class: 'adm1', filter: filter });
         }
     });
 
@@ -493,20 +501,24 @@ async function draw(simplified = false, _) {
     function drawPaths(data) {
         if (data.name === 'landImg') return appendLandImage.call(this, data.showSource);
         if (!data.data) return;
-        const pathElem = d3.select(this).style('will-change', 'opacity').selectAll('path')
+        const parentPathElem = d3.select(this).style('will-change', 'opacity'); 
+        const pathElem = parentPathElem.selectAll('path')
             .data(data.data.features ? data.data.features : data.data)
             .join('path')
                 .attr('d', (d) => {return path(d)});
         if (data.id) pathElem.attr('id', (d) => d.properties[data.id]);
         if (data.class) pathElem.attr('class', data.class);
-        if (data.filter) pathElem.attr('filter', `url(#${data.filter})`);
+        if (data.filter) parentPathElem.attr('filter', `url(#${data.filter})`);
         data.props.forEach((prop) => pathElem.attr(prop, (d) => d.properties[prop]))
     }
 
     groups.each(drawPaths);
 
     drawCustomPaths(providedPaths, svg, projection);
-    appendGlow(svg, 'secondGlow', false, p('innerGlow2'), p('outerGlow2'));
+    const existingFilters = [...new Set(Object.entries(zonesFilter).filter(([key, fi]) => fi && key !== 'land').map(([key, fi]) => fi))];
+    existingFilters.forEach(fiIndex => {
+        appendGlow(svg, `glow${fiIndex}`, true, p(`innerGlow${fiIndex}`), p(`outerGlow${fiIndex}`));
+    });
     appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
     d3.select('#outline').style('fill', "url(#noise)");
     colorizeAndLegend();
@@ -523,9 +535,20 @@ async function draw(simplified = false, _) {
     addTooltipListener(map, tooltipDefs, zonesData);
 }
 
+let totalCommonCss;
 function computeCss() {
-    const finalColorsCss = Object.values(colorsCss).reduce((acc, cur) => {acc += cur; return acc;}, ''); 
-    commonCss = Mustache.render(cssTemplate, params) + finalColorsCss;
+    const finalColorsCss = Object.values(colorsCss).reduce((acc, cur) => {acc += cur; return acc;}, '');
+    const borderCss = `
+    #static-svg-map, #static-svg-map > svg {
+        border-radius: ${p('borderRadius')}px;
+    }
+    #frame {
+        fill: none;
+        stroke: ${p('borderColor')};
+        stroke-width:${p('borderWidth')}px;
+    }`;
+    commonCss = finalColorsCss + borderCss;
+    totalCommonCss = exportStyleSheet('#paths path') + commonCss;
 }
 
 function appendLandImage(showSource) {
@@ -538,12 +561,14 @@ function appendLandImage(showSource) {
         .data(land.features ? land.features : land)
         .join('path')
             .attr('d', (d) => {return path(d)});
-    pathElem.attr('filter', 'url(#firstGlow)');
-    appendGlow(landElem, 'firstGlow', showSource, p('innerGlow1'), p('outerGlow1'));
+    if(zonesFilter['land']) {
+        const filterIndex = zonesFilter['land'];
+        const filterId = `glow${filterIndex}`;
+        pathElem.attr('filter', `url(#${filterId})`);
+        appendGlow(landElem, filterId, showSource, p(`innerGlow${filterIndex}`), p(`outerGlow${filterIndex}`));
+    }
     const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
-        .attr('href', `data:image/svg+xml,${encodeURIComponent(SVGO.optimize(landElem.node().outerHTML, svgoConfig).data)}`);
-        // .attr('href', `data:image/svg+xml;utf8,${landElem.node().outerHTML}`);
-        // .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(landElem.node().outerHTML, svgoConfig).data}`);
+        .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(landElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
         
     d3.select(this).html(landImage.node().outerHTML)
         .style('pointer-events', 'none')
@@ -552,15 +577,18 @@ function appendLandImage(showSource) {
 }
 
 function save() {
-    saveState({params, inlineProps, cssFonts, providedFonts, 
+    baseCss = exportStyleSheet('#paths path');
+    saveState({params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
-        inlineStyles, shapeCount, zonesData, lastUsedLabelProps,
+        inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, colorDataDefs, legendDefs,
     });
 }
 
 function resetState() {
     params = JSON.parse(JSON.stringify(defaultParams));
+    baseCss = defaultBaseCss;
+    commonStyleSheetElem.innerHTML = baseCss;
     providedPaths = [];
     providedShapes = [];
     chosenCountries = [];
@@ -572,13 +600,13 @@ function resetState() {
         altitude: 1000,
         rotation: 0,
         tilt: 25,
-    }
+    };
     providedFonts = [];
-    cssFonts;
     shapeCount = 0;
     inlineStyles = {};
     zonesData = {};
-    lastUsedLabelProps = {};
+    zonesFilter = {land: '1'};
+    lastUsedLabelProps = {'font-size': '14px'};
     tooltipDefs = {
         countries: {
             template: defaultTooltipContent('name'),
@@ -599,19 +627,21 @@ function restoreState(givenState) {
     }
     else state = getState();
     if (!state) return;
-    ({  params, inlineProps, cssFonts, providedFonts, 
+    ({  params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
-        inlineStyles, shapeCount, zonesData, lastUsedLabelProps,
+        inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, colorDataDefs, legendDefs,
     } = state);
+    commonStyleSheetElem.innerHTML = baseCss;
     const tabsWoLand = orderedTabs.filter(x => x !== 'land');
     if (tabsWoLand.length) onTabChanged(tabsWoLand[0]);   
 }
 
 function saveProject() {
-    const state = {params, inlineProps, cssFonts, providedFonts, 
+    baseCss = exportStyleSheet('#paths path');
+    const state = {params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
-        inlineStyles, shapeCount, zonesData, lastUsedLabelProps,
+        inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, colorDataDefs, legendDefs,
     };
     download(JSON.stringify(state), 'text/json', 'project.mapbuilder');
@@ -654,6 +684,7 @@ function applyStyles() {
 function openEditor(e) {
     styleEditor.open(e.target, e.pageX, e.pageY);
 }
+
 // function handleInput(e) {
 //     const file = e.target.files[0];
 //     const reader = new FileReader();
@@ -687,6 +718,7 @@ function handleInputFont(e) {
         const newFont = {name: fileName, content: reader.result}
         providedFonts.push(newFont);
         providedFonts = providedFonts;
+        save();
     });
     reader.readAsDataURL(file);
 }
@@ -763,7 +795,7 @@ function drawAndSetupShapes() {
         const targetId = target.getAttribute('id');
         if (targetId.includes('label')) {
             editedLabelId = targetId;
-            typedText = target.childNodes[0].nodeValue;
+            typedText = target.childNodes[0].nodeValue.trim();
             addLabel();
             showMenu(e);
         }
@@ -799,11 +831,11 @@ function addShape(shapeName) {
 }
 
 function copySelection() {
-    const pointId = openContextMenuInfo.event.target.getAttribute('id');
-    const newDef = {...providedShapes.find(def => def.id === pointId)};
+    const objectId = openContextMenuInfo.event.target.getAttribute('id');
+    const newDef = {...providedShapes.find(def => def.id === objectId)};
     const projected = projection(newDef.pos);
     newDef.pos = projection.invert([projected[0] - 10, projected[1]]);
-    const newShapeId = `${newDef.name}-${shapeCount++}`;
+    const newShapeId = `${newDef.name ? newDef.name : 'label'}-${shapeCount++}`;
     inlineStyles[newShapeId] = {...inlineStyles[newDef.id]};
     newDef.id = newShapeId;
     providedShapes.push(newDef);
@@ -881,6 +913,7 @@ function onTemplateChange() {
 
 async function onTabChanged(newTabTitle) {
     currentTab = newTabTitle;
+    if (!tooltipDefs[newTabTitle]) return;
     await tick();
     if (tooltipDefs[newTabTitle].enabled) {
         const tmpElem = htmlToElement(tooltipDefs[newTabTitle].content);
@@ -938,10 +971,15 @@ function dragstart(event, i, prevent = false) {
     dragStartIndex = i;
 }
 
+function validateExport() {
+    const formData = Object.fromEntries(new FormData(exportForm).entries());
+    exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, providedFonts, true, totalCommonCss, formData);
+    showExportConfirm = false;
+}
 // === Export as PNG behaviour ===
 
-function exportRaster() {
-    const optimized = exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, providedFonts, false);
+async function exportRaster() {
+    const optimized = await exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, providedFonts, false, totalCommonCss, {});
     svgToPng('data:image/svg+xml;base64,' + window.btoa(optimized), p('width'), p('height'));
 }
 
@@ -963,7 +1001,7 @@ const categoricalPalettes = [
 let availableColumns = [], availablePalettes = [];
 
 $: availableColorTypes = zonesData?.[currentTab]?.numericCols?.length ? ['category', 'quantile', 'quantize'] : ['category'];
-$: curDataDefs = colorDataDefs[currentTab];
+$: curDataDefs = colorDataDefs?.[currentTab];
 function autoSelectColors() {
     if (!zonesData[currentTab]) return;
     if (curDataDefs.colorScale === null) {
@@ -984,7 +1022,7 @@ function autoSelectColors() {
     if(svg) colorizeAndLegend();
 }
 
-$: {
+$: if (colorDataDefs[currentTab]) {
     autoSelectColors(colorDataDefs[currentTab].colorScale, colorDataDefs[currentTab].colorColumn, colorDataDefs[currentTab].colorPalette, colorDataDefs[currentTab].nbBreaks);
 }
 
@@ -1068,7 +1106,8 @@ function getLegendColors(dataColorDef, tab, scale) {
 </script>
 
 <svelte:head>
-	{@html `<${''}style id="map-style"> ${commonCss} </${''}style>`}
+    <!-- {@html `<${''}style id="test"> ${baseCss} </${''}style>`} -->
+	{@html `<${''}style> ${commonCss} </${''}style>`}
 	{@html `<${''}style> ${cssFonts} </${''}style>`}
 </svelte:head>
 
@@ -1097,23 +1136,23 @@ function getLegendColors(dataColorDef, tab, scale) {
         <NestedAccordions sections={params} paramDefs={paramDefs} on:change={handleChangeProp} ></NestedAccordions>
         <ul class="nav nav-tabs">
             {#each computedOrderedTabs as tabTitle, index (tabTitle) }
+            {@const isLand = tabTitle === "land"}
             <li class="nav-item d-flex align-items-center"
-                draggable={tabTitle === "land"}
+                draggable={isLand}
                 on:dragstart={event => dragstart(event, index, tabTitle !== "land")}
                 on:drop|preventDefault={event => drop(event, index)}
                 ondragover="return false"
                 on:dragenter={() => hoveringTab = index}
                 class:is-dnd-hovering-right={hoveringTab === index && index > dragStartIndex}
                 class:is-dnd-hovering-left={hoveringTab === index && index < dragStartIndex}
-                class:grabbable={tabTitle === 'land'}>
+                class:grabbable={isLand}>
                 <a href="javascript:;"
                 class:active={currentTab === tabTitle}
-                class:disabled={tabTitle === 'land'}
                 class="nav-link d-flex align-items-center"
                 on:click={() => onTabChanged(tabTitle)}>
-                    {#if tabTitle === "land"} <Icon svg={icons['draggable']}/> {/if}
+                    {#if isLand} <Icon svg={icons['draggable']}/> {/if}
                     {tabTitle}
-                    {#if tabTitle !== 'countries' && tabTitle !== "land"}
+                    {#if tabTitle !== 'countries' && !isLand}
                         <span role="button" class="delete-tab" on:click={() => deleteCountry(tabTitle)}> ✕ </span>
                     {/if}
                 </a>
@@ -1128,6 +1167,13 @@ function getLegendColors(dataColorDef, tab, scale) {
                 <span class="nav-link d-flex"> <Icon fillColor="none" svg={icons['add']}/> </span>
             </li>
         </ul>
+        {#if currentTab !== 'countries'}
+            <select class="form-select form-select-sm" bind:value={zonesFilter[currentTab]} on:change={() => draw()}>
+                <option value={null}> None </option>
+                <option value="1"> First filter </option>
+                <option value="2"> Second filter </option>
+            </select>
+        {/if}
         {#if zonesData?.[currentTab]?.['data']}
             <div>
                 <label for="data-input-json" class="m-2 btn btn-light"> Import data for {currentTab} </label>
@@ -1175,7 +1221,7 @@ function getLegendColors(dataColorDef, tab, scale) {
             </div>
             {#if curDataDefs.enabled}
                 <div class="form-floating">
-                    <select class="form-select" id="choseColorType" bind:value={curDataDefs.colorScale}>
+                    <select class="form-select form-select-sm" id="choseColorType" bind:value={curDataDefs.colorScale}>
                         {#each availableColorTypes as colorType}
                             <option value={colorType}> {colorType} </option>
                         {/each}
@@ -1183,7 +1229,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                     <label for="choseColorType">Color type</label>
                 </div>
                 <div class="form-floating">
-                    <select class="form-select" id="choseColorColumn" bind:value={curDataDefs.colorColumn}>
+                    <select class="form-select form-select-sm" id="choseColorColumn" bind:value={curDataDefs.colorColumn}>
                         {#each availableColumns as colorColumn}
                             <option value={colorColumn}> {colorColumn} </option>
                         {/each}
@@ -1191,7 +1237,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                     <label for="choseColorColumn"> Value color</label>
                 </div>
                 <div class="form-floating">
-                    <select class="form-select" id="choseColorPalette" bind:value={curDataDefs.colorPalette}>
+                    <select class="form-select form-select-sm" id="choseColorPalette" bind:value={curDataDefs.colorPalette}>
                         {#each availablePalettes as palette}
                             <option value={palette}> {palette} </option>
                         {/each}
@@ -1233,10 +1279,10 @@ function getLegendColors(dataColorDef, tab, scale) {
                 <input type="file" id="fontinput" accept=".ttf,.woff,.woff2" on:change={handleInputFont}>
             </div>
             <div class="d-flex align-items-center m-2 btn btn-light"
-                on:click={() => exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, providedFonts)}>
+                on:click={() => showExportConfirm = true}>
                 <Icon fillColor="none" svg={icons['download']}/> Download SVG 
             </div>
-            <div class="m-2 btn btn-light" on:click={() => exportRaster()}>
+            <div class="m-2 btn btn-light" on:click={exportRaster}>
                 <Icon fillColor="none" svg={icons['download']}/> Download raster
             </div>
             <div class="d-flex align-items-center m-2 btn btn-light" on:click={saveProject}>
@@ -1254,7 +1300,57 @@ function getLegendColors(dataColorDef, tab, scale) {
     <div id="map-container"></div>
 </div>
 <Modal open={showModal} onClosed={() => onModalClose()}>
-    <DataTable data={zonesData?.[currentTab]?.['data']} > </DataTable>
+    <DataTable slot="content" data={zonesData?.[currentTab]?.['data']} > </DataTable>
+</Modal>
+
+<Modal open={showExportConfirm} onClosed={() => showExportConfirm = false}>
+    <form slot="content" bind:this={exportForm}>
+        {#if providedFonts.length}
+            <h3> Font export </h3>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="exportFonts" value={exportFontChoices.noExport} id="exportFonts1">
+                <label class="form-check-label" for="exportFonts1">
+                    Do not export fonts
+                    <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="If the final document will contain imported fonts, no need to export it as part of the SVG">?</span>
+                </label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="exportFonts" value={exportFontChoices.convertToPath} id="exportFonts2">
+                <label class="form-check-label" for="exportFonts2">
+                    Convert texts with imported fonts to path
+                    <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Convert text to <path> elements to remove dependency on the imported font(s)">?</span>
+                </label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="exportFonts" value={exportFontChoices.embedFont} id="exportFonts3">
+                <label class="form-check-label" for="exportFonts3">
+                    Embed font(s)
+                    <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Always embed imported font(s)">?</span>
+                </label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="exportFonts" id="exportFonts4" value={exportFontChoices.smallest} checked>
+                <label class="form-check-label" for="exportFonts4">
+                    Smallest of the 2
+                    <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Automatically determine the smallest file size between converting to <path> and embedding font">?</span>
+                </label>
+            </div>
+        {/if}
+        <h3> Resize </h3>
+        <div class="form-check form-switch">
+            <input class="form-check-input" name="hideOnResize" type="checkbox" role="switch" id="hideOnResize" checked>
+            <label class="form-check-label" for="flexSwitchCheckDefault">
+                Hide svg on resize 
+                <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="On some browsers, resizing the window triggers a re-render, which can cause a slowdown. If activated, the SVG will be hidden while the window is being resized, thus reducing the computing load.">?</span>
+            </label>
+        </div>
+    </form>
+    <div slot="footer" class="d-flex justify-content-end">
+        <button type="button" class="btn btn-success"
+            on:click={validateExport}> 
+            Export
+        </button>
+    </div>
 </Modal>
 <div>
     <!-- <div class="file m-4">

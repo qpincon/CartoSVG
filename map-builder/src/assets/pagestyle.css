@@ -2,15 +2,7 @@
     display: block;
     height: auto;
 }
-#static-svg-map, #static-svg-map > svg {
-    //clip-path: inset(0% 0% 0% 0% round 15px);
-    border-radius: {{Styling.Border.borderRadius}}px;
-}
-#frame {
-    fill: none;
-    stroke: {{Styling.Border.borderColor}};
-    stroke-width: {{Styling.Border.borderWidth}}px;
-}
+
 #paths path {
     pointer-events: none;
     stroke: #7c490ea0;
@@ -51,18 +43,6 @@
 .adm1:hover {
     fill: #7c490ea0;
 }
-
-/* {{#adm1.hover}}
-.adm1:hover {
-    fill: {{ adm1.hoverColor }};
-}
-{{/adm1.hover}}
-
-{{#countries.hover}}
-.country:hover {
-    fill: {{ countries.hoverColor }};
-}
-{{/countries.hover}} */
 
 #tooltip {
     position: absolute;

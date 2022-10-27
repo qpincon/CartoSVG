@@ -1,3 +1,5 @@
+import Tooltip from 'bootstrap/js/dist/tooltip';
+
 function download(content, mimeType, filename) {
     const a = document.createElement('a');
     const blob = new Blob([content], { type: mimeType });
@@ -80,4 +82,10 @@ function getNumericCols(jsonData) {
     }
     return [...numericCols];
 }
-export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce, getNumericCols };
+
+function initTooltips() {
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    [...tooltipTriggerList].map(tooltipTriggerEl => new Tooltip(tooltipTriggerEl, {placement: 'top', html: false}))
+}
+
+export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce, getNumericCols, initTooltips };

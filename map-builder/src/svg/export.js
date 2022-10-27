@@ -12,6 +12,13 @@ const domParser = new DOMParser();
 
 const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`
 
+const exportFontChoices = Object.freeze({
+    noExport: "0",
+    convertToPath: "1",
+    embedFont: "2",
+    smallest: "3"
+});
+
 const domBaselineToBaseline = {
     hanging: "top",
     auto: "middle",
@@ -19,40 +26,41 @@ const domBaselineToBaseline = {
     "text-top": "bottom"
 };
 const anchorToAnchor = {
-    left: 'left', 
+    left: 'left',
     middle: 'center',
     right: 'right'
 };
+
 function replaceTextsWithPaths(svgElem, transformedTexts) {
     const texts = Array.from(svgElem.querySelectorAll('text'));
     texts.forEach(textElem => {
         const fontFamily = textElem.style['font-family'];
         const text = textElem.textContent.trim();
-        const transformed = transformedTexts[fontFamily][text];
+        const transformed = transformedTexts[fontFamily]?.[text];
         if (!transformed) return;
         const pathElem = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         pathElem.setAttribute('d', transformed);
-        pathElem.setAttribute('transform', textElem.getAttribute('transform'));
+        const transform = textElem.getAttribute('transform');
+        if (transform) pathElem.setAttribute('transform', transform);
         reportStyle(textElem, pathElem);
         textElem.replaceWith(pathElem);
         // textElem.parentElement.append(pathElem);
     });
 }
 
-async function inlineFontVsPath(svgElem, providedFonts) {
-    let nbFontChars = 0; 
+async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
+    let nbFontChars = 0;
     let nbPathChars = 0;
     const transformedTexts = {};
     const defaultStyles = getComputedStyle(document.body);
-    await Promise.all(providedFonts.map(({name, content}) => {
+    await Promise.all(providedFonts.map(({ name, content }) => {
         transformedTexts[name] = {};
         nbFontChars += content.length;
         const texts = Array.from(svgElem.querySelectorAll('text'));
-        return new Promise(resolve => { 
-            TextToSVG.load(content, function(err, textToSVG) {
+        return new Promise(resolve => {
+            TextToSVG.load(content, function (err, textToSVG) {
                 texts.forEach(textElem => {
                     const fontFamily = textElem.style['font-family'] || defaultStyles.getPropertyValue('font-family');
-                    console.log(defaultStyles.getPropertyValue('font-size'));
                     if (fontFamily === name) {
                         const text = textElem.textContent.trim();
                         const anchor = anchorToAnchor[textElem.getAttribute('text-anchor')] || 'left';
@@ -81,30 +89,33 @@ async function inlineFontVsPath(svgElem, providedFonts) {
             });
         });
     }));
-    console.log('font chars=', nbFontChars);
-    console.log('path chars=', nbPathChars);
-    const pathIsBetter = nbPathChars + 10000  < nbFontChars;
-    if (pathIsBetter) {
+    const pathIsBetter = nbPathChars + 10000 < nbFontChars;
+    if (exportFontsOption === exportFontChoices.convertToPath || pathIsBetter) {
         replaceTextsWithPaths(svgElem, transformedTexts);
         return true;
     }
     return false;
 }
 
-async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, providedFonts, downloadExport=true) {
-    // svg.select('foreignObject').remove();
+async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, providedFonts, downloadExport = true, commonCss,
+    { exportFonts = exportFontChoices.smallest, hideOnResize = false }) {
+
     const fo = svg.select('foreignObject').node();
     if (fo) document.body.append(fo);
-    // const clonedSvg = svg.node().cloneNode(true);
-    // document.body.append(clonedSvg);
     const svgNode = svg.node();
     const cssFonts = fontsToCss(providedFonts);
-    
+
     const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig).data;
     if (fo) svg.node().append(fo);
     const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
-    const pathIsBetter = await inlineFontVsPath(optimizedSVG.firstChild, providedFonts);
-    const finalDataByGroup = {data: {}, tooltips: {}};
+    let pathIsBetter = false;
+    if (exportFonts === exportFontChoices.smallest || exportFonts === exportFontChoices.convertToPath) {
+        pathIsBetter = await inlineFontVsPath(optimizedSVG.firstChild, providedFonts);
+    }
+    else if (exportFonts === exportFontChoices.noExport) {
+        pathIsBetter = true;
+    }
+    const finalDataByGroup = { data: {}, tooltips: {} };
     [...chosenCountries, 'countries'].forEach(groupId => {
         const containerId = groupId !== 'countries' ? groupId + '-adm1' : groupId;
         const group = optimizedSVG.getElementById(containerId);
@@ -116,7 +127,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         usedVars = [...new Set(usedVars)];
         const functionStr = ttTemplate.replaceAll(/\{(\w+)\}/gi, '${data.$1}');
         finalDataByGroup.tooltips[groupId] = functionStr;
-        const indexed = indexBy(zonesData[groupId].data, groupId === 'countries' ? 'alpha-3': 'shapeName');
+        const indexed = indexBy(zonesData[groupId].data, groupId === 'countries' ? 'alpha-3' : 'shapeName');
         const finalData = {};
         for (let child of group.children) {
             const id = child.getAttribute('id');
@@ -125,6 +136,14 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         }
         finalDataByGroup.data[groupId] = finalData;
     });
+
+    const onResize = hideOnResize ? `
+    let resizeTimeout;
+    const contentSvg = mapElement.firstChild;
+    window.addEventListener('resize', e => {
+        contentSvg.style.display = "none"; clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => { contentSvg.style.display = 'block' }, 300);
+    });`: '';
 
     const finalScript = `
     <![CDATA[
@@ -137,14 +156,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         tooltip.element = constructTooltip({}, '');
         mapElement.append(tooltip.element);
         tooltip.element.style.display = 'none';
-            
-        let resizeTimeout;
-        const contentSvg = mapElement.firstChild;
-        window.addEventListener('resize', e => {
-            contentSvg.style.display = "none"; clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => { contentSvg.style.display = 'block' }, 100);
-        });
-
+        ${onResize}    
         const dataByGroup = ${JSON.stringify(finalDataByGroup)};
         function constructTooltip(data, templateStr) {
             if(!data) return;
@@ -231,11 +243,10 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         }
     });]]>`;
     const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
-    let renderedCss = exportStyleSheet('map-style');
-    renderedCss = renderedCss.replaceAll(/rgb\(.*?\)/g, rgb2hex);
+    const renderedCss = commonCss.replaceAll(/rgb\(.*?\)/g, rgb2hex);
     styleElem.innerHTML = pathIsBetter ? renderedCss : renderedCss + cssFonts;
     optimizedSVG.firstChild.append(styleElem);
-    if (!downloadExport) return optimizedSVG.firstChild.outerHTML;
+    if (!downloadExport) {console.log(optimizedSVG.firstChild.outerHTML); return optimizedSVG.firstChild.outerHTML;}
     const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
     scriptElem.innerHTML = finalScript;
     optimizedSVG.firstChild.append(scriptElem);
@@ -250,24 +261,5 @@ function getFinalTooltipTemplate(groupId, tooltipDefs) {
     return finalTemplate.outerHTML;
 }
 
-function styleSheetToText(sheet) {
-    let styleTxt = '';
-    const rules = sheet.cssRules;
-    for (let r in rules) {
-        styleTxt += rules[r].cssText;
-    }
-    return styleTxt.replace(/undefined/g, '');
-}
 
-function exportStyleSheet() {
-    const sheets = document.styleSheets;
-    for (let i in sheets) {
-        const rules = sheets[i].cssRules;
-        for (let r in rules) {
-            const selectorText = rules[r].selectorText;
-            if (selectorText?.includes("#paths path")) return styleSheetToText(sheets[i]);
-        }
-    }
-}
-
-export { exportSvg };
+export { exportSvg, exportFontChoices };

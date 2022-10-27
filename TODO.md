@@ -32,7 +32,7 @@
     - d3
     - github
     - "tilting the satellite observable"
-- [ ] Option to push to front on hover to avoid surrounding boundaries of top of hovered ( add js to export ?)
+- [x] Option to push to front on hover to avoid surrounding boundaries of top of hovered ( add js to export ?) => always here, but replace on leave
 - [x] Find a way to retain inline styles on redraw  
 - [x] Define <style> in <defs> in SVG directly  
 - [ ] Allow for ordering <land> div after/before countries/ADM1. If after, remove <SourceGraphic> from merge filter, otherwise retain it (for stroke)

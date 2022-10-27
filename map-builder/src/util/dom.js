@@ -22,4 +22,23 @@ function fontsToCss(fonts) {
     }).join('\n') || '';
 }
 
-export { reportStyle, fontsToCss };
+function styleSheetToText(sheet) {
+    let styleTxt = '';
+    const rules = sheet.cssRules;
+    for (let r in rules) {
+        styleTxt += rules[r].cssText;
+    }
+    return styleTxt.replace(/undefined/g, '');
+}
+
+function exportStyleSheet(selectorToFind) {
+    const sheets = document.styleSheets;
+    for (let i in sheets) {
+        const rules = sheets[i].cssRules;
+        for (let r in rules) {
+            const selectorText = rules[r].selectorText;
+            if (selectorText?.includes(selectorToFind)) return styleSheetToText(sheets[i]);
+        }
+    }
+}
+export { reportStyle, fontsToCss, exportStyleSheet };

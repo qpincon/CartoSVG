@@ -21,8 +21,16 @@ const config = {
     module: {
         rules: [
             {
-                test: /\.css$/i,
-                use: ["style-loader", "css-loader"],
+                test: /\.css$/s,
+                oneOf: [
+                    {
+                        resourceQuery: /inline/,
+                        type: 'asset/source',
+                    },
+                    {
+                        use: ["style-loader", "css-loader"],
+                    }
+                ]
             },
             {
                 test: /\.s[ac]ss$/i,
@@ -73,10 +81,6 @@ const config = {
                         ],
                     }
                 ]
-            },
-            {
-                test: /\.(txt)$/,
-                type: 'asset/source',
             },
             {
                 test: /\.(topojson|geojson)$/,

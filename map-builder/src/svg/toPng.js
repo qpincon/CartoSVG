@@ -5,6 +5,7 @@ function svgToPng(b64, width, height) {
         const link = document.createElement("a");
         link.download = 'map.png';
         link.href = pngSrc;
+        console.log(pngSrc)
         link.click();
   });
 }

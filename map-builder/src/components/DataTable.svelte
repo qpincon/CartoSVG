@@ -25,3 +25,10 @@ $: headers = data.length ? Object.keys(data[1]) : [];
         {/each}
     </tbody>
 </table>
+
+<style scoped>
+th {
+    white-space: nowrap;
+}
+
+</style>

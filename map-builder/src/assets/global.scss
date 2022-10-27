@@ -23,7 +23,8 @@ $input-padding-y:                         2px;
 @import "bootstrap/scss/maps";
 @import "bootstrap/scss/mixins";
 @import "bootstrap/scss/root";
-$accordion-button-bg:                     tint-color($component-active-bg, 90%);
+$accordion-button-bg:               tint-color($component-active-bg, 90%);
+$tooltip-bg:                        $primary;
 
 // // 6. Optionally include any other parts as needed
 @import "bootstrap/scss/grid";
@@ -38,6 +39,8 @@ $accordion-button-bg:                     tint-color($component-active-bg, 90%);
 @import "bootstrap/scss/buttons";
 @import "bootstrap/scss/button-group";
 @import "bootstrap/scss/modal";
+@import "bootstrap/scss/tooltip";
+
 @import "bootstrap/scss/close";
 
 // @import "bootstrap/scss/grid";
@@ -73,4 +76,18 @@ html {
 
 .range-label {
     min-width: 2rem;
+}
+
+.help-tooltip {
+    display: inline-flex;
+    justify-content: center;
+    align-items: end;
+    width: 20px;
+    height: 20px;
+    background-color: $secondary;
+    border-radius: 100%;
+    color:white;
+    text-decoration: none;
+    font-weight: 500;
+    margin-left: 5px;
 }
