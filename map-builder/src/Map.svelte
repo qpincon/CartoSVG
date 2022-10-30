@@ -6,22 +6,22 @@ import * as d3 from "d3";
 import SVGO from 'svgo/dist/svgo.browser';
 import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
 
-// https://greensock.com/docs/v3/Plugins/MotionPathHelper/static.editPath()
-import MotionPathHelper from "./util/MotionPathHelper.js";
 import svgoConfig from './svgoExport.config';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
+import PathEditor from './svg/pathEditor';
 import { paramDefs, defaultParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
 import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips } from './util/common';
 import * as shapes from './svg/shapeDefs';
-import { setTransformScale } from './svg/svg';
+import { setTransformScale, closestDistance } from './svg/svg';
 import { drawShapes } from './svg/shape';
 import iso3Data from './assets/data/iso3_filtered.json';
 import DataTable from './components/DataTable.svelte';
 import Legend from './components/Legend.svelte';
 import defaultBaseCss from './assets/pagestyle.css?inline';
 import { drawLegend } from './svg/legend';
+import { freeHandDrawPath } from './svg/freeHandPath'
 import Modal from './components/Modal.svelte';
 import NestedAccordions from './components/NestedAccordions.svelte';
 import Icon from './components/Icon.svelte';
@@ -105,7 +105,6 @@ Promise.all([adm0Land, verySimpleLand]).then(() => draw());
 let path = null;
 let projection = null;
 let svg = null;
-let addingPath = false;
 let currentPath = [];
 const defaultLegendDef =  {
     x: 20,
@@ -183,7 +182,9 @@ let currentTab = 'countries';
 let orderedTabs = ['countries', 'land'];
 
 let commonStyleSheetElem;
-
+let zoomFunc;
+let dragFunc;
+let editingPath = false;
 onMount(() => {
     initTooltips();
     commonStyleSheetElem = document.createElement('style');
@@ -243,19 +244,30 @@ onMount(() => {
     document.body.append(contextualMenu);
     contextualMenu.style.display = 'none';
     contextualMenu.style.position = 'absolute';
+    attachListeners();
+});
+
+function attachListeners() {
     const container = d3.select('#map-container');
-    container.call(d3.drag()
+    dragFunc = d3.drag()
         .filter((e) => !e.button)   // Remove ctrlKey
         .on("drag", dragged)
         .on('start', () => {
             if (menuStates.addingLabel) validateLabel();
             styleEditor.close();
             closeMenu();
-        })
-    );
-    const zoom = d3.zoom().on('zoom', zoomed).on('start', () => closeMenu());
-    container.call(zoom);
-});
+        });
+
+    zoomFunc = d3.zoom().on('zoom', zoomed).on('start', () => closeMenu());
+    container.call(dragFunc);
+    container.call(zoomFunc);
+}
+
+function detachListeners() {
+    const container = d3.select('#map-container');
+    container.on(".drag", null);
+    container.on(".zoom", null);
+}
 
 let altScale = d3.scaleLinear().domain([1, 0]).range([100, 10000]);
 function zoomed(event) {
@@ -438,7 +450,6 @@ async function draw(simplified = false, _) {
     
     path = d3.geoPath(projection);
     svg.html('');
-    // appendClip(svg, width, height, p('borderRadius'));
     svg.on('contextmenu', function(e) {
         e.preventDefault();
         showMenu(e);
@@ -447,26 +458,24 @@ async function draw(simplified = false, _) {
     }, false);
     svg.on("click", function(e) {
         closeMenu();
-        if (!addingPath) return;
-        const pos = projection.invert(d3.pointer(e));
-        let elem = svg.select('#paths');
-        if (elem.empty()) elem = svg.append('g').attr('id', 'paths');
-        currentPath.push(pos);
-        if (currentPath.length === 2) {
-            const pathIndex = providedPaths.length;
-            const id = `path-${pathIndex}`;
-            const initialPath = `M${projection(currentPath[0])}L${projection(currentPath[1])}`;
-            elem.append('path')
-                .attr('id', id)
-                .attr('d', initialPath);
-            providedPaths.push(parseAndUnprojectPath(initialPath, projection));
-            currentPath = [];
-            addingPath = false;
-            MotionPathHelper.editPath(`#${id}`, {
-                onRelease: function() {
-                    const parsed = parseAndUnprojectPath(this.path, projection);
-                    providedPaths[pathIndex] = parsed;
-                }
+        if (editingPath) return;
+        const [x, y] = d3.pointer(e);
+        const point = {x, y};
+        const paths = Array.from(document.getElementById('paths').children);
+        const closestPoint = paths.reduce((prev, curElem) => {
+            const curDist = closestDistance(point, curElem);
+            curDist.elem = curElem;
+            return prev.distance < curDist.distance ? prev : curDist
+        }, {});
+        if (closestPoint.distance && closestPoint.distance < 6) {
+            editingPath = true;
+            detachListeners();
+            new PathEditor(closestPoint.elem, svg.node(), (pathElem) => {
+                editingPath = false;
+                const index = closestPoint.elem.getAttribute('id').match(/\d+$/)[0];
+                const parsed = parseAndUnprojectPath(pathElem, projection);
+                providedPaths[index] = parsed;
+                attachListeners();
             });
         }
     });
@@ -492,7 +501,7 @@ async function draw(simplified = false, _) {
             groupData.push({ name: `${layer}-adm1`, data: resolvedAdm1[layer], id: 'shapeName', props: [], class: 'adm1', filter: filter });
         }
     });
-
+    groupData.push({ name: 'paths', data: [], id: null, props: [], class: null, filter: null });
     groupData.push({ name: 'points-labels', data: [], id: null, props: [], class: null, filter: null });
     // const groups = svg.selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
     const groups = svg.append('svg')
@@ -725,7 +734,15 @@ function handleInputFont(e) {
 
 function addPath() {
     closeMenu();
-    addingPath = true;
+    detachListeners();
+    freeHandDrawPath(svg, projection, (finishedElem) => {
+        attachListeners();
+        const pathIndex = providedPaths.length;
+        const id = `path-${pathIndex}`;
+        finishedElem.setAttribute('id', id);
+        providedPaths.push(parseAndUnprojectPath(finishedElem.getAttribute('d'), projection));
+        drawCustomPaths();
+    });
 }
 
 function redraw(propName) {

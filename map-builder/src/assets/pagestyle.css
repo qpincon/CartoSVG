@@ -4,7 +4,6 @@
 }
 
 #paths path {
-    pointer-events: none;
     stroke: #7c490ea0;
     stroke-dasharray: 5px;
     stroke-width: 2;

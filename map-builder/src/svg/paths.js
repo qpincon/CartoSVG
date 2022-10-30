@@ -1,5 +1,4 @@
 import parsePath from 'parse-svg-path';
-import MotionPathHelper from "../util/MotionPathHelper.js";
 
 export function drawCustomPaths(pathDefs, svg, projection) {
     if (!pathDefs) return;
@@ -16,17 +15,10 @@ export function drawCustomPaths(pathDefs, svg, projection) {
             d +=  `${instruction}${newData}`;
             return d
         }, '');
-        const path = elem.append('path').attr('id', id).attr('d', newPath);
-        path.on('click', (e) => {
-            MotionPathHelper.editPath(e.target, {
-                onRelease: function() {
-                    const parsed = parseAndUnprojectPath(this.path, projection);
-                    pathDefs[index] = parsed;
-                }
-            });
-        })
+        elem.append('path').attr('id', id).attr('d', newPath);
     });
 }
+
 
 function parseMatrixAttr(matrixStr) {
     const numOnly = matrixStr.match(/[-0-9]+/g);

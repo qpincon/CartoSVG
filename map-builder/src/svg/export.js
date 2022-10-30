@@ -246,7 +246,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     const renderedCss = commonCss.replaceAll(/rgb\(.*?\)/g, rgb2hex);
     styleElem.innerHTML = pathIsBetter ? renderedCss : renderedCss + cssFonts;
     optimizedSVG.firstChild.append(styleElem);
-    if (!downloadExport) {console.log(optimizedSVG.firstChild.outerHTML); return optimizedSVG.firstChild.outerHTML;}
+    if (!downloadExport) return optimizedSVG.firstChild.outerHTML;
     const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
     scriptElem.innerHTML = finalScript;
     optimizedSVG.firstChild.append(scriptElem);

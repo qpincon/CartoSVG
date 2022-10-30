@@ -11,7 +11,7 @@ function removeCoveringAll(groupElement) {
         // ignore empty path, and big ones (that actually draw something)
         if (!d || d.length > 100) continue;
         const rect = child.getBoundingClientRect();
-        const includes = rect.x <= containerRect.x && rect.right >= containerRect.right 
+        const includes = rect.x <= containerRect.x && rect.right >= containerRect.right
             && rect.y <= containerRect.y && rect.bottom >= containerRect.bottom;
         if (includes) {
             console.log('removing', child);
@@ -19,6 +19,33 @@ function removeCoveringAll(groupElement) {
         }
     }
 }
+
+
+function distance(p1, p2) {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+function closestDistance(point, pathElem) {
+    const pathLength = pathElem.getTotalLength();
+    const delta = 10;
+    const nbSample = Math.ceil(pathLength / delta);
+    let minDist = Number.MAX_SAFE_INTEGER;
+    let minDistPoint;
+    let advancement;
+    for (let i = 0; i < nbSample; i++) {
+        const pathPoint = pathElem.getPointAtLength(i * delta);
+        const dist = distance(pathPoint, point);
+        if (dist < minDist) {
+            minDist = dist;
+            minDistPoint = pathPoint;
+            advancement = (i * delta) / pathLength;
+        }
+    }
+    return {distance: minDist, point: minDistPoint, advancement: advancement };
+}
+
 
 function setTransformScale(el, scaleStr) {
     const existingTransform = el.getAttribute('transform');
@@ -32,7 +59,7 @@ function setTransformScale(el, scaleStr) {
         const newAttr = existingTransform.replace(/scale\(.*?\)/, scaleStr);
         el.setAttribute("transform", newAttr);
     }
-} 
+}
 
 function getTranslateFromTransform(el) {
     const existingTransform = el.getAttribute('transform');
@@ -61,4 +88,4 @@ function createSvgFromPart(partStr) {
     return domParser.parseFromString(svgStr, 'text/html').body.childNodes[0].firstChild;
 }
 
-export { createSvgFromPart, setTransformScale, setTransformTranslate, getTranslateFromTransform };
+export { createSvgFromPart, setTransformScale, setTransformTranslate, getTranslateFromTransform, closestDistance };
