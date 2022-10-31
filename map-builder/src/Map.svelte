@@ -470,11 +470,16 @@ async function draw(simplified = false, _) {
         if (closestPoint.distance && closestPoint.distance < 6) {
             editingPath = true;
             detachListeners();
+            const index = closestPoint.elem.getAttribute('id').match(/\d+$/)[0];
             new PathEditor(closestPoint.elem, svg.node(), (pathElem) => {
+                // element was deleted
                 editingPath = false;
-                const index = closestPoint.elem.getAttribute('id').match(/\d+$/)[0];
-                const parsed = parseAndUnprojectPath(pathElem, projection);
-                providedPaths[index] = parsed;
+                if (!pathElem) {
+                    providedPaths.splice(index, 1);
+                } else {
+                    const parsed = parseAndUnprojectPath(pathElem, projection);
+                    providedPaths[index] = parsed;
+                }
                 attachListeners();
             });
         }
@@ -557,7 +562,7 @@ function computeCss() {
         stroke-width:${p('borderWidth')}px;
     }`;
     commonCss = finalColorsCss + borderCss;
-    totalCommonCss = exportStyleSheet('#paths path') + commonCss;
+    totalCommonCss = exportStyleSheet('#paths > path') + commonCss;
 }
 
 function appendLandImage(showSource) {
@@ -586,7 +591,7 @@ function appendLandImage(showSource) {
 }
 
 function save() {
-    baseCss = exportStyleSheet('#paths path');
+    baseCss = exportStyleSheet('#paths > path');
     saveState({params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
@@ -647,7 +652,7 @@ function restoreState(givenState) {
 }
 
 function saveProject() {
-    baseCss = exportStyleSheet('#paths path');
+    baseCss = exportStyleSheet('#paths > path'); 
     const state = {params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountries, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,

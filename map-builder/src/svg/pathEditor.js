@@ -17,7 +17,13 @@ export default class PathEditor {
         this.svgContainer = svgContainer;
         this.onFinish = onFinish;
         this.editorContainer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        this.pathOverlayElem = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        this.pathOverlayElem.setAttribute('d', this.pathElem.getAttribute('d'));
+        this.pathOverlayElem.setAttribute('stroke', " #528af4");
+        this.pathOverlayElem.setAttribute('stroke-width', "3");
+        this.pathOverlayElem.setAttribute('fill', "none");
         this.pathElem.parentNode.append(this.editorContainer);
+        this.editorContainer.append(this.pathOverlayElem);
         const parsedPath = parsePath(pathElem.getAttribute('d'));
         // flatten parsed path into a single array, wrapping coords into array on 2 elements
         this.pathData = parsedPath.flatMap(x => x).filter(x => typeof (x) !== 'string')
@@ -34,6 +40,7 @@ export default class PathEditor {
         this.addOrAbortFunc = (e) => this.addOrAbort(e);
         this.svgContainer.addEventListener('mousedown', this.addOrAbortFunc);
         this.createPoints();
+        this.setupPathOverlay();
     }
 
     cleanup() {
@@ -46,8 +53,37 @@ export default class PathEditor {
         this.init(this.pathElem, this.svgContainer, this.onFinish);
     }
 
+    setupPathOverlay() {
+        this.pathOverlayElem.addEventListener('mousedown', e => {
+            e.stopPropagation();
+            this.currentDragging = this.pathOverlayElem;
+            this.pathOverlayElem.x = e.clientX;
+            this.pathOverlayElem.y = e.clientY;
+        });
+        this.svgContainer.addEventListener('mousemove', e => {
+            if (this.currentDragging === this.pathOverlayElem) {
+                e.stopPropagation();
+                const deltaX = e.clientX - this.pathOverlayElem.x;
+                const deltaY = e.clientY - this.pathOverlayElem.y;
+                for (let i = 0; i < this.pathData.length; ++i) {
+                    this.pathData[i][0] = this.pathOverlayElem.x + deltaX;
+                    this.pathData[i][1] = this.pathOverlayElem.y + deltaY;
+                    this.movePoint(this.pointElems[i].coordIndex, deltaX, deltaY);
+                    if (this.pointElems[i].lines) this.pointElems[i].lines.forEach(line => this.updateLine(line));
+                }
+                this.pathOverlayElem.x = e.clientX;
+                this.pathOverlayElem.y = e.clientY;
+                this.pathDataToD();
+            }
+        });
+        this.pathOverlayElem.addEventListener('mouseup', e => {
+            if (this.currentDragging === this.pathOverlayElem) {
+                this.currentDragging = null;
+            }
+        });
+    }
+
     addOrAbort(e) {
-        // e.stopPropagation();
         if (e.ctrlKey) {
             const [x, y] = pointer(e);
             const point = { x, y };
@@ -88,6 +124,7 @@ export default class PathEditor {
             d += `${coord[0]} ${coord[1]} `;
         });
         this.pathElem.setAttribute('d', d);
+        this.pathOverlayElem.setAttribute('d', d);
     }
 
     createPoints() {
@@ -117,12 +154,12 @@ export default class PathEditor {
             // Attach first coord to first control point
             if (isFirstCoord) {
                 point.linkedNext = index + 1;
-                point.lines = [this.createLine(point, this.pointElems[index + 1])];
+                point.lines = [this.createLine(index, index + 1)];
             }
             // Attach last coord to last control point
             else if (isLastCoord) {
                 point.linkedPrev = index - 1;
-                point.lines = [this.createLine(point, this.pointElems[index - 1])];
+                point.lines = [this.createLine(index, index - 1)];
             }
             // First control point moved (and not first C command)
             else if (!isFirstCurveCommand && (index % 3) === 1) {
@@ -141,8 +178,8 @@ export default class PathEditor {
                 point.linkedPrev = index - 1; // last control point of previous C
                 point.linkedNext = index + 1; // first control point of next C
                 point.lines = [
-                    this.createLine(point, this.pointElems[index - 1]),
-                    this.createLine(point, this.pointElems[index + 1]),
+                    this.createLine(index, index - 1),
+                    this.createLine(index, index + 1),
                 ];
             }
             point.addEventListener('mousedown', (e) => this.onPointClick(e, point));
@@ -152,20 +189,24 @@ export default class PathEditor {
         });
     }
 
-    createLine(p1, p2) {
+    createLine(p1Index, p2Index) {
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('stroke', '#528af4');
         line.setAttribute('stroke-width', '2');
-        line.p1 = p1;
-        line.p2 = p2;
+        line.p1Index = p1Index;
+        line.p2Index = p2Index;
         this.editorContainer.insertBefore(line, this.editorContainer.firstChild);
         this.updateLine(line);
         return line;
     }
 
     updateLine(lineElem) {
-        const [x1, y1] = this.getPosCircle(lineElem.p1);
-        const [x2, y2] = this.getPosCircle(lineElem.p2);
+        // const [x1, y1] = this.getPosCircle(lineElem.p1);
+        // const [x2, y2] = this.getPosCircle(lineElem.p2);
+        const p1 = this.pathData[lineElem.p1Index];
+        const p2 = this.pathData[lineElem.p2Index];
+        const [x1, y1] = [p1[0], p1[1]];
+        const [x2, y2] = [p2[0], p2[1]]
         lineElem.setAttribute('x1', x1);
         lineElem.setAttribute('y1', y1);
         lineElem.setAttribute('x2', x2);
@@ -186,7 +227,7 @@ export default class PathEditor {
         if (this.pointElems.length < 5) {
             this.pathElem.remove();
             this.cleanup();
-            this.onFinish(this.pathElem);
+            this.onFinish(null);
             return;
         }
         if (point.coordIndex === 0) {
@@ -201,7 +242,7 @@ export default class PathEditor {
     }
 
     onMouseMove(e) {
-        if (!this.currentDragging) return;
+        if (!this.currentDragging || this.currentDragging === this.pathOverlayElem) return;
         const point = this.currentDragging;
         const deltaX = e.clientX - point.x;
         const deltaY = e.clientY - point.y;
