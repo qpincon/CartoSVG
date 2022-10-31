@@ -3,11 +3,9 @@ import svgoConfig from '../svgoExport.config';
 import svgoConfigText from '../svgoExportText.config';
 
 import TextToSVG from 'text-to-svg';
-// import paper from 'paper';
-// paper.setup([1000, 1000]);
 import { htmlToElement } from '../util/common';
 import { indexBy, pick, download } from '../util/common';
-import { reportStyle, fontsToCss } from '../util/dom';
+import { reportStyle, fontsToCss, getUsedInlineFonts } from '../util/dom';
 const domParser = new DOMParser();
 
 const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`
@@ -80,9 +78,6 @@ async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
                         path = optimized.querySelector('path').getAttribute('d');
                         transformedTexts[name][text] = path;
                         nbPathChars += path.length;
-                        // const paperPath = new paper.Path(path);
-                        // paperPath.simplify(1);
-                        // console.log(paperPath.pathData)
                     }
                 });
                 resolve();
@@ -103,8 +98,9 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     const fo = svg.select('foreignObject').node();
     if (fo) document.body.append(fo);
     const svgNode = svg.node();
-    const cssFonts = fontsToCss(providedFonts);
-
+    
+    const usedFonts = getUsedInlineFonts(svgNode);
+    const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
     const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig).data;
     if (fo) svg.node().append(fo);
     const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
@@ -244,7 +240,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     });]]>`;
     const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
     const renderedCss = commonCss.replaceAll(/rgb\(.*?\)/g, rgb2hex);
-    styleElem.innerHTML = pathIsBetter ? renderedCss : renderedCss + cssFonts;
+    styleElem.innerHTML = pathIsBetter ? renderedCss : renderedCss + fontsToCss(usedProvidedFonts);
     optimizedSVG.firstChild.append(styleElem);
     if (!downloadExport) return optimizedSVG.firstChild.outerHTML;
     const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');

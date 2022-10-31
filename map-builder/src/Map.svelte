@@ -12,7 +12,7 @@ import PathEditor from './svg/pathEditor';
 import { paramDefs, defaultParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
-import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips } from './util/common';
+import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import { setTransformScale, closestDistance } from './svg/svg';
 import { drawShapes } from './svg/shape';
@@ -160,6 +160,8 @@ let colorDataDefs = {
     countries: {...defaultColorDef}
 };
 let legendDefs = {countries: JSON.parse(JSON.stringify(defaultLegendDef))};
+let orderedTabs = ['countries', 'land'];
+
 // ==== End state =====
 
 let cssFonts;
@@ -168,6 +170,8 @@ const menuStates = {
     chosingPoint:      false,
     pointSelected:     false,
     addingLabel:       false,
+    pathSelected:      false,
+    addingImageToPath: false
 };
 let editedLabelId;
 let textInput;
@@ -179,12 +183,11 @@ let showExportConfirm = false;
 let exportForm;
 let htmlTooltipElem;
 let currentTab = 'countries';
-let orderedTabs = ['countries', 'land'];
 
+let editingPath = false;
 let commonStyleSheetElem;
 let zoomFunc;
 let dragFunc;
-let editingPath = false;
 onMount(() => {
     initTooltips();
     commonStyleSheetElem = document.createElement('style');
@@ -451,14 +454,10 @@ async function draw(simplified = false, _) {
     path = d3.geoPath(projection);
     svg.html('');
     svg.on('contextmenu', function(e) {
-        e.preventDefault();
-        showMenu(e);
-        menuStates.chosingPoint = false;
-        return false;
-    }, false);
-    svg.on("click", function(e) {
-        closeMenu();
         if (editingPath) return;
+        e.preventDefault();
+        closeMenu();
+        let target = null;
         const [x, y] = d3.pointer(e);
         const point = {x, y};
         const paths = Array.from(document.getElementById('paths').children);
@@ -468,21 +467,15 @@ async function draw(simplified = false, _) {
             return prev.distance < curDist.distance ? prev : curDist
         }, {});
         if (closestPoint.distance && closestPoint.distance < 6) {
-            editingPath = true;
-            detachListeners();
-            const index = closestPoint.elem.getAttribute('id').match(/\d+$/)[0];
-            new PathEditor(closestPoint.elem, svg.node(), (pathElem) => {
-                // element was deleted
-                editingPath = false;
-                if (!pathElem) {
-                    providedPaths.splice(index, 1);
-                } else {
-                    const parsed = parseAndUnprojectPath(pathElem, projection);
-                    providedPaths[index] = parsed;
-                }
-                attachListeners();
-            });
+            menuStates.pathSelected = true;
+            target = closestPoint.elem;
+            selectedPathIndex = closestPoint.elem.getAttribute('id').match(/\d+$/)[0];
         }
+        showMenu(e, target);
+        return false;
+    }, false);
+    svg.on("click", function(e) {
+        closeMenu();
     });
     
     const groupData = [];
@@ -699,6 +692,69 @@ function openEditor(e) {
     styleEditor.open(e.target, e.pageX, e.pageY);
 }
 
+let selectedPathIndex;
+function editPath() {
+    closeMenu();
+    const pathElem = openContextMenuInfo.target;
+    detachListeners();
+    editingPath = true;
+    
+    new PathEditor(pathElem, svg.node(), (editedPathElem) => {
+        // element was deleted
+        if (!editedPathElem) {
+            providedPaths.splice(selectedPathIndex, 1);
+        } else {
+            const parsed = parseAndUnprojectPath(editedPathElem, projection);
+            providedPaths[selectedPathIndex].d = parsed;
+        }
+        attachListeners();
+        editingPath = false;
+        save();
+    });
+}
+
+function addImageToPath(e) {
+    menuStates.pathSelected = false;
+    menuStates.addingImageToPath = true;
+}
+
+function importImagePath(e) {
+    const file = e.target.files[0];
+    const fileName = file.name;
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+        const newImage = {name: fileName, content: reader.result};
+        providedPaths[selectedPathIndex].image = newImage;
+        if (!providedPaths[selectedPathIndex].duration) {
+            providedPaths[selectedPathIndex].duration = 10;
+            providedPaths[selectedPathIndex].width = 20;
+            providedPaths[selectedPathIndex].height = 10;
+        }
+        drawCustomPaths(providedPaths, svg, projection);
+        save();
+    });
+    reader.readAsDataURL(file);
+}
+
+const saveDebounced = debounce(save, 200);
+function changeDurationAnimation(e) {
+    providedPaths[selectedPathIndex].duration = e.target.value;
+    drawCustomPaths(providedPaths, svg, projection);
+    saveDebounced();
+}
+
+function changePathImageWidth(e) {
+    providedPaths[selectedPathIndex].width = e.target.value;
+    drawCustomPaths(providedPaths, svg, projection);
+    saveDebounced();
+}
+
+function changePathImageHeight(e) {
+    providedPaths[selectedPathIndex].height = e.target.value;
+    drawCustomPaths(providedPaths, svg, projection);
+    saveDebounced();
+}
+
 // function handleInput(e) {
 //     const file = e.target.files[0];
 //     const reader = new FileReader();
@@ -745,8 +801,8 @@ function addPath() {
         const pathIndex = providedPaths.length;
         const id = `path-${pathIndex}`;
         finishedElem.setAttribute('id', id);
-        providedPaths.push(parseAndUnprojectPath(finishedElem.getAttribute('d'), projection));
-        drawCustomPaths();
+        providedPaths.push({d: parseAndUnprojectPath(finishedElem.getAttribute('d'), projection)});
+        saveDebounced();
     });
 }
 
@@ -770,11 +826,14 @@ function closeMenu() {
     menuStates.chosingPoint = false;
     menuStates.pointSelected = false;
     menuStates.addingLabel = false;
+    menuStates.pathSelected = false;
+    menuStates.addingImageToPath = false;
     editedLabelId = null;
 }
+
 function editStyles() {
     closeMenu();
-    styleEditor.open(openContextMenuInfo.event.target, openContextMenuInfo.event.pageX, openContextMenuInfo.event.pageY);
+    styleEditor.open(openContextMenuInfo.target, openContextMenuInfo.event.pageX, openContextMenuInfo.event.pageY);
 }
 function addPoint() {
     menuStates.chosingPoint = true;
@@ -834,8 +893,9 @@ function drawAndSetupShapes() {
     applyStyles();
 }
 
-function showMenu(e) {
+function showMenu(e, target = null) {
     openContextMenuInfo = {event: e, position: projection.invert(d3.pointer(e))};
+    openContextMenuInfo.target = target ? target : e.target;
     contextualMenu.style.display = 'block';
     contextualMenu.style.left = e.pageX + "px";
     contextualMenu.style.top = e.pageY + "px";
@@ -853,7 +913,7 @@ function addShape(shapeName) {
 }
 
 function copySelection() {
-    const objectId = openContextMenuInfo.event.target.getAttribute('id');
+    const objectId = openContextMenuInfo.target.getAttribute('id');
     const newDef = {...providedShapes.find(def => def.id === objectId)};
     const projected = projection(newDef.pos);
     newDef.pos = projection.invert([projected[0] - 10, projected[1]]);
@@ -866,7 +926,7 @@ function copySelection() {
 }
 
 function deleteSelection() {
-    const pointId = openContextMenuInfo.event.target.getAttribute('id');
+    const pointId = openContextMenuInfo.target.getAttribute('id');
     delete inlineStyles[pointId];
     providedShapes = providedShapes.filter(def => def.id !== pointId);
     drawAndSetupShapes();
@@ -1144,6 +1204,33 @@ function getLegendColors(dataColorDef, tab, scale) {
         <div role="button" class="px-2 py-1" on:click={editStyles}> Edit styles </div>
         <div role="button" class="px-2 py-1" on:click={copySelection}> Copy </div>
         <div role="button" class="px-2 py-1" on:click={deleteSelection}> Delete </div>
+    {:else if menuStates.pathSelected}
+        <div role="button" class="px-2 py-1" on:click={editPath}> Edit path </div>
+        <div role="button" class="px-2 py-1" on:click={editStyles}> Edit style </div>
+        <div role="button" class="px-2 py-1" on:click={addImageToPath}> Image along path </div>
+    {:else if menuStates.addingImageToPath}
+        <div class="m-1">
+            <label for="image-select" class="m-2 d-flex align-items-center btn btn-sm btn-light"> File: {providedPaths[selectedPathIndex].image?.name || 'Import image'} </label>
+            <input type="file" id="image-select" accept=".png,.jpg,.svg" on:change={importImagePath}>
+        </div>
+        <div class="row m-1">
+            <label for="duration-select" class="col-6 col-form-label col-form-label-sm"> Duration </label>
+            <div class="col-6">
+                <input id="duration-select" class="form-control form-control-sm" type="number" value={providedPaths[selectedPathIndex].duration} on:change={changeDurationAnimation}/>
+            </div>
+        </div>
+        <div class="row m-1">
+            <label for="path-img-width" class="col-6 col-form-label col-form-label-sm"> Image width </label>
+            <div class="col-6">
+                <input id="path-img-width" class="form-control form-control-sm" type="number" value={providedPaths[selectedPathIndex].width} on:change={changePathImageWidth}/>
+            </div>
+        </div>
+        <div class="row m-1">
+            <label for="path-img-height" class="col-6 col-form-label col-form-label-sm"> Image height </label>
+            <div class="col-6">
+                <input id="path-img-height" class="form-control form-control-sm" type="number" value={providedPaths[selectedPathIndex].height} on:change={changePathImageHeight}/>
+            </div>
+        </div>
     {:else}
         <div role="button" class="px-2 py-1" on:click={editStyles}> Edit styles </div>
         <div role="button" class="px-2 py-1" on:click={addPath}> Draw path </div>
@@ -1347,7 +1434,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                 <input class="form-check-input" type="radio" name="exportFonts" value={exportFontChoices.embedFont} id="exportFonts3">
                 <label class="form-check-label" for="exportFonts3">
                     Embed font(s)
-                    <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Always embed imported font(s)">?</span>
+                    <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Always embed imported font(s) (only used fonts will be exported)">?</span>
                 </label>
             </div>
             <div class="form-check">

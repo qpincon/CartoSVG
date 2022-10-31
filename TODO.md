@@ -1,7 +1,7 @@
 - [x] Two layers: "land" (outside) and adm(inside, hover possible, action on hover)
 - [x] add "Context": countries
 - [-] Add labels (from geojson properties) : give choice to select font + marker
-- [ ] "Save current geo params" -> localstorage. If defined, to moving on import new file
+- [x] "Save current geo params" -> localstorage. If defined, to moving on import new file
 - [x] Support import geojson
 - [x] Create tooltips on hover: have a builder to chose properties on geometries
 - [ ] Default themes (pirate map style, brand style...)
@@ -28,28 +28,29 @@
 - [ ] Display labels using projection (how?)
 - [ ] Add credits to:
     - geoboundaries
-    - greensock
     - d3
     - github
     - "tilting the satellite observable"
 - [x] Option to push to front on hover to avoid surrounding boundaries of top of hovered ( add js to export ?) => always here, but replace on leave
 - [x] Find a way to retain inline styles on redraw  
 - [x] Define <style> in <defs> in SVG directly  
-- [ ] Allow for ordering <land> div after/before countries/ADM1. If after, remove <SourceGraphic> from merge filter, otherwise retain it (for stroke)
+- [x] Allow for ordering <land> div after/before countries/ADM1. If after, remove <SourceGraphic> from merge filter, otherwise retain it (for stroke)
 - [x] Wrap "land" inside an inline <image> tag, inside a separate <svg> for FF performance (and maybe other browsers?)
     - MUCH worse performance on chrome. Tried:
         - Move svg containing <image> on the outside: same
         - Same principle, using <img> tag: same
     - Solution: will-change: opacity + <image>
 - [ ] Instructions: how to tilt / rotate / zoom / drag
-- [ ] Change zoom sensibility according to FOV
-- [ ] Animate object along path
+- [x] Change zoom sensibility according to FOV
+- [x] Animate object along path
 - [ ] Clip path instead of border-radius, not working for viewBox (will drop)
 - [ ] Add validation on imported data (alpha-3 / shapeName)
-- [ ] Add conversion of final CSS rgb(x y z) => #hex
+- [x] Add conversion of final CSS rgb(x y z) => #hex
 - [ ] Format tooltip when containing decimal values
-- [ ] Remove imported fonts
+- [-] Choice to remove imported fonts -> export only used fonts
 - [ ] On delete country, delete legend + color def (+ else ?)
-- [ ] Export button => popup modal to select
-    - [ ] No redraw on resize
-    - [ ] Choice between "font(s) will be included in final file" & "best between embed font / transform text to paths"
+- [x] Export button => popup modal to select
+    - [x] No redraw on resize
+    - [x] Choice between "font(s) will be included in final file" & "best between embed font / transform text to paths"
+- [ ] SEO: title + meta tag + raw html for FAQ
+- [ ] Redesign layout: accordions on right, data / colors / legend on left

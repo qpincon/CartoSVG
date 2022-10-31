@@ -56,8 +56,9 @@ html {
 }
 
 #contextmenu  {
+    max-width: 15rem;
     background-color: #f8f8f8;
-    div {
+    div[role="button"] {
         &:hover {
             background-color:#e2eef8;
         }

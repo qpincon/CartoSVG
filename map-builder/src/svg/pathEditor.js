@@ -56,6 +56,7 @@ export default class PathEditor {
     setupPathOverlay() {
         this.pathOverlayElem.addEventListener('mousedown', e => {
             e.stopPropagation();
+            if (e.ctrlKey) return this.addPoint(e);
             this.currentDragging = this.pathOverlayElem;
             this.pathOverlayElem.x = e.clientX;
             this.pathOverlayElem.y = e.clientY;
@@ -84,36 +85,37 @@ export default class PathEditor {
     }
 
     addOrAbort(e) {
-        if (e.ctrlKey) {
-            const [x, y] = pointer(e);
-            const point = { x, y };
-            const dist = closestDistance(point, this.pathElem);
-            const middlePoints = this.pointElems.filter((p, i) => p.isOnCurve && i != 0 && i != this.pointElems.length - 1);
-            let clickedSegment = 0;
-            let found = false;
-            let advancement = dist.advancement;
-            for (let index = 0; index < middlePoints.length; ++index) {
-                const point = middlePoints[index];
-                if (point.advancement && dist.advancement < point.advancement) {
-                    clickedSegment = index;
-                    found = true;
-                    break;
-                }
-            }
-            if (middlePoints.length && !found) {
-                clickedSegment = middlePoints.length;
-            }
-            const prevAdv = clickedSegment && middlePoints.length ? middlePoints[clickedSegment - 1].advancement : 0;
-            const nextAdv = clickedSegment < middlePoints.length ? middlePoints[clickedSegment].advancement : 1;
-            advancement = (dist.advancement - prevAdv) / (nextAdv - prevAdv);
-            const points = this.getBezierPoints(advancement, clickedSegment * 3);
-            this.pathData.splice(clickedSegment * 3 + 1, 3, points[0][1], points[0][2], points[0][3], points[1][1], points[1][2], points[1][3]);
-            this.pathDataToD();
-            this.reset();
-            return;
-        }
+        if (e.ctrlKey) return this.addPoint(e);
         this.cleanup();
         this.onFinish(this.pathElem);
+    }
+
+    addPoint(e) {
+        const [x, y] = pointer(e);
+        const point = { x, y };
+        const dist = closestDistance(point, this.pathElem);
+        const middlePoints = this.pointElems.filter((p, i) => p.isOnCurve && i != 0 && i != this.pointElems.length - 1);
+        let clickedSegment = 0;
+        let found = false;
+        let advancement = dist.advancement;
+        for (let index = 0; index < middlePoints.length; ++index) {
+            const point = middlePoints[index];
+            if (point.advancement && dist.advancement < point.advancement) {
+                clickedSegment = index;
+                found = true;
+                break;
+            }
+        }
+        if (middlePoints.length && !found) {
+            clickedSegment = middlePoints.length;
+        }
+        const prevAdv = clickedSegment && middlePoints.length ? middlePoints[clickedSegment - 1].advancement : 0;
+        const nextAdv = clickedSegment < middlePoints.length ? middlePoints[clickedSegment].advancement : 1;
+        advancement = (dist.advancement - prevAdv) / (nextAdv - prevAdv);
+        const points = this.getBezierPoints(advancement, clickedSegment * 3);
+        this.pathData.splice(clickedSegment * 3 + 1, 3, points[0][1], points[0][2], points[0][3], points[1][1], points[1][2], points[1][3]);
+        this.pathDataToD();
+        this.reset();
     }
 
     pathDataToD() {
@@ -148,8 +150,8 @@ export default class PathEditor {
             const isOnCurve = (index % 3) === 0;
             const point = this.pointElems[index];
             point.isOnCurve = isOnCurve;
-            if (isOnCurve) point.setAttribute('r', '8');
-            else point.setAttribute('r', '5');
+            if (isOnCurve) point.setAttribute('r', '10');
+            else point.setAttribute('r', '7');
             point.moveType = moveTypes.TRANSLATE;
             // Attach first coord to first control point
             if (isFirstCoord) {
@@ -192,7 +194,7 @@ export default class PathEditor {
     createLine(p1Index, p2Index) {
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('stroke', '#528af4');
-        line.setAttribute('stroke-width', '2');
+        line.setAttribute('stroke-width', '4');
         line.p1Index = p1Index;
         line.p2Index = p2Index;
         this.editorContainer.insertBefore(line, this.editorContainer.firstChild);
@@ -201,8 +203,6 @@ export default class PathEditor {
     }
 
     updateLine(lineElem) {
-        // const [x1, y1] = this.getPosCircle(lineElem.p1);
-        // const [x2, y2] = this.getPosCircle(lineElem.p2);
         const p1 = this.pathData[lineElem.p1Index];
         const p2 = this.pathData[lineElem.p2Index];
         const [x1, y1] = [p1[0], p1[1]];
@@ -284,7 +284,7 @@ export default class PathEditor {
     movePoint(index, deltaX, deltaY) {
         const point = this.pointElems[index];
         const [curX, curY] = this.getPosCircle(point);
-        this.setPosCircle(point, curX + deltaX, curY + deltaY)
+        this.setPosCircle(this.pointElems[index], curX + deltaX, curY + deltaY)
         this.pathData[index][0] = curX + deltaX;
         this.pathData[index][1] = curY + deltaY;
     }
@@ -301,18 +301,16 @@ export default class PathEditor {
 
     // assumes currently dragged point has already been moved
     movePointAngle(point, movedIndex) {
-        const refPoint = this.pointElems[point.symRef];
-        const [refX, refY] = this.getPosCircle(refPoint);
-        const [curX, curY] = this.getPosCircle(point);
+        const [refX, refY] = this.getPosAtIndex(point.symRef);
+        const [curX, curY] = this.getPosAtIndex(point.coordIndex);
         const relativeX = curX - refX;
         const relativeY = curY - refY;
         const newAngle = this.calcAngle(relativeX, relativeY);
-        const movedPoint = this.pointElems[movedIndex];
-        const [curMovedX, curMovedY] = this.getPosCircle(movedPoint);
+        const [curMovedX, curMovedY] = this.getPosAtIndex(movedIndex);
         const length = this.getLength(curMovedX - refX, curMovedY - refY);
         const newPosX = -(Math.cos(newAngle) * length) + refX;
         const newPosY = (Math.sin(newAngle) * length) + refY;
-        this.setPosCircle(movedPoint, newPosX, newPosY);
+        this.setPosCircle(this.pointElems[movedIndex], newPosX, newPosY);
         this.pathData[movedIndex][0] = newPosX;
         this.pathData[movedIndex][1] = newPosY;
     }
@@ -321,6 +319,11 @@ export default class PathEditor {
         const curX = parseFloat(pointElem.getAttribute('cx'));
         const curY = parseFloat(pointElem.getAttribute('cy'));
         return [curX, curY];
+    }
+
+    getPosAtIndex(index) {
+        const p = this.pathData[index];
+        return [p[0], p[1]];
     }
 
     setPosCircle(pointElem, x, y) {

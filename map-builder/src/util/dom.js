@@ -1,6 +1,6 @@
 
 function reportStyle(reference, target) {
-    const walkerRef = document.createTreeWalker(reference, NodeFilter.SHOW_ELEMENT); 
+    const walkerRef = document.createTreeWalker(reference, NodeFilter.SHOW_ELEMENT);
     const walkerTarget = document.createTreeWalker(target, NodeFilter.SHOW_ELEMENT);
     reportStyleElem(walkerRef.currentNode, walkerTarget.currentNode);
     while (walkerRef.nextNode()) {
@@ -14,13 +14,24 @@ function reportStyleElem(ref, target) {
 }
 
 function fontsToCss(fonts) {
-    return fonts.map(({name, content}) => {
+    return fonts.map(({ name, content }) => {
         return `@font-face {
             font-family: ${name};
             src: url("${content}");
         }`;
     }).join('\n') || '';
 }
+
+function getUsedInlineFonts(svg) {
+    const fonts = new Set();
+    for (let node of document.querySelectorAll('*')) {
+        if (!node.style) continue
+        const fontFamily = node.style['font-family'] || null;
+        if (fontFamily) fonts.add(fontFamily);
+    }
+    return fonts;
+}
+
 
 function styleSheetToText(sheet) {
     let styleTxt = '';
@@ -41,4 +52,4 @@ function exportStyleSheet(selectorToFind) {
         }
     }
 }
-export { reportStyle, fontsToCss, exportStyleSheet };
+export { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts };
