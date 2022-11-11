@@ -1,5 +1,5 @@
 import { reportStyle } from './util/dom';
-import { htmlToElement } from './util/common';
+import { htmlToElement, getBestFormatter } from './util/common';
 
 function addTooltipListener(map, tooltipDefs, zonesData) {
     const tooltip = {shapeId: null, element: document.createElement('div')};
@@ -35,7 +35,7 @@ function hideTooltip(tooltip) {
 function onMouseMove(e, map, tooltipDefs, zonesData, tooltip) {
     const parent = e.target.parentNode;
     if (!parent?.hasAttribute?.("id")) return hideTooltip(tooltip);
-    const groupId = parent.getAttribute('id').replace('-adm1', '');
+    let groupId = parent.getAttribute('id');
     if (!tooltipDefs?.[groupId]?.enabled) return hideTooltip(tooltip);
     const shapeId = e.target.getAttribute('id');
     const mapBounds = map.getBoundingClientRect();
@@ -66,8 +66,13 @@ function onMouseMove(e, map, tooltipDefs, zonesData, tooltip) {
         tooltip.element.style.opacity = tooltipVisibleOpacity;
     }
     else {
-        const idCol = groupId === 'countries' ? 'alpha-3' : 'shapeName';
-        const data = zonesData[groupId].data.find(row => row[idCol] === shapeId);
+        const data = {...zonesData[groupId].data.find(row => row.name === shapeId)};
+        if (zonesData[groupId].numericCols.length) {
+            zonesData[groupId].numericCols.forEach(col => {
+                const format = getBestFormatter(zonesData[groupId].data.map(row => row[col]));
+                data[col] = format(data[col]);
+            });
+        }
         if (!data) {
             tooltip.element.style.display = 'none';
             tooltip.element.style.opacity = 0;

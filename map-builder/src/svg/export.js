@@ -3,7 +3,7 @@ import svgoConfig from '../svgoExport.config';
 import svgoConfigText from '../svgoExportText.config';
 
 import TextToSVG from 'text-to-svg';
-import { htmlToElement } from '../util/common';
+import { htmlToElement, getBestFormatter } from '../util/common';
 import { indexBy, pick, download } from '../util/common';
 import { reportStyle, fontsToCss, getUsedInlineFonts } from '../util/dom';
 const domParser = new DOMParser();
@@ -113,8 +113,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     }
     const finalDataByGroup = { data: {}, tooltips: {} };
     [...chosenCountries, 'countries'].forEach(groupId => {
-        const containerId = groupId !== 'countries' ? groupId + '-adm1' : groupId;
-        const group = optimizedSVG.getElementById(containerId);
+        const group = optimizedSVG.getElementById(groupId);
         if (!group || !tooltipDefs[groupId].enabled) return;
         const ttTemplate = getFinalTooltipTemplate(groupId, tooltipDefs);
         let usedVars = [...ttTemplate.matchAll(/\{(\w+)\}/g)].map(group => {
@@ -123,7 +122,16 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         usedVars = [...new Set(usedVars)];
         const functionStr = ttTemplate.replaceAll(/\{(\w+)\}/gi, '${data.$1}');
         finalDataByGroup.tooltips[groupId] = functionStr;
-        const indexed = indexBy(zonesData[groupId].data, groupId === 'countries' ? 'alpha-3' : 'shapeName');
+        const zonesDataDup = JSON.parse(JSON.stringify(zonesData[groupId].data));
+        if (zonesData[groupId].numericCols.length) {
+            zonesData[groupId].numericCols.forEach(col => {
+                const format = getBestFormatter(zonesDataDup.map(row => row[col]));
+                zonesDataDup.forEach(row => {
+                    row[col] = format(row[col]);
+                });
+            });
+        }
+        const indexed = indexBy(zonesDataDup, 'name');
         const finalData = {};
         for (let child of group.children) {
             const id = child.getAttribute('id');
@@ -196,7 +204,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
             const ttBounds = tooltip.element.firstChild?.firstChild?.getBoundingClientRect();
             let posX = (e.clientX - mapBounds.left + 10) * transformX, posY = (e.clientY - mapBounds.top + 10) * transformY;
             let tooltipVisibleOpacity = 1;
-            const groupId = parent.getAttribute('id').replace('-adm1', '');
+            const groupId = parent.getAttribute('id');
             const shapeId = e.target.getAttribute('id');
             if (ttBounds?.width > 0) {
                 if (mapBounds.right - ttBounds.width < e.clientX + 10) {

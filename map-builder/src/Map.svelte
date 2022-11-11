@@ -55,7 +55,6 @@ const availableCountriesAdm2 = countriesAdm2Resolve.keys().reduce((acc, file) =>
     acc[`${iso3DataById[name]?.name} ADM2`] = file
     return acc;
 }, {});
-console.log(availableCountriesAdm2);
 const allAvailableAdm = [...Object.keys(availableCountriesAdm1), ...Object.keys(availableCountriesAdm2)].sort();
 
 function resolveAdm(name) {
@@ -164,8 +163,8 @@ let lastUsedLabelProps = {'font-size': '14px'};
 
 let tooltipDefs = {
     countries: {
-        template: defaultTooltipContent('name'),
-        content: defaultTooltipFull(defaultTooltipContent('name')),
+        template: defaultTooltipContent(true),
+        content: defaultTooltipFull(defaultTooltipContent(true)),
         enabled: false,
     }
 };
@@ -231,8 +230,7 @@ onMount(() => {
         getAdditionalElems: (el) => {
             if (el.classList.contains('adm')) {
                 const parentCountry = el.parentNode.getAttribute('id').replace(/ ADM(1|2)/, '')
-                console.log(parentCountry);
-                const parentCountryIso3 = iso3Data.find(row => row.name === parentCountry)['alpha-3'];
+                const parentCountryIso3 = iso3Data.find(row => row.name === parentCountry)['name'];
                 const countryElem = document.getElementById(parentCountryIso3);
                 if (!countryElem) return [];
                 return [countryElem];
@@ -349,7 +347,7 @@ async function draw(simplified = false, _) {
             return;
         }
         if (!(countryAdm in tooltipDefs)) {
-            const contentTemplate = defaultTooltipContent('name');
+            const contentTemplate = defaultTooltipContent(false);
             tooltipDefs[countryAdm] = {
                 template: contentTemplate,
                 content: defaultTooltipFull(contentTemplate),
@@ -368,7 +366,6 @@ async function draw(simplified = false, _) {
         }
     }
     const fov = p('fieldOfView');
-    // 
     const width = p('width'), height = p('height'), altitude = p('altitude');
     const snyderP = 1.0 + altitude / earthRadius;
     const dY = altitude * Math.sin(inlineProps.tilt / degrees);
@@ -501,13 +498,14 @@ async function draw(simplified = false, _) {
         const filter = zonesFilter[layer] ? `glow${zonesFilter[layer]}` : null;
         if (layer === 'countries' && p('showCountries') && countries) {
             if (!('countries' in zonesData) && !zonesData?.['countries']?.provided) {
-                const data = sortBy(countries.features.map(f => f.properties), 'alpha-3')
+                console.log(countries);
+                const data = sortBy(countries.features.map(f => f.properties), 'name');
                 zonesData['countries'] = {
                     data: data,
                     numericCols: getNumericCols(data),
                 };
             }
-            groupData.push({ name: 'countries', data: countries, id: 'alpha-3', props: [], class: 'country', filter: filter });
+            groupData.push({ name: 'countries', data: countries, id: 'name', props: [], class: 'country', filter: filter });
         }
         if (layer === 'land' && p('showLand')) groupData.push({name: 'landImg', showSource: i === 0});
         // selected country
@@ -632,8 +630,8 @@ function resetState() {
     lastUsedLabelProps = {'font-size': '14px'};
     tooltipDefs = {
         countries: {
-            template: defaultTooltipContent('name'),
-            content: defaultTooltipFull(defaultTooltipContent('name')),
+            template: defaultTooltipContent(true),
+            content: defaultTooltipFull(defaultTooltipContent(true)),
         }
     };
     colorDataDefs = {
@@ -655,6 +653,7 @@ function restoreState(givenState) {
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, colorDataDefs, legendDefs,
     } = state);
+    if (!baseCss) baseCss = defaultBaseCss;
     commonStyleSheetElem.innerHTML = baseCss;
     const tabsWoLand = orderedTabs.filter(x => x !== 'land');
     if (tabsWoLand.length) onTabChanged(tabsWoLand[0]);   
@@ -962,8 +961,14 @@ function handleDataImport(e) {
     const reader = new FileReader();
     reader.addEventListener('load', () => {
         try {
-            const sortKey = currentTab === 'countries' ? 'alpha-3' : 'name';
-            const parsed = sortBy(JSON.parse(reader.result), sortKey);
+            let parsed = JSON.parse(reader.result);
+            if (!Array.isArray(parsed)) {
+                return window.alert("JSON sould be a list of objects, each object reprensenting a line.");
+            }
+            if (parsed.some(line => line.name === undefined )) {
+                return window.alert("All lines should have a 'name' property.");
+            }
+            parsed = sortBy(parsed, 'name'); 
             zonesData[currentTab] = {data: parsed, provided:true, numericCols: getNumericCols(parsed) };
             autoSelectColors();
             save();
@@ -974,9 +979,9 @@ function handleDataImport(e) {
     reader.readAsText(file);
 }
 
-function defaultTooltipContent(idCol) {
+function defaultTooltipContent(isCountry) {
     return `<div>
-    <span> ${idCol === 'name' ? 'Country' : 'Region'}: {${idCol}}</span>
+    <span> ${isCountry ? 'Country' : 'Region'}: {name}</span>
 </div>
     `;
 }
@@ -1044,6 +1049,10 @@ function addNewCountry(e) {
 function deleteCountry(country) {
     chosenCountriesAdm = chosenCountriesAdm.filter(x => x !== country);
     orderedTabs = orderedTabs.filter(x => x !== country);
+    currentTab = orderedTabs[0];
+    console.log(legendDefs);
+    delete legendDefs[country];
+    delete colorDataDefs[country];
     draw();
 }
 
