@@ -41,13 +41,27 @@ const icons = iconsReq.keys().reduce((acc, iconFile) => {
 
 let params = JSON.parse(JSON.stringify(defaultParams));
 const iso3DataById = indexBy(iso3Data, 'alpha-3');
-const resolvedAdm1 = {};
-const countriesAdm1 = require.context('./assets/layers/adm1/', false, /\..*json$/, 'lazy');
-const availableCountriesAdm1 = countriesAdm1.keys().reduce((acc, file) => {
+const resolvedAdm = {};
+const countriesAdm1Resolve = require.context('./assets/layers/adm1/', false, /\..*json$/, 'lazy');
+const availableCountriesAdm1 = countriesAdm1Resolve.keys().reduce((acc, file) => {
     const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
-    acc[iso3DataById[name.replace('_ADM', '')]?.name] = file;
+    acc[`${iso3DataById[name]?.name} ADM1`] = file;
     return acc;
 }, {});
+
+const countriesAdm2Resolve = require.context('./assets/layers/adm2/', false, /\..*json$/, 'lazy');
+const availableCountriesAdm2 = countriesAdm2Resolve.keys().reduce((acc, file) => {
+    const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
+    acc[`${iso3DataById[name]?.name} ADM2`] = file
+    return acc;
+}, {});
+console.log(availableCountriesAdm2);
+const allAvailableAdm = [...Object.keys(availableCountriesAdm1), ...Object.keys(availableCountriesAdm2)].sort();
+
+function resolveAdm(name) {
+    if (name.includes('ADM1')) return countriesAdm1Resolve(availableCountriesAdm1[name]);
+    return countriesAdm2Resolve(availableCountriesAdm2[name]);
+}
 
 function findProp(propName, obj) {
     if (propName in obj) return obj[propName];
@@ -88,24 +102,24 @@ let simpleLand = null;
 let openContextMenuInfo;
 const adm0Land = import('./assets/layers/world_adm0_simplified.topojson')
     .then(({default:topoAdm0}) => {
-        countries = topojson.feature(topoAdm0, topoAdm0.objects.simp);
-        
+        const firstKey = Object.keys(topoAdm0.objects)[0];
+        countries = topojson.feature(topoAdm0, topoAdm0.objects[firstKey]);
         countries.features.forEach(feat => {
             feat.properties = iso3DataById[feat.properties['shapeGroup']] || {};
         });
-        land = topojson.merge(topoAdm0, topoAdm0.objects.simp.geometries);
+        land = topojson.merge(topoAdm0, topoAdm0.objects[firstKey].geometries);
         land = splitMultiPolygons({type: 'FeatureCollection', features: [{type:'Feature', geometry: {...land} }]}, 'land');
     });
 const verySimpleLand = import('./assets/layers/world_land_very_simplified.topojson')
     .then(({default:land}) => {
-        simpleLand = topojson.feature(land, land.objects.simp);
+        const firstKey = Object.keys(land.objects)[0];
+        simpleLand = topojson.feature(land, land.objects[firstKey]);
     });
 Promise.all([adm0Land, verySimpleLand]).then(() => draw());
 
 let path = null;
 let projection = null;
 let svg = null;
-let currentPath = [];
 const defaultLegendDef =  {
     x: 20,
     y: p('height') - 100,
@@ -132,7 +146,7 @@ const defaultColorDef = {
 let baseCss = defaultBaseCss;
 let providedPaths = [];
 let providedShapes = []; // {name, coords, scale, id}
-let chosenCountries = [];
+let chosenCountriesAdm = [];
 let inlineProps = {
     longitude: 15,
     latitude: 36,
@@ -215,8 +229,9 @@ onMount(() => {
             save();
         },
         getAdditionalElems: (el) => {
-            if (el.classList.contains('adm1')) {
-                const parentCountry = el.parentNode.getAttribute('id').replace('-adm1', '');
+            if (el.classList.contains('adm')) {
+                const parentCountry = el.parentNode.getAttribute('id').replace(/ ADM(1|2)/, '')
+                console.log(parentCountry);
                 const parentCountryIso3 = iso3Data.find(row => row.name === parentCountry)['alpha-3'];
                 const countryElem = document.getElementById(parentCountryIso3);
                 if (!countryElem) return [];
@@ -325,26 +340,27 @@ async function draw(simplified = false, _) {
         while (computedOrderedTabs[i] === 'land') ++i;
         currentTab = computedOrderedTabs[i];
     }
-    for (const country of chosenCountries) {
-        if (!(country in resolvedAdm1)) {
-            const resolved = await countriesAdm1(availableCountriesAdm1[country]);
-            resolvedAdm1[country] = topojson.feature(resolved, resolved.objects.country);
+    for (const countryAdm of chosenCountriesAdm) {
+        if (!(countryAdm in resolvedAdm)) {
+            const resolved = await resolveAdm(countryAdm);
+            const firstKey = Object.keys(resolved.objects)[0];
+            resolvedAdm[countryAdm] = topojson.feature(resolved, resolved.objects[firstKey]);
             draw(simplified);
             return;
         }
-        if (!(country in tooltipDefs)) {
-            const contentTemplate = defaultTooltipContent('shapeName');
-            tooltipDefs[country] = {
+        if (!(countryAdm in tooltipDefs)) {
+            const contentTemplate = defaultTooltipContent('name');
+            tooltipDefs[countryAdm] = {
                 template: contentTemplate,
                 content: defaultTooltipFull(contentTemplate),
                 enabled: false,
             };
-            colorDataDefs[country] = {...defaultColorDef};
-            legendDefs[country] = JSON.parse(JSON.stringify(defaultLegendDef));
+            colorDataDefs[countryAdm] = {...defaultColorDef};
+            legendDefs[countryAdm] = JSON.parse(JSON.stringify(defaultLegendDef));
         }
-        if (!(country in zonesData) && !zonesData?.[country]?.provided) {
-            const data = sortBy(resolvedAdm1[country].features.map(f => f.properties), 'shapeName');
-            zonesData[country] = {
+        if (!(countryAdm in zonesData) && !zonesData?.[countryAdm]?.provided) {
+            const data = sortBy(resolvedAdm[countryAdm].features.map(f => f.properties), 'name');
+            zonesData[countryAdm] = {
                 data: data,
                 provided: false,
                 numericCols: getNumericCols(data)
@@ -496,7 +512,7 @@ async function draw(simplified = false, _) {
         if (layer === 'land' && p('showLand')) groupData.push({name: 'landImg', showSource: i === 0});
         // selected country
         else if (layer !== 'countries') {
-            groupData.push({ name: `${layer}-adm1`, data: resolvedAdm1[layer], id: 'shapeName', props: [], class: 'adm1', filter: filter });
+            groupData.push({ name: layer, data: resolvedAdm[layer], id: 'name', props: [], class: 'adm', filter: filter });
         }
     });
     groupData.push({ name: 'paths', data: [], id: null, props: [], class: null, filter: null });
@@ -586,7 +602,7 @@ function appendLandImage(showSource) {
 function save() {
     baseCss = exportStyleSheet('#paths > path');
     saveState({params, inlineProps, baseCss, providedFonts, 
-        providedShapes, providedPaths, chosenCountries, orderedTabs,
+        providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, colorDataDefs, legendDefs,
     });
@@ -598,7 +614,7 @@ function resetState() {
     commonStyleSheetElem.innerHTML = baseCss;
     providedPaths = [];
     providedShapes = [];
-    chosenCountries = [];
+    chosenCountriesAdm = [];
     orderedTabs = ['countries', 'land'];
     currentTab = 'countries';
     inlineProps = {
@@ -635,7 +651,7 @@ function restoreState(givenState) {
     else state = getState();
     if (!state) return;
     ({  params, inlineProps, baseCss, providedFonts, 
-        providedShapes, providedPaths, chosenCountries, orderedTabs,
+        providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, colorDataDefs, legendDefs,
     } = state);
@@ -647,7 +663,7 @@ function restoreState(givenState) {
 function saveProject() {
     baseCss = exportStyleSheet('#paths > path'); 
     const state = {params, inlineProps, baseCss, providedFonts, 
-        providedShapes, providedPaths, chosenCountries, orderedTabs,
+        providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, colorDataDefs, legendDefs,
     };
@@ -946,7 +962,7 @@ function handleDataImport(e) {
     const reader = new FileReader();
     reader.addEventListener('load', () => {
         try {
-            const sortKey = currentTab === 'countries' ? 'alpha-3' : 'shapeName';
+            const sortKey = currentTab === 'countries' ? 'alpha-3' : 'name';
             const parsed = sortBy(JSON.parse(reader.result), sortKey);
             zonesData[currentTab] = {data: parsed, provided:true, numericCols: getNumericCols(parsed) };
             autoSelectColors();
@@ -1008,17 +1024,25 @@ async function onTabChanged(newTabTitle) {
 }
 
 function addNewCountry(e) {
-    if (chosenCountries.includes(e.target.value)) return;
-    chosenCountries.push(e.target.value);
-    chosenCountries = chosenCountries;
+    if (chosenCountriesAdm.includes(e.target.value)) return;
+    let searchedAdm;
+    if (e.target.value.slice(-1) === '1') searchedAdm = e.target.value.replace('ADM1', 'ADM2');
+    else searchedAdm = e.target.value.replace('ADM2', 'ADM1');
+    const existingIndex = chosenCountriesAdm.indexOf(searchedAdm);
+    if (existingIndex > -1) {
+        chosenCountriesAdm.splice(existingIndex, 1);
+        orderedTabs.splice(orderedTabs.indexOf(searchedAdm), 1);
+    }
+    chosenCountriesAdm.push(e.target.value);
     orderedTabs.push(e.target.value);
+    chosenCountriesAdm = chosenCountriesAdm;
     orderedTabs = orderedTabs;
     e.target.selectedIndex = null;
     draw();
 }
 
 function deleteCountry(country) {
-    chosenCountries = chosenCountries.filter(x => x !== country);
+    chosenCountriesAdm = chosenCountriesAdm.filter(x => x !== country);
     orderedTabs = orderedTabs.filter(x => x !== country);
     draw();
 }
@@ -1055,13 +1079,13 @@ function dragstart(event, i, prevent = false) {
 
 function validateExport() {
     const formData = Object.fromEntries(new FormData(exportForm).entries());
-    exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, providedFonts, true, totalCommonCss, formData);
+    exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, true, totalCommonCss, formData);
     showExportConfirm = false;
 }
 // === Export as PNG behaviour ===
 
 async function exportRaster() {
-    const optimized = await exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountries, zonesData, providedFonts, false, totalCommonCss, {});
+    const optimized = await exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, false, totalCommonCss, {});
     svgToPng('data:image/svg+xml;base64,' + window.btoa(optimized), p('width'), p('height'));
 }
 
@@ -1137,7 +1161,7 @@ async function colorizeAndLegend() {
         } else if(dataColorDef.colorScale === "quantize") {
             scale = d3.scaleQuantile().domain(d3.extent(data)).range(d3[paletteName][dataColorDef.nbBreaks]);
         }
-        const shapeKey = tab === 'countries' ? 'alpha-3' : 'shapeName';
+        const shapeKey = tab === 'countries' ? 'alpha-3' : 'name';
         let newCss = '';
         zonesData[tab].data.forEach(row => {
             const color = scale(row[dataColorDef.colorColumn]);
@@ -1253,7 +1277,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                 ondragover="return false"
                 on:dragenter={() => hoveringTab = index}
                 class:is-dnd-hovering-right={hoveringTab === index && index > dragStartIndex}
-                class:is-dnd-hovering-left={hoveringTab === index && index < dragStartIndex}
+                class:is-dnd-hois-dnd-hoveringvering-left={hoveringTab === index && index < dragStartIndex}
                 class:grabbable={isLand}>
                 <a href="javascript:;"
                 class:active={currentTab === tabTitle}
@@ -1269,7 +1293,7 @@ function getLegendColors(dataColorDef, tab, scale) {
             
             <li class="nav-item">
                 <select role="button" id='countrySelect' on:change={addNewCountry}>
-                    {#each Object.keys(availableCountriesAdm1) as country}
+                    {#each allAvailableAdm as country}
                         <option value={country}> {country} </option>
                     {/each}
                 </select>

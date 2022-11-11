@@ -1,6 +1,6 @@
 [
 	{
-		"shapeName": "Abruzzo",
+		"name": "Abruzzo",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B21559980",
 		"shapeGroup": "ITA",
@@ -9,7 +9,7 @@
 		"population": 83693
 	},
 	{
-		"shapeName": "Basilicata",
+		"name": "Basilicata",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B90067714",
 		"shapeGroup": "ITA",
@@ -18,7 +18,7 @@
 		"population": 93693
 	},
 	{
-		"shapeName": "Calabria",
+		"name": "Calabria",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B13201117",
 		"shapeGroup": "ITA",
@@ -27,7 +27,7 @@
 		"population": 100693
 	},
 	{
-		"shapeName": "Campania",
+		"name": "Campania",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B41184188",
 		"shapeGroup": "ITA",
@@ -36,7 +36,7 @@
 		"population": 87693
 	},
 	{
-		"shapeName": "Emilia-Romagna",
+		"name": "Emilia-Romagna",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B16769007",
 		"shapeGroup": "ITA",
@@ -45,7 +45,7 @@
 		"population": 153693
 	},
 	{
-		"shapeName": "Friuli Venezia Giulia",
+		"name": "Friuli Venezia Giulia",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B35490994",
 		"shapeGroup": "ITA",
@@ -54,7 +54,7 @@
 		"population": 184693
 	},
 	{
-		"shapeName": "Lazio",
+		"name": "Lazio",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B40737626",
 		"shapeGroup": "ITA",
@@ -63,7 +63,7 @@
 		"population": 81693
 	},
 	{
-		"shapeName": "Liguria",
+		"name": "Liguria",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B60860247",
 		"shapeGroup": "ITA",
@@ -72,7 +72,7 @@
 		"population": 23693
 	},
 	{
-		"shapeName": "Lombardia",
+		"name": "Lombardia",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B51462447",
 		"shapeGroup": "ITA",
@@ -81,7 +81,7 @@
 		"population": 197093
 	},
 	{
-		"shapeName": "Marche",
+		"name": "Marche",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B71526225",
 		"shapeGroup": "ITA",
@@ -90,7 +90,7 @@
 		"population": 293693
 	},
 	{
-		"shapeName": "Molise",
+		"name": "Molise",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B9873014",
 		"shapeGroup": "ITA",
@@ -99,7 +99,7 @@
 		"population": 87693
 	},
 	{
-		"shapeName": "Piemonte",
+		"name": "Piemonte",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B6746688",
 		"shapeGroup": "ITA",
@@ -108,7 +108,7 @@
 		"population": 47693
 	},
 	{
-		"shapeName": "Puglia",
+		"name": "Puglia",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B30366135",
 		"shapeGroup": "ITA",
@@ -117,7 +117,7 @@
 		"population": 107693
 	},
 	{
-		"shapeName": "Sardegna",
+		"name": "Sardegna",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B18689942",
 		"shapeGroup": "ITA",
@@ -126,7 +126,7 @@
 		"population": 37693
 	},
 	{
-		"shapeName": "Sicilia",
+		"name": "Sicilia",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B23023710",
 		"shapeGroup": "ITA",
@@ -135,7 +135,7 @@
 		"population": 45693
 	},
 	{
-		"shapeName": "Toscana",
+		"name": "Toscana",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B58761566",
 		"shapeGroup": "ITA",
@@ -144,7 +144,7 @@
 		"population": 81693
 	},
 	{
-		"shapeName": "Trentino-Alto Adige",
+		"name": "Trentino-Alto Adige",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B35488848",
 		"shapeGroup": "ITA",
@@ -153,7 +153,7 @@
 		"population": 127693
 	},
 	{
-		"shapeName": "Umbria",
+		"name": "Umbria",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B13919098",
 		"shapeGroup": "ITA",
@@ -162,7 +162,7 @@
 		"population": 92693
 	},
 	{
-		"shapeName": "Valle D'Aosta",
+		"name": "Valle D'Aosta",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B12110529",
 		"shapeGroup": "ITA",
@@ -171,7 +171,7 @@
 		"population": 257693
 	},
 	{
-		"shapeName": "Veneto",
+		"name": "Veneto",
 		"Level": "ADM1",
 		"shapeID": "ITA-ADM1-99219370B94639346",
 		"shapeGroup": "ITA",

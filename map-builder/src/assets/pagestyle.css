@@ -34,12 +34,12 @@
 .country:hover {
     fill: #f0e0e0;
 }
-.adm1 {
+.adm {
     stroke: #D1BEB038;
     stroke-width: 2px;
     fill: #ffffffd0;
 }
-.adm1:hover {
+.adm:hover {
     fill: #7c490ea0;
 }
 

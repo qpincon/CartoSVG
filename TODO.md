@@ -46,7 +46,7 @@
 - [ ] Clip path instead of border-radius, not working for viewBox (will drop)
 - [ ] Add validation on imported data (alpha-3 / shapeName)
 - [x] Add conversion of final CSS rgb(x y z) => #hex
-- [ ] Format tooltip when containing decimal values
+- [ ] Format tooltip when containing decimal values => determinte formatter automatically
 - [-] Choice to remove imported fonts -> export only used fonts
 - [ ] On delete country, delete legend + color def (+ else ?)
 - [x] Export button => popup modal to select
