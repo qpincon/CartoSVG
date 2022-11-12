@@ -1,7 +1,6 @@
 import Tooltip from 'bootstrap/js/dist/tooltip';
-import { format } from "d3";
+import { formatLocale } from "d3";
 
-window.format = format;
 function download(content, mimeType, filename) {
     const a = document.createElement('a');
     const blob = new Blob([content], { type: mimeType });
@@ -90,11 +89,12 @@ function initTooltips() {
     [...tooltipTriggerList].map(tooltipTriggerEl => new Tooltip(tooltipTriggerEl, {placement: 'top', html: false}))
 }
 
-function getBestFormatter(values) {
+function getBestFormatter(values, locale) {
+    const loc = formatLocale(locale);
     const max = Math.max(...values);
     if (max < 10) return format(',.1~f');
     if (max < 1) return format(',.2~f');
-    return format(',~d');
+    return loc.format(',~d');
 }
 
 export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce, getNumericCols, initTooltips, getBestFormatter };

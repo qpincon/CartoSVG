@@ -3,7 +3,7 @@ import svgoConfig from '../svgoExport.config';
 import svgoConfigText from '../svgoExportText.config';
 
 import TextToSVG from 'text-to-svg';
-import { htmlToElement, getBestFormatter } from '../util/common';
+import { htmlToElement } from '../util/common';
 import { indexBy, pick, download } from '../util/common';
 import { reportStyle, fontsToCss, getUsedInlineFonts } from '../util/dom';
 const domParser = new DOMParser();
@@ -123,14 +123,11 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         const functionStr = ttTemplate.replaceAll(/\{(\w+)\}/gi, '${data.$1}');
         finalDataByGroup.tooltips[groupId] = functionStr;
         const zonesDataDup = JSON.parse(JSON.stringify(zonesData[groupId].data));
-        if (zonesData[groupId].numericCols.length) {
-            zonesData[groupId].numericCols.forEach(col => {
-                const format = getBestFormatter(zonesDataDup.map(row => row[col]));
-                zonesDataDup.forEach(row => {
-                    row[col] = format(row[col]);
-                });
+        zonesData[groupId].numericCols.forEach(col => {
+            zonesDataDup.forEach(row => {
+                row[col] = zonesData[groupId].formatters[col](row[col]);
             });
-        }
+        });
         const indexed = indexBy(zonesDataDup, 'name');
         const finalData = {};
         for (let child of group.children) {

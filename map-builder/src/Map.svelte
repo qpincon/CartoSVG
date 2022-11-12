@@ -12,7 +12,7 @@ import PathEditor from './svg/pathEditor';
 import { paramDefs, defaultParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
-import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce } from './util/common';
+import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce, getBestFormatter } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import { setTransformScale, closestDistance } from './svg/svg';
 import { drawShapes } from './svg/shape';
@@ -56,6 +56,15 @@ const availableCountriesAdm2 = countriesAdm2Resolve.keys().reduce((acc, file) =>
     return acc;
 }, {});
 const allAvailableAdm = [...Object.keys(availableCountriesAdm1), ...Object.keys(availableCountriesAdm2)].sort();
+
+const formatLocaleResolve = require.context('../node_modules/d3-format/locale/', false,  /\..*json$/);
+const resolvedLocales = {};
+const availableFormatLocales = formatLocaleResolve.keys().map(file => {
+    const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
+    resolvedLocales[name] = formatLocaleResolve(file);
+    return name;
+}, {});
+
 
 function resolveAdm(name) {
     if (name.includes('ADM1')) return countriesAdm1Resolve(availableCountriesAdm1[name]);
@@ -166,6 +175,7 @@ let tooltipDefs = {
         template: defaultTooltipContent(true),
         content: defaultTooltipFull(defaultTooltipContent(true)),
         enabled: false,
+        locale: 'en-US'
     }
 };
 
@@ -352,6 +362,7 @@ async function draw(simplified = false, _) {
                 template: contentTemplate,
                 content: defaultTooltipFull(contentTemplate),
                 enabled: false,
+                locale: 'en-US'
             };
             colorDataDefs[countryAdm] = {...defaultColorDef};
             legendDefs[countryAdm] = JSON.parse(JSON.stringify(defaultLegendDef));
@@ -498,12 +509,12 @@ async function draw(simplified = false, _) {
         const filter = zonesFilter[layer] ? `glow${zonesFilter[layer]}` : null;
         if (layer === 'countries' && p('showCountries') && countries) {
             if (!('countries' in zonesData) && !zonesData?.['countries']?.provided) {
-                console.log(countries);
                 const data = sortBy(countries.features.map(f => f.properties), 'name');
                 zonesData['countries'] = {
                     data: data,
                     numericCols: getNumericCols(data),
                 };
+                getZonesDataFormatters();
             }
             groupData.push({ name: 'countries', data: countries, id: 'name', props: [], class: 'country', filter: filter });
         }
@@ -632,6 +643,7 @@ function resetState() {
         countries: {
             template: defaultTooltipContent(true),
             content: defaultTooltipFull(defaultTooltipContent(true)),
+            locale: 'en-US'
         }
     };
     colorDataDefs = {
@@ -656,7 +668,8 @@ function restoreState(givenState) {
     if (!baseCss) baseCss = defaultBaseCss;
     commonStyleSheetElem.innerHTML = baseCss;
     const tabsWoLand = orderedTabs.filter(x => x !== 'land');
-    if (tabsWoLand.length) onTabChanged(tabsWoLand[0]);   
+    if (tabsWoLand.length) onTabChanged(tabsWoLand[0]);
+    getZonesDataFormatters();
 }
 
 function saveProject() {
@@ -770,6 +783,24 @@ function changePathImageHeight(e) {
     saveDebounced();
 }
 
+function getFirstDataRow(zonesDataDef) {
+    if (!zonesData) return null;
+    const row = {...zonesDataDef.data[0]};
+    zonesDataDef.numericCols.forEach(col => {
+        row[col] = zonesDataDef.formatters[col](row[col]);
+    });
+    return row;
+}
+
+let currentTemplateHasNumeric = false;
+function templateHasNumeric(layerName) {
+    const toFind = zonesData[layerName].numericCols.map(col => (`{${col}}`));
+    const template = tooltipDefs[layerName].template;
+    if (toFind.some(str => template.includes(str))) {
+        return true;
+    }
+    return false;
+}
 // function handleInput(e) {
 //     const file = e.target.files[0];
 //     const reader = new FileReader();
@@ -956,6 +987,19 @@ function exportJson(data) {
     download(JSON.stringify(data, null, '\t'), 'text/json', 'data.json');
 }
 
+function getZonesDataFormatters() {
+    Object.entries(zonesData).forEach(([name, def]) => {
+        const locale = tooltipDefs[name].locale;
+        const formatters = {};
+        if (def.numericCols.length) {
+            def.numericCols.forEach(col => {
+                formatters[col] = getBestFormatter(def.data.map(row => row[col]), resolvedLocales[locale]);
+            });
+        }
+        zonesData[name].formatters = formatters;
+    });
+}
+
 function handleDataImport(e) {
     const file = e.target.files[0];
     const reader = new FileReader();
@@ -968,8 +1012,9 @@ function handleDataImport(e) {
             if (parsed.some(line => line.name === undefined )) {
                 return window.alert("All lines should have a 'name' property.");
             }
-            parsed = sortBy(parsed, 'name'); 
+            parsed = sortBy(parsed, 'name');
             zonesData[currentTab] = {data: parsed, provided:true, numericCols: getNumericCols(parsed) };
+            getZonesDataFormatters();
             autoSelectColors();
             save();
         } catch (e) {
@@ -1003,14 +1048,18 @@ function onTemplateChange() {
     const parsed = domParser.parseFromString(tooltipDefs[currentTab].template, 'application/xml');
     const errorNode = parsed.querySelector('parsererror');
     if(errorNode) {
-        // const firstLineError = errorNode.firstChild.data.split('\n')[0];
         templateErrorMessages[currentTab] = true;
     }
     else {
         tooltipDefs[currentTab].content = htmlTooltipElem.outerHTML;
+        currentTemplateHasNumeric = templateHasNumeric(currentTab);
         templateErrorMessages[currentTab] = null;
     }
     save(); 
+}
+
+function changeTooltipLocale() {
+    getZonesDataFormatters();
 }
 
 
@@ -1026,6 +1075,7 @@ async function onTabChanged(newTabTitle) {
         const tmpElem = htmlToElement(legendDefs[newTabTitle].sampleHtml);
         reportStyle(tmpElem, legendSample);
     }
+    currentTemplateHasNumeric = templateHasNumeric(currentTab);
 }
 
 function addNewCountry(e) {
@@ -1050,7 +1100,6 @@ function deleteCountry(country) {
     chosenCountriesAdm = chosenCountriesAdm.filter(x => x !== country);
     orderedTabs = orderedTabs.filter(x => x !== country);
     currentTab = orderedTabs[0];
-    console.log(legendDefs);
     delete legendDefs[country];
     delete colorDataDefs[country];
     draw();
@@ -1170,11 +1219,10 @@ async function colorizeAndLegend() {
         } else if(dataColorDef.colorScale === "quantize") {
             scale = d3.scaleQuantile().domain(d3.extent(data)).range(d3[paletteName][dataColorDef.nbBreaks]);
         }
-        const shapeKey = tab === 'countries' ? 'alpha-3' : 'name';
         let newCss = '';
         zonesData[tab].data.forEach(row => {
             const color = scale(row[dataColorDef.colorColumn]);
-            const key = row[shapeKey];
+            const key = row.name;
             newCss += `path[id="${key}"]{fill:${color};}
             path[id="${key}"]:hover{fill:${d3.color(color).brighter(.2).hex()};}`;
         });
@@ -1347,8 +1395,18 @@ function getLegendColors(dataColorDef, tab, scale) {
                     <label for="tooltip-preview-{currentTab}"> Example tooltip: <br> (click to update style) </label>
                     <div class="tooltip-preview">
                         <div id="tooltip-preview-{currentTab}" bind:this={htmlTooltipElem} on:click={editTooltip} style="will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content;">
-                            {@html tooltipDefs[currentTab].template.formatUnicorn(zonesData?.[currentTab]?.['data'][0])}
+                            {@html tooltipDefs[currentTab].template.formatUnicorn(getFirstDataRow(zonesData?.[currentTab]))}
                         </div>
+                        {#if currentTemplateHasNumeric }
+                            <div class="form-floating">
+                                <select class="form-select form-select-sm" id="choseFormatLocale" bind:value={tooltipDefs[currentTab].locale} on:change={changeTooltipLocale}>
+                                    {#each availableFormatLocales as locale}
+                                        <option value={locale}> {locale} </option>
+                                    {/each}
+                                </select>
+                                <label for="choseFormatLocale">Formatting language</label>
+                            </div>
+                        {/if}
                     </div>
                 </div>
             {/if}

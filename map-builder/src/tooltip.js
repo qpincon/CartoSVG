@@ -1,5 +1,5 @@
 import { reportStyle } from './util/dom';
-import { htmlToElement, getBestFormatter } from './util/common';
+import { htmlToElement } from './util/common';
 
 function addTooltipListener(map, tooltipDefs, zonesData) {
     const tooltip = {shapeId: null, element: document.createElement('div')};
@@ -67,12 +67,9 @@ function onMouseMove(e, map, tooltipDefs, zonesData, tooltip) {
     }
     else {
         const data = {...zonesData[groupId].data.find(row => row.name === shapeId)};
-        if (zonesData[groupId].numericCols.length) {
-            zonesData[groupId].numericCols.forEach(col => {
-                const format = getBestFormatter(zonesData[groupId].data.map(row => row[col]));
-                data[col] = format(data[col]);
-            });
-        }
+        zonesData[groupId].numericCols.forEach(col => {
+            data[col] = zonesData[groupId].formatters[col](data[col]);
+        });
         if (!data) {
             tooltip.element.style.display = 'none';
             tooltip.element.style.opacity = 0;
