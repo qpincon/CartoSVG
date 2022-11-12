@@ -1424,7 +1424,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                 on:click={() => showExportConfirm = true}>
                 <Icon fillColor="none" svg={icons['download']}/> Download SVG 
             </div>
-            <div class="m-2 btn btn-light" on:click={exportRaster}>
+            <div class="m-2 btn btn-light" on:click={exportRaster} data-goatcounter-click="export-raster"            >
                 <Icon fillColor="none" svg={icons['download']}/> Download raster
             </div>
             <div class="d-flex align-items-center m-2 btn btn-light" on:click={saveProject}>
@@ -1489,6 +1489,7 @@ function getLegendColors(dataColorDef, tab, scale) {
     </form>
     <div slot="footer" class="d-flex justify-content-end">
         <button type="button" class="btn btn-success"
+            data-goatcounter-click="export-svg"
             on:click={validateExport}> 
             Export
         </button>
