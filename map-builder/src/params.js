@@ -1,31 +1,29 @@
 let defaultParams = {
-    "General": {
+    General: {
         width: 550,
         height: 600,
         useViewBox: false,
         fieldOfView: 50,
         altitude: 1000,
     },
-    "Styling": {
-        "Border": {
-            borderRadius: 15,
-            borderWidth: 3,
-            borderColor: "#b8b8b8",
-        },
-        showLand: true,
-        showCountries: true,
+    Border: {
+        borderRadius: 15,
+        borderWidth: 3,
+        borderColor: "#b8b8b8",
+    },
+    Background: {
         showGraticule: true,
         graticuleStep: 3,
         seaColor: "#dce7f8ff",
         backgroundNoise: true,
-        firstGlow: {
-            innerGlow1: {blur: 4, strength: 1.4, color: "#7c490eff"},
-            outerGlow1: {blur: 4, strength: 3, color: '#ffffffff'},
-        },
-        secondGlow: {
-            innerGlow2: {blur: 4, strength: 1.4, color: "#A88FAFff"},
-            outerGlow2: {blur: 4, strength: 3, color: '#ffffffff'},
-        },
+    },
+    firstGlow: {
+        innerGlow1: {blur: 4, strength: 1.4, color: "#7c490eff"},
+        outerGlow1: {blur: 4, strength: 3, color: '#ffffffff'},
+    },
+    secondGlow: {
+        innerGlow2: {blur: 4, strength: 1.4, color: "#A88FAFff"},
+        outerGlow2: {blur: 4, strength: 3, color: '#ffffffff'},
     },
 }
 

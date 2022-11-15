@@ -7,6 +7,7 @@
 
     export let open = false;
     export let dialogClasses = "";
+    export let modalWidth = "50%";
     export let backdrop = true;
     export let ignoreBackdrop = false;
     export let keyboard = true;
@@ -87,6 +88,7 @@
         on:introend={onModalOpened}
         on:outroend={onModalClosed}
         transition:fade
+        style:--bs-modal-width={modalWidth}
     >
         <div
             class="modal-dialog {dialogClasses}"
@@ -95,6 +97,9 @@
             out:fly={{ y: -50, duration: 300, easing: quintOut }}
         >
             <div class="modal-content">
+                <div class="modal-header p-0">
+                    <slot name="header"/>
+                </div>
                 <div class="modal-body p-3">
                     <slot name="content"/>
                 </div>
@@ -113,8 +118,11 @@
     .modal {
         display: block;
     }
+    .modal-header {
+        background-color: #f7f7f7;
+    }
     .modal-dialog {
-        --bs-modal-width: 50%;
+        min-width: 10rem;
     }
     .modal-content {
         overflow-x: scroll;

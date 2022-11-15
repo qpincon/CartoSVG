@@ -138,7 +138,7 @@ export default class PathEditor {
             point.setAttribute('cy', coord[1]);
             point.setAttribute('stroke', '#528af4');
             point.setAttribute('fill', '#acc5f4');
-            point.setAttribute('stroke-width', '2');
+            point.setAttribute('stroke-width', '3');
             this.editorContainer.append(point);
             this.pointElems.push(point);
         });
@@ -194,7 +194,7 @@ export default class PathEditor {
     createLine(p1Index, p2Index) {
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('stroke', '#528af4');
-        line.setAttribute('stroke-width', '4');
+        line.setAttribute('stroke-width', '2');
         line.p1Index = p1Index;
         line.p2Index = p2Index;
         this.editorContainer.insertBefore(line, this.editorContainer.firstChild);

@@ -50,7 +50,7 @@ const config = {
                 },
             },
             {
-                test: /\.(png|xlsx|jpg|csv)$/,
+                test: /\.(png|xlsx|jpg|csv|webp)$/,
                 type: 'asset/resource',
             },
             {
