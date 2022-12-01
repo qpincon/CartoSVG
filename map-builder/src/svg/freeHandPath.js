@@ -52,10 +52,8 @@ function fittedCurveDataToPathString(fittedLineData) {
 }
 
 function updateLine() {
-
     if (rawLineData.length > 1) {
         fittedCurveData = fitCurve(rawLineData, 400);
         fittedCurve.setAttribute("d", fittedCurveDataToPathString(fittedCurveData));
     }
-
 }

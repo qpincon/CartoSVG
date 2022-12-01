@@ -42,7 +42,6 @@ function replaceTextsWithPaths(svgElem, transformedTexts) {
         if (transform) pathElem.setAttribute('transform', transform);
         reportStyle(textElem, pathElem);
         textElem.replaceWith(pathElem);
-        // textElem.parentElement.append(pathElem);
     });
 }
 

@@ -138,7 +138,7 @@ export default class PathEditor {
             point.setAttribute('cy', coord[1]);
             point.setAttribute('stroke', '#528af4');
             point.setAttribute('fill', '#acc5f4');
-            point.setAttribute('stroke-width', '3');
+            point.setAttribute('stroke-width', '2');
             this.editorContainer.append(point);
             this.pointElems.push(point);
         });
@@ -151,7 +151,10 @@ export default class PathEditor {
             const point = this.pointElems[index];
             point.isOnCurve = isOnCurve;
             if (isOnCurve) point.setAttribute('r', '10');
-            else point.setAttribute('r', '7');
+            else {
+                point.setAttribute('r', '7');
+                point.setAttribute('stroke-width', '1');
+            }
             point.moveType = moveTypes.TRANSLATE;
             // Attach first coord to first control point
             if (isFirstCoord) {

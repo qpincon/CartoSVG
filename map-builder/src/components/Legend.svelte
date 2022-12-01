@@ -32,7 +32,7 @@
     }
 </script>
 
-<form on:change={sendChange}>
+<form on:change={sendChange} class="m-2">
     <div class="btn-group" role="group">
         <input
             type="radio"

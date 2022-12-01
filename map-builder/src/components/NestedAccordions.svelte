@@ -7,6 +7,7 @@
     export let sections;
     export let paramDefs;
     export let level = 0;
+    export let helpParams = {};
     let pickers = {};
 
     const dispatch = createEventDispatcher();
@@ -31,7 +32,10 @@
                         data-bs-toggle="collapse"
                         data-bs-target={`#panel-${key}-collapse`}
                     >
-                        {camelCaseToSentence(key)}
+                        <span> {camelCaseToSentence(key)} </span>
+                        {#if key in helpParams}
+                            <span class="help-tooltip fs-6 float-end" data-bs-toggle="tooltip" data-bs-title={helpParams[key]}>?</span>
+                        {/if}
                     </button>
                 </h2>
                 <div
@@ -40,7 +44,7 @@
                     class:show={level === 0}
                 >
                     <div class="accordion-body" style="border-left: solid {2 * level}px var(--bs-accordion-active-bg);">
-                        <svelte:self on:change sections={sections[key]} {paramDefs} level={level + 1} />
+                        <svelte:self on:change sections={sections[key]} {paramDefs} {helpParams} level={level + 1} />
                     </div>
                 </div>
             {:else if key in paramDefs}
@@ -48,6 +52,9 @@
                     <div class="row">
                         <label for={`form-${key}`} class="col-4 col-form-label">
                             {camelCaseToSentence(key)}
+                            {#if key in helpParams}
+                                <span class="help-tooltip fs-6" data-bs-toggle="tooltip" data-bs-title={helpParams[key]}>?</span>
+                            {/if}
                         </label>
                         <div class="d-flex align-items-center col">
                             <input
@@ -85,6 +92,9 @@
                     />
                     <label for={`form-${key}`} class="form-check-label">
                         {camelCaseToSentence(key)}
+                        {#if key in helpParams}
+                            <span class="help-tooltip fs-6 float-end" data-bs-toggle="tooltip" data-bs-title={helpParams[key]}>?</span>
+                        {/if}
                     </label>
                 </div>
             {:else if key.toLowerCase().includes('color')}

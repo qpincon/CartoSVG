@@ -54,4 +54,6 @@
     - [x] No redraw on resize
     - [x] Choice between "font(s) will be included in final file" & "best between embed font / transform text to paths"
 - [ ] SEO: title + meta tag + raw html for FAQ
-- [ ] Redesign layout: accordions on right, data / colors / legend on left
+- [x] Redesign layout: accordions on right, data / colors / legend on left
+- [ ] Add line at the end of math (<marker>)
+- [x] Delete paths on right click in menu

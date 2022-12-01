@@ -86,7 +86,10 @@ function getNumericCols(jsonData) {
 
 function initTooltips() {
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-    [...tooltipTriggerList].map(tooltipTriggerEl => new Tooltip(tooltipTriggerEl, {placement: 'top', html: false}))
+    [...tooltipTriggerList].map(tooltipTriggerEl => {
+        const isHtml = tooltipTriggerEl.hasAttribute('allow-html');
+        new Tooltip(tooltipTriggerEl, {placement: 'top', html: isHtml, customClass: isHtml ? 'big-tooltip': ''})
+    });
 }
 
 function getBestFormatter(values, locale) {

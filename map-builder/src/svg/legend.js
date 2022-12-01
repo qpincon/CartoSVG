@@ -3,6 +3,7 @@ import { reportStyle } from '../util/dom';
 import { setTransformTranslate, getTranslateFromTransform } from '../svg/svg';
 
 function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, entryWidth = legendDef.lineWidth) {
+    console.log(legendDef)
     const horizontal = legendDef.direction === 'h';
     const gap = isCategorical ? 5 : 0;
     const textBaseline = !isCategorical && horizontal ? 'hanging' : 'middle';
@@ -54,6 +55,7 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
             const closeInput = () => {
                 legendTitle.text(input.value);
                 legendDef.title = input.value;
+                legendDef.titleChanged = true;
                 input.remove();
             };
             const input = d3.select(document.body).append('input')

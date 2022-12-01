@@ -11,6 +11,7 @@ $accordion-inner-border-radius:           0;
 $accordion-border-radius:                 0;
 $form-label-margin-bottom:                0;
 $input-padding-y:                         2px;
+$navbar-padding-y:                        0px;
 // 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
 @import "bootstrap/scss/functions";
 
@@ -83,7 +84,7 @@ html {
 .help-tooltip {
     display: inline-flex;
     justify-content: center;
-    align-items: end;
+    align-items: center;
     width: 20px;
     height: 20px;
     background-color: $secondary;
@@ -92,4 +93,8 @@ html {
     text-decoration: none;
     font-weight: 500;
     margin-left: 5px;
+    cursor: pointer;
+}
+.big-tooltip {
+    --bs-tooltip-max-width: 500px;
 }

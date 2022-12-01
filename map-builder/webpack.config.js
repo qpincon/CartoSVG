@@ -72,7 +72,7 @@ const config = {
                         ],
                     },
                     {
-                        type: 'asset/inline',
+                        type: 'asset/resource',
                         use: [
                             {
                                 loader: 'svgo-loader',
