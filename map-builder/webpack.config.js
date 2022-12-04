@@ -14,7 +14,7 @@ const config = {
         mainFields: ['svelte', 'browser', 'module', 'main'],
     },
     output: {
-        path: __dirname + '/public',
+        path: path.resolve(__dirname, '../docs'),
         filename: '[name].js',
         chunkFilename: '[contenthash].js',
     },
