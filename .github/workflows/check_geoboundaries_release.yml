@@ -19,7 +19,7 @@ jobs:
         if: steps.git-check.outputs.modified == 'true'
         uses: ./.github/actions/get_world_and_simplify
       - name: Remove old js assets
-        run: find map-builder/public/ -name "*.js" | xargs rm
+        run: find docs/ -name "*.js" | xargs rm
         if: steps.git-check.outputs.modified == 'true'
       - name: Build app with new topojson files
         run: cd map-builder && npm install && npx webpack --mode=production
@@ -29,6 +29,7 @@ jobs:
         run: |
           git config --global user.name 'qpincon'
           git config --global user.email 'qpincon@users.noreply.github.com'
-          git add map-builder/public/
-          git commit -am "New release of geoboundaries: new simplified topojson created"
+          git add map-builder/src/assets/layers/
+          git add docs/
+          git commit -am "New release of geoboundaries: new simplified topojsons created"
           git push

@@ -1,0 +1,17 @@
+
+{
+  "name": "map-actions",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Actions to have fresh maps",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Quentin Pinçon",
+  "license": "ISC",
+  "dependencies": {
+    "mapshaper": "^0.6.5",
+    "node-fetch": "^3.2.10"
+  }
+}

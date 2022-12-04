@@ -18,6 +18,7 @@ async function getWorldTopojson(){
     await mapshaper.runCommands(`-i ${assetsPath}/world_adm0_simplified.topojson -simplify 10% -dissolve -clean -o quantization=100000000000 ${assetsPath}/world_land_very_simplified.topojson`);
     fs.mkdirSync(`${assetsPath}/adm1`);
     await mapshaper.runCommands(`-i ${assetsPath}/adm1_simplified.geojson -split shapeGroup -o format=topojson singles quantization=100000000000 ${assetsPath}/adm1/`);
+    fs.unlinkSync(`${assetsPath}/adm1_simplified.geojson`);
     
     let topologyAdm2 = await fetch('https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/main/releaseData/CGAZ/geoBoundariesCGAZ_ADM2.topojson');
     topologyAdm2 = await topologyAdm2.json();
@@ -28,6 +29,7 @@ async function getWorldTopojson(){
     fs.writeFileSync(`${assetsPath}/adm2_simplified.geojson`, JSON.stringify(simplifiedAdm2));
     fs.mkdirSync(`${assetsPath}/adm2`);
     await mapshaper.runCommands(`-i ${assetsPath}/adm2_simplified.geojson -filter 'shapeType==="ADM2"' -split shapeGroup -o format=topojson singles quantization=100000000000 ${assetsPath}/adm2/`);
+    fs.unlinkSync(`${assetsPath}/adm2_simplified.geojson`);
     return true;
 }
 
