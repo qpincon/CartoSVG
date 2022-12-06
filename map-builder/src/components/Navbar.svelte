@@ -3,7 +3,6 @@
     import Modal from './Modal.svelte';
     import About from './About.svelte';
     import Instructions from './Instructions.svelte';
-    import Icon from './Icon.svelte';
 
     import githubLogo from '../assets/img/github.svg?inline';
     let modalToShow = null;
@@ -45,6 +44,7 @@
   :global(.github > svg) {
     fill: #5f5f5f;
     transition: fill 0.3s;
+    max-width: 3rem;
   }
   :global(.github:hover > svg) {
     fill: black;

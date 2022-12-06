@@ -22,7 +22,7 @@
     <a href="mailto:pinconquentin@gmail.com">pinconquentin@gmail.com</a>.
 </section>
 
-<h2>Credits</h2>
+<h2 class="mt-2">Credits</h2>
 <section>
     Administrative boundaries courtesy of <a
         href="https://www.geoboundaries.org">geoBoundaries</a
@@ -61,5 +61,12 @@
     </a> is also used (made by me).
 </section>
 
-<h2>Licence ?</h2>
-<section>MIT</section>
+<h3 class="mt-2">Note on performance</h3>
+<section>
+    The glow filters use SVG filter primitives. I made some efforts to make them
+    as performant as possible, however such filters are generally quite resource
+    intensive, so use them wisely.
+</section>
+
+<h3 class="mt-2">Licence ?</h3>
+<span>MIT</span>

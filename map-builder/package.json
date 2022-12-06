@@ -25,7 +25,7 @@
     "d3": "^7.6.1",
     "d3-geo-projection": "^4.0.0",
     "fit-curve": "^0.2.0",
-    "inline-style-editor": "^1.2.11",
+    "inline-style-editor": "^1.2.14",
     "node-polyfill-webpack-plugin": "^2.0.1",
     "parse-svg-path": "^0.1.2",
     "sass-loader": "^13.0.2",

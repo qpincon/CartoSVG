@@ -46,6 +46,7 @@
         pickerElem = new Picker({
             parent: self,
             color: value,
+            popup: 'top',
             ...opts
         });
     }

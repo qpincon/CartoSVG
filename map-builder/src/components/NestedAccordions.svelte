@@ -41,7 +41,7 @@
                 <div
                     id={`panel-${key}-collapse`}
                     class="accordion-collapse collapse"
-                    class:show={level === 0}
+                    class:show={level === 0 && i < 3}
                 >
                     <div class="accordion-body" style="border-left: solid {2 * level}px var(--bs-accordion-active-bg);">
                         <svelte:self on:change sections={sections[key]} {paramDefs} {helpParams} level={level + 1} />
@@ -103,7 +103,12 @@
                         {camelCaseToSentence(key)}
                     </label>
                     <div class="d-flex align-items-center col">
-                        <div class="color-preview border border-primary rounded-1" on:click={(e) => {pickers[key].open();}} style="background-color: {sections[key]};"></div>
+                        <div class="color-preview border border-primary rounded-1" on:click={(e) => {pickers[key].open();}} style="background-color: {sections[key]};">
+                            <ColorPicker bind:this={pickers[key]}
+                        value={sections[key]}
+                        onChange={color => {sections[key] = color; propChanged(key, color);}}
+                    /> 
+                        </div>
                         <input
                             type="text"
                             class="ms-2 form-control"
@@ -111,10 +116,7 @@
                             bind:value={sections[key]}
                         />
                     </div>
-                    <ColorPicker bind:this={pickers[key]}
-                        value={sections[key]}
-                        onChange={color => {sections[key] = color; propChanged(key, color);}}
-                    /> 
+                    
                 </div>
             {:else}
                 <div class="input-type">

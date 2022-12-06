@@ -187,7 +187,7 @@ let providedFonts = [];
 let shapeCount = 0;
 let inlineStyles = {}; // elemID -> prop -> value
 let zonesData = {}; // key => {data (list), provided (bool), numericCols (list)}
-let zonesFilter = {'land': '1'};
+let zonesFilter = {'land': 'firstGlow'};
 let lastUsedLabelProps = {'font-size': '14px'};
 
 let tooltipDefs = {
@@ -319,16 +319,9 @@ let altScale = d3.scaleLinear().domain([1, 0]).range([100, 10000]);
 function zoomed(event) {
     if (!event.sourceEvent) return;
     if (!projection) return;
-    if (event.transform.k > 0.00001 && event.transform.k < 1.0) {
-        const newAltitude = Math.round(altScale(event.transform.k));
-        params["General"].altitude = newAltitude;
-    }
-    else if (event.transform.k < 0.00001) {
-        event.transform.k = 0.00001;
-    }
-    else {
-        event.transform.k  = 1.0;
-    }
+    event.transform.k = Math.max(Math.min(event.transform.k, 1), 0.00001)
+    const newAltitude = Math.round(altScale(event.transform.k));
+    params["General"].altitude = newAltitude;
     redraw('altitude');
 }
 
@@ -404,10 +397,10 @@ async function draw(simplified = false, _) {
     const dZ = altitude * Math.cos(inlineProps.tilt / degrees);
     const fovExtent = Math.tan(0.5 * fov / degrees);
     const visibleYextent = 2 * dZ * fovExtent;
-    const altRange = [(1/fovExtent) * 500, (1/fovExtent) * 9000];
+    const altRange = [(1/fovExtent) * 500, (1/fovExtent) * 4000];
     altScale = d3.scaleLinear().domain([1, 0]).range(altRange);
-    if (altitude < altScale[0]) { altitude = altScale[0]; redraw('altitude');}
-    if (altitude > altScale[1]) { altitude = altScale[1]; redraw('altitude');}
+    if (altitude < altScale[0]) { params["General"].altitude = altScale[0]; redraw('altitude');}
+    if (altitude > altScale[1]) { params["General"].altitude = altScale[1]; redraw('altitude');}
     const yShift = dY * 600 / visibleYextent;
     const scale = earthRadius * 600 / visibleYextent;
     const tilt = inlineProps.tilt / degrees;
@@ -527,7 +520,7 @@ async function draw(simplified = false, _) {
     groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
     groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
     computedOrderedTabs.forEach((layer, i) => {
-        const filter = zonesFilter[layer] ? `glow${zonesFilter[layer]}` : null;
+        const filter = zonesFilter[layer] ? zonesFilter[layer] : null;
         if (layer === 'countries' && inlineProps.showCountries && countries) {
             if (!('countries' in zonesData) && !zonesData?.['countries']?.provided) {
                 const data = sortBy(countries.features.map(f => f.properties), 'name');
@@ -568,9 +561,9 @@ async function draw(simplified = false, _) {
     groups.each(drawPaths);
 
     drawCustomPaths(providedPaths, svg, projection);
-    const existingFilters = [...new Set(Object.entries(zonesFilter).filter(([key, fi]) => fi && key !== 'land').map(([key, fi]) => fi))];
-    existingFilters.forEach(fiIndex => {
-        appendGlow(svg, `glow${fiIndex}`, true, p(`innerGlow${fiIndex}`), p(`outerGlow${fiIndex}`));
+    const existingFilters = [...new Set(Object.entries(zonesFilter).filter(([key, fi]) => fi && key !== 'land').map(([key, value]) => value))];
+    existingFilters.forEach(filterName => {
+        appendGlow(svg, filterName, true, p(filterName));
     });
     appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
     d3.select('#outline').style('fill', "url(#noise)");
@@ -615,10 +608,9 @@ function appendLandImage(showSource) {
         .join('path')
             .attr('d', (d) => {return path(d)});
     if(zonesFilter['land']) {
-        const filterIndex = zonesFilter['land'];
-        const filterId = `glow${filterIndex}`;
-        pathElem.attr('filter', `url(#${filterId})`);
-        appendGlow(landElem, filterId, showSource, p(`innerGlow${filterIndex}`), p(`outerGlow${filterIndex}`));
+        const filterName = zonesFilter['land'];
+        pathElem.attr('filter', `url(#${filterName})`);
+        appendGlow(landElem, filterName, showSource, p(filterName));
     }
     const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
         .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(landElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
@@ -660,7 +652,7 @@ function resetState() {
     shapeCount = 0;
     inlineStyles = {};
     zonesData = {};
-    zonesFilter = {land: '1'};
+    zonesFilter = {land: 'firstGlow'};
     lastUsedLabelProps = {'font-size': '14px'};
     tooltipDefs = {
         countries: {
@@ -1098,7 +1090,6 @@ function changeTooltipLocale() {
     getZonesDataFormatters();
 }
 
-
 async function onTabChanged(newTabTitle) {
     currentTab = newTabTitle;
     await tick();
@@ -1115,31 +1106,34 @@ async function onTabChanged(newTabTitle) {
     currentTemplateHasNumeric = templateHasNumeric(currentTab);
 }
 
-function addNewCountry(e) {
-    if (chosenCountriesAdm.includes(e.target.value)) return;
+async function addNewCountry(e) {
+    const newLayerName = e.target.value;
+    if (chosenCountriesAdm.includes(newLayerName)) return;
     let searchedAdm;
-    if (e.target.value.slice(-1) === '1') searchedAdm = e.target.value.replace('ADM1', 'ADM2');
-    else searchedAdm = e.target.value.replace('ADM2', 'ADM1');
+    if (newLayerName.slice(-1) === '1') searchedAdm = newLayerName.replace('ADM1', 'ADM2');
+    else searchedAdm = newLayerName.replace('ADM2', 'ADM1');
     const existingIndex = chosenCountriesAdm.indexOf(searchedAdm);
     if (existingIndex > -1) {
-        chosenCountriesAdm.splice(existingIndex, 1);
-        orderedTabs.splice(orderedTabs.indexOf(searchedAdm), 1);
+        deleteCountry(searchedAdm, false);
     }
-    chosenCountriesAdm.push(e.target.value);
-    orderedTabs.push(e.target.value);
+    chosenCountriesAdm.push(newLayerName);
+    orderedTabs.push(newLayerName);
     chosenCountriesAdm = chosenCountriesAdm;
     orderedTabs = orderedTabs;
     e.target.selectedIndex = null;
-    draw();
+    await draw();
+    onTabChanged(newLayerName);
+    // setTimeout(() => {onTabChanged(e.target.value);}, 2000);
 }
 
-function deleteCountry(country) {
+function deleteCountry(country, drawAfter = true) {
     chosenCountriesAdm = chosenCountriesAdm.filter(x => x !== country);
     orderedTabs = orderedTabs.filter(x => x !== country);
     currentTab = orderedTabs[0];
+    delete tooltipDefs[country];
     delete legendDefs[country];
     delete colorDataDefs[country];
-    draw();
+    if(drawAfter) draw();
 }
 
 // === Drag and drop behaviour ===
@@ -1362,7 +1356,7 @@ function getLegendColors(dataColorDef, tab, scale) {
 
 <Navbar></Navbar>
 <div class="container-fluid">
-    <div class="d-flex justify-content-between p-3">
+    <div class="d-flex justify-content-between align-items-start p-3">
         <aside class="panel rounded p-0 border mx-2">
             <NestedAccordions sections={params} paramDefs={paramDefs} helpParams={helpParams} on:change={handleChangeProp} ></NestedAccordions>
         </aside>
@@ -1455,8 +1449,8 @@ function getLegendColors(dataColorDef, tab, scale) {
                     <div class="form-floating flex-grow-1">
                         <select id="choseFilter" class="form-select form-select-sm" bind:value={zonesFilter[currentTab]} on:change={() => draw()}>
                             <option value={null}> None </option>
-                            <option value="1"> First filter </option>
-                            <option value="2"> Second filter </option>
+                            <option value="firstGlow"> First filter </option>
+                            <option value="secondGlow"> Second filter </option>
                         </select>
                         <label for="choseFilter">Glow filter</label>
                     </div>
@@ -1485,7 +1479,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                     {#if tooltipDefs[currentTab].enabled}
                         <div class="m-2 has-validation">
                             <label for="templatetooltip" class="form-label"> Tooltip template
-                                <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="The template must be valid HTML (<br/> can be used to break lines)">?</span>
+                                <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="The template must be valid HTML (<br/> can be used to break lines). Brackets  &#123; &#125; can be used to reference variables.  ">?</span>
                             </label>
                             <textarea class="form-control" 
                             class:is-invalid="{templateErrorMessages[currentTab]}"
@@ -1590,7 +1584,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                                     on:click={openEditor}> {sampleLegend.text} </text>
                             </g>
                         </svg>
-                        <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click to update style">?</span>
+                        <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click to update style (the legend is SVG)">?</span>
                     {/if}
                 {/if}    
             </div> 

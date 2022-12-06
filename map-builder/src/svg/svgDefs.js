@@ -2,14 +2,15 @@ import * as d3 from "d3";
 import bg from '../assets/img/bg.png?inline';
 import plaid from '../assets/img/plaid.jpg';
 
-function appendGlow(selection, id="glows", displaySource = false,
-                    innerParams = {blur: 2, strength: 1, color: "#7c490e"},
-                    outerParams = {blur: 4, strength: 1, color: '#998'}) {
-    const colorInner = d3.rgb(innerParams.color);
-    const colorOuter = d3.rgb(outerParams.color);
+function appendGlow(selection, id = "glows", displaySource = false,
+    {
+        innerBlur, innerStrength, innerColor,
+        outerBlur, outerStrength, outerColor,
+    }
+) {
+    const colorInner = d3.rgb(innerColor);
+    const colorOuter = d3.rgb(outerColor);
     const existing = d3.select(`#${id}`);
-    // const defs = !existing.empty() ? existing.select(function() { return this.parentNode} ) : 
-    //         .append('defs');
     if (!existing.empty()) existing.remove();
     let defs = selection.select('defs');
     if (defs.empty()) defs = selection.append('defs')
@@ -18,7 +19,7 @@ function appendGlow(selection, id="glows", displaySource = false,
     // OUTER GLOW
     filter.append('feMorphology')
         .attr('in', 'SourceGraphic')
-        .attr('radius', outerParams.strength)
+        .attr('radius', outerStrength)
         .attr('operator', 'dilate')
         .attr('result', 'MASK_OUTER');
     filter.append('feColorMatrix')
@@ -28,7 +29,7 @@ function appendGlow(selection, id="glows", displaySource = false,
         .attr('result', 'OUTER_COLORED');
     filter.append('feGaussianBlur')
         .attr('in', 'OUTER_COLORED')
-        .attr('stdDeviation', outerParams.blur)
+        .attr('stdDeviation', outerBlur)
         .attr('result', 'OUTER_BLUR');
     filter.append('feComposite')
         .attr('in', 'OUTER_BLUR')
@@ -39,26 +40,26 @@ function appendGlow(selection, id="glows", displaySource = false,
     // INNER GLOW
     filter.append('feMorphology')
         .attr('in', 'SourceAlpha')
-        .attr('radius', innerParams.strength)
+        .attr('radius', innerStrength)
         .attr('operator', 'erode')
         .attr('result', 'INNER_ERODED_A');
     filter.append('feComponentTransfer')
         .attr('in', 'INNER_ERODED_A')
         .attr('result', 'INNER_ERODED')
         .append('feFuncA')
-            .attr('type', 'linear')
-            .attr('slope', '1000')
-            .attr('intercept', '0');
+        .attr('type', 'linear')
+        .attr('slope', '1000')
+        .attr('intercept', '0');
 
     filter.append('feGaussianBlur')
         .attr('in', 'INNER_ERODED')
-        .attr('stdDeviation', innerParams.blur)
+        .attr('stdDeviation', innerBlur)
         .attr('result', 'INNER_BLURRED');
 
     filter.append('feColorMatrix')
         .attr('in', 'INNER_BLURRED')
         .attr('type', 'matrix')
-        .attr('values', `0 0 0 0 ${colorInner.r / 255} 0 0 0 0 ${colorInner.g / 255} 0 0 0 0 ${colorInner.b / 255} 0 0 0 -1 ${colorInner.opacity }`) // inverse color
+        .attr('values', `0 0 0 0 ${colorInner.r / 255} 0 0 0 0 ${colorInner.g / 255} 0 0 0 0 ${colorInner.b / 255} 0 0 0 -1 ${colorInner.opacity}`) // inverse color
         .attr('result', 'INNER_COLOR');
 
     filter.append('feComposite')
@@ -70,7 +71,7 @@ function appendGlow(selection, id="glows", displaySource = false,
     // Merge
     const merge = filter.append('feMerge');
     merge.append('feMergeNode').attr('in', 'OUTGLOW');
-    if(displaySource) merge.append('feMergeNode').attr('in', 'SourceGraphic');
+    if (displaySource) merge.append('feMergeNode').attr('in', 'SourceGraphic');
     merge.append('feMergeNode').attr('in', 'INGLOW');
     filter.append(() => merge.node());
 
@@ -88,7 +89,7 @@ function appendBgPattern(selection, id, seaColor, backgroundNoise = false, image
         .attr('patternUnits', 'userSpaceOnUse')
         .attr('width', imageSize)
         .attr('height', imageSize);
-        
+
     pattern.append('rect')
         .attr('width', imageSize).attr('height', imageSize)
         .attr('fill', seaColor);
