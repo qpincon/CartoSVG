@@ -603,15 +603,34 @@ function appendLandImage(showSource) {
     if (showSource) {
         landElem.attr('fill', 'white');
     }
-    const pathElem = landElem.selectAll('path')
+    // const pathElemFilter = landElem.append('g').selectAll('path')
+    //     .data(land.features ? land.features : land)
+    //     .join('path')
+    //         .attr('d', (d) => {return path(d)});
+    // landElem.append('g')
+    //     .selectAll('path')
+    //     .data(land.features ? land.features : land)
+    //         .join('path')
+    //             .attr('d', (d) => {return path(d)})
+                // .attr('stroke', 'black')
+                // .attr('stroke-width', '2px')
+                // .attr('fill', 'none');
+
+    landElem.append('defs').append('g').attr('id', 'landshape').selectAll('path')
         .data(land.features ? land.features : land)
         .join('path')
             .attr('d', (d) => {return path(d)});
+            
     if(zonesFilter['land']) {
         const filterName = zonesFilter['land'];
-        pathElem.attr('filter', `url(#${filterName})`);
+        landElem.append('use').attr('href', '#landshape').attr('filter', `url(#${filterName})`);
+        // pathElemFilter.attr('filter', `url(#${filterName})`);
         appendGlow(landElem, filterName, showSource, p(filterName));
     }
+    landElem.append('use').attr('href', '#landshape')
+        .attr('stroke', 'black')
+        .attr('stroke-width', '2px')
+        .attr('fill', 'none');
     const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
         .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(landElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
         
