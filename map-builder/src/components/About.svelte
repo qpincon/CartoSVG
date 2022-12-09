@@ -1,3 +1,8 @@
+<script>
+    import Navbar from './Navbar.svelte';
+</script>
+
+<Navbar></Navbar>
 <h1>About</h1>
 <h2>Purpose</h2>
 <section>

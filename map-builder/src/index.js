@@ -1,6 +1,6 @@
-import Map from './Map.svelte';
+import App from './App.svelte';
 import './assets/global.scss';
 
-new Map({
-  target: document.getElementById('container')
+new App({
+  target: document.body
 });

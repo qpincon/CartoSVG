@@ -15,11 +15,14 @@
       </a>
       <div class="navbar-collapse" >
         <ul class="navbar-nav me-auto">
+          <li class="nav-item" >
+            <a class="nav-link" role="button" href="/"> Design </a>
+          </li>
           <li class="nav-item">
             <a class="nav-link" role="button" on:click={() => modalToShow = 'instructions'}>Instructions</a>
           </li>
           <li class="nav-item" >
-            <a class="nav-link" role="button" on:click={() => modalToShow = 'about'}>About </a>
+            <a class="nav-link" role="button" href="/about">About </a>
           </li>
         </ul>
         <a class="p-2 github" target="_blank" style="width:50px; height:auto; fill:#aaa;" href="https://github.com/qpincon/SVGscape">{@html githubLogo}</a>

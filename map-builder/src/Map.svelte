@@ -603,18 +603,6 @@ function appendLandImage(showSource) {
     if (showSource) {
         landElem.attr('fill', 'white');
     }
-    // const pathElemFilter = landElem.append('g').selectAll('path')
-    //     .data(land.features ? land.features : land)
-    //     .join('path')
-    //         .attr('d', (d) => {return path(d)});
-    // landElem.append('g')
-    //     .selectAll('path')
-    //     .data(land.features ? land.features : land)
-    //         .join('path')
-    //             .attr('d', (d) => {return path(d)})
-                // .attr('stroke', 'black')
-                // .attr('stroke-width', '2px')
-                // .attr('fill', 'none');
 
     landElem.append('defs').append('g').attr('id', 'landshape').selectAll('path')
         .data(land.features ? land.features : land)
@@ -624,7 +612,6 @@ function appendLandImage(showSource) {
     if(zonesFilter['land']) {
         const filterName = zonesFilter['land'];
         landElem.append('use').attr('href', '#landshape').attr('filter', `url(#${filterName})`);
-        // pathElemFilter.attr('filter', `url(#${filterName})`);
         appendGlow(landElem, filterName, showSource, p(filterName));
     }
     landElem.append('use').attr('href', '#landshape')
@@ -1475,6 +1462,9 @@ function getLegendColors(dataColorDef, tab, scale) {
                     </div>
                     <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Two filters are available, that are customizable in the panel on the other side (first / second glow sections).">?</span>
                 </div>
+                {:else if currentTab === "land"}
+
+                <span> coucou </span>
                 {/if}
                 {#if zonesData?.[currentTab]?.['data']}
                     <div class="d-flex align-items-center">
