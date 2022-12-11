@@ -4,7 +4,10 @@ const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 const config = {
-    entry: './src/index.js',
+    entry: {
+        main: './src/index.js',
+        about: './src/about.js'
+    },
     resolve: {
         alias: {
             svelte: path.resolve('node_modules', 'svelte')
@@ -93,8 +96,18 @@ const config = {
             title: 'SVGscape - Easiest way to draw beautiful, interactive and lightweight SVG maps',
             meta: {
                 description: 'SVGscape is an online editor to create, tweak and export rich and splendid SVG map visualizations. It allows customization by binding data, displaying tooltips, drawing choropleth, and provides optimizations for exporting the SVG file as light as possible.'
-            }
-        })
+            },
+            chunks: ['main'],
+        }),
+        new HtmlWebpackPlugin({
+            title: 'SVGscape - About',
+            meta: {
+                description: 'SVGscape aims to be a easy, beautiful and lightweight datamaps replacement.'
+            },
+            filename: 'about.html',
+            chunks: ['about'],
+          })
+        
     ],
     // devServer: {
 

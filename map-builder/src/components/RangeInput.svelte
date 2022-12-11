@@ -4,6 +4,7 @@
     export let min = 0;
     export let max = 10;
     export let step = 1;
+    export let onChange = (newVal) => {};
 </script>
 
 <div class="row">
@@ -17,6 +18,7 @@
             min={min}
             max={max}
             step={step}
+            on:change={onChange}
         />
         <span
             class="range-label text-center text-primary mx-1 text-opacity-75 fs-6"

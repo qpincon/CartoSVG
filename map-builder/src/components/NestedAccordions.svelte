@@ -3,12 +3,13 @@
     import { createEventDispatcher } from 'svelte';
 
     import ColorPicker from './ColorPicker';
+    let pickers = {};
+    import ColorPickerPreview from "./ColorPickerPreview.svelte";
     import { camelCaseToSentence } from "../util/common";
     export let sections;
     export let paramDefs;
     export let level = 0;
     export let helpParams = {};
-    let pickers = {};
 
     const dispatch = createEventDispatcher();
 
@@ -21,7 +22,7 @@
 </script>
 
 <div class="accordion" style="padding:{padding}px 0 0  {padding}px;">
-    {#each Object.entries(sections) as [key, value], i}
+    {#each Object.entries(sections) as [key, value], i (key)}
         {@const isObject = typeof value === "object"}
         <div class="accordion-item" class:noborder={!isObject}>
             {#if isObject}
@@ -98,26 +99,7 @@
                     </label>
                 </div>
             {:else if key.toLowerCase().includes('color')}
-                <div class="row input-type">
-                    <label for={`form-${key}`} class="col-form-label col-4">
-                        {camelCaseToSentence(key)}
-                    </label>
-                    <div class="d-flex align-items-center col">
-                        <div class="color-preview border border-primary rounded-1" on:click={(e) => {pickers[key].open();}} style="background-color: {sections[key]};">
-                            <ColorPicker bind:this={pickers[key]}
-                        value={sections[key]}
-                        onChange={color => {sections[key] = color; propChanged(key, color);}}
-                    /> 
-                        </div>
-                        <input
-                            type="text"
-                            class="ms-2 form-control"
-                            id={`form-${key}`}
-                            bind:value={sections[key]}
-                        />
-                    </div>
-                    
-                </div>
+            <ColorPickerPreview id={`form-${key}`} popup="right" title={camelCaseToSentence(key)} value={sections[key]} onChange={(col) => {sections[key] = col; propChanged(key, col); sections=sections;}}> </ColorPickerPreview>
             {:else}
                 <div class="input-type">
                     <label for={`form-${key}`} class="form-label">
@@ -137,10 +119,6 @@
 </div>
 
 <style scoped >
-    .color-preview {
-        width: 2rem;
-        height: 2rem;
-    }
     .accordion-item > .input-type {
         padding-right: 6px;
     }

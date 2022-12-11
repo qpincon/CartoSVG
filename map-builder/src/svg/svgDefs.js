@@ -78,7 +78,7 @@ function appendGlow(selection, id = "glows", displaySource = false,
     defs.append(() => filter.node());
 }
 
-function appendBgPattern(selection, id, seaColor, backgroundNoise = false, imageSize = 100) {
+function appendBgPattern(selection, id, seaColor, backgroundNoise = false, imageSize = 60) {
     let defs = selection.select('defs');
     if (defs.empty()) defs = selection.append('defs')
     const existing = d3.select(`#${id}`);

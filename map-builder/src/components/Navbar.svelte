@@ -1,11 +1,7 @@
 <script>
     import logo from '../assets/img/logo_transparent_text.webp';
-    import Modal from './Modal.svelte';
-    import About from './About.svelte';
-    import Instructions from './Instructions.svelte';
-
     import githubLogo from '../assets/img/github.svg?inline';
-    let modalToShow = null;
+    export let activeTitle = 'index.html'
 </script>
 
 <nav class="navbar navbar-expand-lg bg-light">
@@ -16,13 +12,11 @@
       <div class="navbar-collapse" >
         <ul class="navbar-nav me-auto">
           <li class="nav-item" >
-            <a class="nav-link" role="button" href="/"> Design </a>
+            <a class="nav-link" class:active={activeTitle === 'index.html'} role="button" href="index.html"> <strong> Design </strong> </a>
           </li>
-          <li class="nav-item">
-            <a class="nav-link" role="button" on:click={() => modalToShow = 'instructions'}>Instructions</a>
-          </li>
+          
           <li class="nav-item" >
-            <a class="nav-link" role="button" href="/about">About </a>
+            <a class="nav-link" class:active={activeTitle === 'about.html'}  role="button" href="about.html">About </a>
           </li>
         </ul>
         <a class="p-2 github" target="_blank" style="width:50px; height:auto; fill:#aaa;" href="https://github.com/qpincon/SVGscape">{@html githubLogo}</a>
@@ -30,26 +24,3 @@
       <slot></slot>
     </div>
   </nav>
-
-<Modal open={modalToShow !== null} onClosed={() => modalToShow = null}>
-  <div slot="content">
-    {#if modalToShow === 'instructions'}<Instructions></Instructions>
-    {:else } <About></About>
-    {/if}
-  </div>
-</Modal>
-
-<style>
-  .github {
-    width: 40px;
-    height: auto;
-  }
-  :global(.github > svg) {
-    fill: #5f5f5f;
-    transition: fill 0.3s;
-    max-width: 3rem;
-  }
-  :global(.github:hover > svg) {
-    fill: black;
-  }
-</style>

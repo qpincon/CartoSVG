@@ -1,17 +1,17 @@
 $primary: #37383d;
-$accordion-padding-y:                     0.5rem;
-$accordion-padding-x:                     0.6rem;
-$accordion-body-padding-y:                0;
-$accordion-body-padding-x:                0;
-$accordion-border-width:                  0;
-$form-range-thumb-width:                  0.8rem;
-$form-range-thumb-height:                 1rem;
-$form-range-thumb-border-radius:          2px;
-$accordion-inner-border-radius:           0;
-$accordion-border-radius:                 0;
-$form-label-margin-bottom:                0;
-$input-padding-y:                         2px;
-$navbar-padding-y:                        0px;
+$accordion-padding-y: 0.5rem;
+$accordion-padding-x: 0.6rem;
+$accordion-body-padding-y: 0;
+$accordion-body-padding-x: 0;
+$accordion-border-width: 0;
+$form-range-thumb-width: 0.8rem;
+$form-range-thumb-height: 1rem;
+$form-range-thumb-border-radius: 2px;
+$accordion-inner-border-radius: 0;
+$accordion-border-radius: 0;
+$form-label-margin-bottom: 0;
+$input-padding-y: 2px;
+$navbar-padding-y: 0px;
 // 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
 @import "bootstrap/scss/functions";
 
@@ -24,8 +24,8 @@ $navbar-padding-y:                        0px;
 @import "bootstrap/scss/maps";
 @import "bootstrap/scss/mixins";
 @import "bootstrap/scss/root";
-$accordion-button-bg:               tint-color($component-active-bg, 90%);
-$tooltip-bg:                        $primary;
+$accordion-button-bg: tint-color($component-active-bg, 90%);
+$tooltip-bg: $primary;
 
 // // 6. Optionally include any other parts as needed
 @import "bootstrap/scss/grid";
@@ -57,12 +57,13 @@ html {
     font-size: 14px;
 }
 
-#contextmenu  {
+#contextmenu {
     max-width: 15rem;
     background-color: #f8f8f8;
+
     div[role="button"] {
         &:hover {
-            background-color:#e2eef8;
+            background-color: #e2eef8;
         }
     }
 }
@@ -70,9 +71,11 @@ html {
 .accordion-item.noborder {
     border: none;
 }
+
 .accordion-item .picker_sample {
     display: none;
 }
+
 .accordion-item .picker_editor {
     display: none;
 }
@@ -89,12 +92,32 @@ html {
     height: 20px;
     background-color: $secondary;
     border-radius: 100%;
-    color:white;
+    color: white;
     text-decoration: none;
     font-weight: 500;
     margin-left: 5px;
     cursor: pointer;
 }
+
 .big-tooltip {
     --bs-tooltip-max-width: 500px;
+}
+
+.github {
+    width: 40px;
+    height: auto;
+}
+
+.github>svg {
+    fill: #5f5f5f;
+    transition: fill 0.3s;
+    max-width: 3rem;
+}
+
+.github:hover>svg {
+    fill: black;
+}
+.color-preview {
+    width: 2rem;
+    height: 2rem;
 }

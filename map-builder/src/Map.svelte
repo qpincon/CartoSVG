@@ -28,7 +28,9 @@ import { freeHandDrawPath } from './svg/freeHandPath'
 import Modal from './components/Modal.svelte';
 import NestedAccordions from './components/NestedAccordions.svelte';
 import Navbar from './components/Navbar.svelte';
+import ColorPickerPreview from './components/ColorPickerPreview.svelte';
 
+import Instructions from './components/Instructions.svelte';
 import Icon from './components/Icon.svelte';
 import RangeInput from './components/RangeInput.svelte';
 import { reportStyle, fontsToCss, exportStyleSheet } from './util/dom';
@@ -189,7 +191,11 @@ let inlineStyles = {}; // elemID -> prop -> value
 let zonesData = {}; // key => {data (list), provided (bool), numericCols (list)}
 let zonesFilter = {'land': 'firstGlow'};
 let lastUsedLabelProps = {'font-size': '14px'};
-
+let contourParams = {
+    strokeWidth: 1,
+    strokeColor: '#6a6653',
+    strokeDash: 0
+};
 let tooltipDefs = {
     countries: {
         template: defaultTooltipContent(true),
@@ -223,6 +229,7 @@ let styleEditor;
 let contextualMenu;
 let showModal = false;
 let showExportConfirm = false;
+let showInstructions = false;
 let exportForm;
 let htmlTooltipElem;
 let currentTab = 'countries';
@@ -615,9 +622,11 @@ function appendLandImage(showSource) {
         appendGlow(landElem, filterName, showSource, p(filterName));
     }
     landElem.append('use').attr('href', '#landshape')
-        .attr('stroke', 'black')
-        .attr('stroke-width', '2px')
+        .attr('stroke', contourParams.strokeColor)
+        .attr('stroke-width', contourParams.strokeWidth)
+        .attr('stroke-dasharray', contourParams.strokeDash)
         .attr('fill', 'none');
+
     const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
         .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(landElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
         
@@ -632,7 +641,7 @@ function save() {
     saveState({params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
-        tooltipDefs, colorDataDefs, legendDefs,
+        tooltipDefs, contourParams, colorDataDefs, legendDefs,
     });
 }
 
@@ -667,6 +676,11 @@ function resetState() {
             locale: 'en-US'
         }
     };
+    contourParams = {
+        strokeWidth: 1,
+        strokeColor: '#6a6653',
+        strokeDash: 0
+    };
     colorDataDefs = {
         countries: {...defaultColorDef}
     };
@@ -680,12 +694,14 @@ function restoreState(givenState) {
         state = givenState;
     }
     else state = getState();
+    console.log(state.params.Border.borderColor);
     if (!state) return;
     ({  params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
-        tooltipDefs, colorDataDefs, legendDefs,
+        tooltipDefs, contourParams, colorDataDefs, legendDefs,
     } = state);
+    console.log(JSON.parse(JSON.stringify(params)));
     if (!baseCss) baseCss = defaultBaseCss;
     commonStyleSheetElem.innerHTML = baseCss;
     const tabsWoLand = orderedTabs.filter(x => x !== 'land');
@@ -698,7 +714,7 @@ function saveProject() {
     const state = {params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
-        tooltipDefs, colorDataDefs, legendDefs,
+        tooltipDefs, contourParams, colorDataDefs, legendDefs,
     };
     download(JSON.stringify(state), 'text/json', 'project.mapbuilder');
 }
@@ -1363,8 +1379,14 @@ function getLegendColors(dataColorDef, tab, scale) {
 <Navbar></Navbar>
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-start p-3">
-        <aside class="panel rounded p-0 border mx-2">
-            <NestedAccordions sections={params} paramDefs={paramDefs} helpParams={helpParams} on:change={handleChangeProp} ></NestedAccordions>
+        <aside class="panel d-flex flex-column align-items-center">
+            <span class="m-2 btn btn-outline-primary" role="button" on:click={() => showInstructions = true} > 
+                <Icon className="mb-1" marginRight="0px" width="1.8rem" svg={icons['help']}/>
+                Instructions
+            </span>
+            <div class="rounded p-0 border mx-2">
+                <NestedAccordions sections={params} paramDefs={paramDefs} helpParams={helpParams} on:change={handleChangeProp} ></NestedAccordions>
+            </div>
         </aside>
         <div class="w-auto d-flex flex-column justify-content-center">
             <div id="map-container" class="col"></div>
@@ -1386,7 +1408,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                             <Icon svg={icons['reset']}/>Reset
                         </a></li>
                         <li><a class="dropdown-item" href="#">
-                            <label class="" role="button" for="project-import"> <Icon svg={icons['restore']}/> Load project</label>
+                            <label role="button" for="project-import"> <Icon svg={icons['restore']}/> Load project</label>
                             <input id="project-import" type="file" accept=".mapbuilder" on:change={loadProject}>
                         </a></li>
                     </ul>
@@ -1462,9 +1484,11 @@ function getLegendColors(dataColorDef, tab, scale) {
                     </div>
                     <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Two filters are available, that are customizable in the panel on the other side (first / second glow sections).">?</span>
                 </div>
-                {:else if currentTab === "land"}
-
-                <span> coucou </span>
+                {/if}
+                {#if currentTab === "land"}
+                    <RangeInput title="Contour width" onChange={() => draw()} bind:value={contourParams.strokeWidth} min="0" max="5" step="0.5"></RangeInput>
+                    <ColorPickerPreview id="contourpicker" popupLoc="bottom" title="Contour color" value={contourParams.strokeColor} onChange={(col) => {contourParams.strokeColor = col; draw()}}> </ColorPickerPreview>
+                    <RangeInput title="Contour dash" onChange={() => draw()} bind:value={contourParams.strokeDash} min="0" max="20" step="0.5"></RangeInput>
                 {/if}
                 {#if zonesData?.[currentTab]?.['data']}
                     <div class="d-flex align-items-center">
@@ -1562,7 +1586,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                             </div>
                         </div>
                         {#if curDataDefs.colorScale !== 'category'}
-                            <div class="">
+                            <div>
                                 <RangeInput title="Number of breaks" bind:value={curDataDefs.nbBreaks} min="3" max="9"></RangeInput>
                             </div>
                         {/if}
@@ -1655,6 +1679,12 @@ function getLegendColors(dataColorDef, tab, scale) {
             on:click={validateExport}> 
             Export
         </button>
+    </div>
+</Modal>
+
+<Modal open={showInstructions} onClosed={() => showInstructions = false}>
+    <div slot="content">
+        <Instructions></Instructions>
     </div>
 </Modal>
 

@@ -9,11 +9,12 @@
     let self;
     let pickerElem;
     
-    $: if (pickerElem) {
-        pickerElem.setColor(value);
+    $: if (pickerElem || value.length) {
+        if(isHexColor(value)) pickerElem.setColor(value);
     }
 
     export function setColor(hexString) {
+        if (!isHexColor(hexString)) return;
         pickerElem.setColor(hexString);
     }
     
@@ -21,6 +22,13 @@
         pickerElem.show();
         pickerElem.openHandler();
     }
+
+    function isHexColor (hex) {
+        return typeof hex === 'string'
+            && (hex.length === 8 || hex.length === 6)
+            && !isNaN(Number('0x' + hex))
+}
+
     function setValue(val) {
         if (val === value) return;
         onChange(val, value)
@@ -32,21 +40,24 @@
     }
     
     onMount( () => {
-        init(options);
+        _init(options);
     });
     
     onDestroy( () => {
         pickerElem.destroy();
     });
-    
-    function init(opts) {
+
+    export function init() {
+        _init(options);
+    }
+
+    function _init(opts) {
         if (!self) return;
         if (pickerElem) pickerElem.destroy();
         opts.onChange = _onChange;
         pickerElem = new Picker({
             parent: self,
             color: value,
-            popup: 'top',
             ...opts
         });
     }
