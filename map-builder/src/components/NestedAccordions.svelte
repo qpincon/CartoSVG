@@ -117,12 +117,3 @@
         </div>
     {/each}
 </div>
-
-<style scoped >
-    .accordion-item > .input-type {
-        padding-right: 6px;
-    }
-    .accordion-item:last-of-type > .input-type {
-        padding-bottom: 6px;
-    }
-</style>

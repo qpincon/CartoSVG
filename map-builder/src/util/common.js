@@ -10,6 +10,15 @@ function download(content, mimeType, filename) {
     a.click();
 }
 
+function downloadURI(uri, filename) {
+    var link = document.createElement("a");
+    link.setAttribute('download', filename);
+    link.href = uri;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+
 function debounce(func, wait, immediate = false) {
     let timeout;
     return function() {
@@ -100,4 +109,4 @@ function getBestFormatter(values, locale) {
     return loc.format(',~d');
 }
 
-export { download, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce, getNumericCols, initTooltips, getBestFormatter };
+export { download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce, getNumericCols, initTooltips, getBestFormatter };

@@ -5,8 +5,9 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 const config = {
     entry: {
-        main: './src/index.js',
-        about: './src/about.js'
+        main: './src/entrypoints/index.js',
+        about: './src/entrypoints/about.js',
+        italia: './src/entrypoints/italia.js',
     },
     resolve: {
         alias: {
@@ -85,7 +86,7 @@ const config = {
                 ]
             },
             {
-                test: /\.(topojson|geojson)$/,
+                test: /\.(topojson|geojson|svgscape)$/,
                 type: 'json',
             }
         ],
@@ -106,14 +107,16 @@ const config = {
             },
             filename: 'about.html',
             chunks: ['about'],
-          })
-        
+        }),
+        new HtmlWebpackPlugin({
+            title: 'SVGscape - La Bella Italia',
+            meta: {
+                description: 'Map of Italia built with SVGscape'
+            },
+            filename: 'italia.html',
+            chunks: ['italia'],
+        }),
     ],
-    // devServer: {
-
-    //     static: './docs',
-
-    // },
     mode: 'development',
 
 };

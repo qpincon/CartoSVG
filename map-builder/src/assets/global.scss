@@ -121,3 +121,9 @@ html {
     width: 2rem;
     height: 2rem;
 }
+.accordion-item > .input-type {
+    padding-right: 6px;
+}
+.accordion-item:last-of-type > .input-type {
+    padding-bottom: 6px;
+}

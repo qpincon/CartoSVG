@@ -14,13 +14,14 @@ import PathEditor from './svg/pathEditor';
 import { paramDefs, defaultParams, helpParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
-import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce, getBestFormatter } from './util/common';
+import { download, downloadURI, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce, getBestFormatter } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import { setTransformScale, closestDistance } from './svg/svg';
 import { drawShapes } from './svg/shape';
 import iso3Data from './assets/data/iso3_filtered.json';
 import DataTable from './components/DataTable.svelte';
 
+import Examples from './components/Examples.svelte';
 import Legend from './components/Legend.svelte';
 import defaultBaseCss from './assets/pagestyle.css?inline';
 import { drawLegend } from './svg/legend';
@@ -193,7 +194,7 @@ let zonesFilter = {'land': 'firstGlow'};
 let lastUsedLabelProps = {'font-size': '14px'};
 let contourParams = {
     strokeWidth: 1,
-    strokeColor: '#6a6653',
+    strokeColor: '#a0a0a0',
     strokeDash: 0
 };
 let tooltipDefs = {
@@ -678,7 +679,7 @@ function resetState() {
     };
     contourParams = {
         strokeWidth: 1,
-        strokeColor: '#6a6653',
+        strokeColor: '#a0a0a0',
         strokeDash: 0
     };
     colorDataDefs = {
@@ -694,14 +695,12 @@ function restoreState(givenState) {
         state = givenState;
     }
     else state = getState();
-    console.log(state.params.Border.borderColor);
     if (!state) return;
     ({  params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, contourParams, colorDataDefs, legendDefs,
     } = state);
-    console.log(JSON.parse(JSON.stringify(params)));
     if (!baseCss) baseCss = defaultBaseCss;
     commonStyleSheetElem.innerHTML = baseCss;
     const tabsWoLand = orderedTabs.filter(x => x !== 'land');
@@ -716,7 +715,7 @@ function saveProject() {
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, contourParams, colorDataDefs, legendDefs,
     };
-    download(JSON.stringify(state), 'text/json', 'project.mapbuilder');
+    download(JSON.stringify(state), 'text/json', 'project.svgscape');
 }
 
 function loadProject(e) {
@@ -733,6 +732,13 @@ function loadProject(e) {
         }
     });
     reader.readAsText(file);    
+}
+
+function loadExample(e) {
+    if (!window.confirm('Caution: Loading the example will discard your current project. Please save it first if you want to keep it.')) return;
+    restoreState(e.detail.projectParams);
+    save();
+    draw();
 }
 
 function applyStyles() {
@@ -1380,10 +1386,13 @@ function getLegendColors(dataColorDef, tab, scale) {
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-start p-3">
         <aside class="panel d-flex flex-column align-items-center">
-            <span class="m-2 btn btn-outline-primary" role="button" on:click={() => showInstructions = true} > 
-                <Icon className="mb-1" marginRight="0px" width="1.8rem" svg={icons['help']}/>
-                Instructions
-            </span>
+            <div class="d-flex justify-content-center align-items-center">
+                <span class="m-2 btn btn-outline-primary" role="button" on:click={() => showInstructions = true} > 
+                    <Icon className="mb-1" marginRight="0px" width="1.8rem" svg={icons['help']}/>
+                    Instructions
+                </span>
+                <Examples on:example={loadExample}/>
+            </div>
             <div class="rounded p-0 border mx-2">
                 <NestedAccordions sections={params} paramDefs={paramDefs} helpParams={helpParams} on:change={handleChangeProp} ></NestedAccordions>
             </div>
@@ -1409,7 +1418,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                         </a></li>
                         <li><a class="dropdown-item" href="#">
                             <label role="button" for="project-import"> <Icon svg={icons['restore']}/> Load project</label>
-                            <input id="project-import" type="file" accept=".mapbuilder" on:change={loadProject}>
+                            <input id="project-import" type="file" accept=".svgscape" on:change={loadProject}>
                         </a></li>
                     </ul>
                 </div>
