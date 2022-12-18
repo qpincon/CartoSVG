@@ -2,9 +2,8 @@
     import "bootstrap/js/dist/collapse";
     import { createEventDispatcher } from 'svelte';
 
-    import ColorPicker from './ColorPicker';
-    let pickers = {};
     import ColorPickerPreview from "./ColorPickerPreview.svelte";
+    import RangeInput from "./RangeInput.svelte";
     import { camelCaseToSentence } from "../util/common";
     export let sections;
     export let paramDefs;
@@ -50,31 +49,9 @@
                 </div>
             {:else if key in paramDefs}
                 {#if paramDefs[key].type == "range"}
-                    <div class="row">
-                        <label for={`form-${key}`} class="col-4 col-form-label">
-                            {camelCaseToSentence(key)}
-                            {#if key in helpParams}
-                                <span class="help-tooltip fs-6" data-bs-toggle="tooltip" data-bs-title={helpParams[key]}>?</span>
-                            {/if}
-                        </label>
-                        <div class="d-flex align-items-center col">
-                            <input
-                                type="range"
-                                class="form-range"
-                                id={`form-${key}`}
-                                bind:value={sections[key]}
-                                on:change={(e) => propChanged(key, parseFloat(e.target.value))}
-                                min={paramDefs[key].min}
-                                max={paramDefs[key].max}
-                                step={paramDefs[key].step || 1}
-                            />
-                            <span
-                                class="range-label text-center text-primary mx-1 text-opacity-75 fs-6"
-                            >
-                                {sections[key]}
-                            </span>
-                        </div>
-                    </div>
+                <RangeInput title={camelCaseToSentence(key)} helpText={helpParams[key]} id={`form-${key}`} value={sections[key]} min={paramDefs[key].min}
+                    max={paramDefs[key].max} step={paramDefs[key].step || 1} onChange={(val) => {sections[key] = val; propChanged(key, val); sections=sections;}}
+                ></RangeInput>
                 {:else if paramDefs[key].type == "select"}
                     <select class="form-select" on:change={(e) => propChanged(key, e.target.value)}>
                         {#each paramDefs[key].choices as opt}

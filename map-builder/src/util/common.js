@@ -21,9 +21,9 @@ function downloadURI(uri, filename) {
 
 function debounce(func, wait, immediate = false) {
     let timeout;
-    return function() {
+    return function () {
         const context = this, args = arguments;
-        const later = function() {
+        const later = function () {
             timeout = null;
             if (!immediate) func.apply(context, args);
         };
@@ -77,7 +77,7 @@ function sortBy(data, key) {
         if (!a || Object.keys(a).length === 0) return 1;
         if (!b || Object.keys(b).length === 0) return -1;
         if (a[key] < b[key]) return -1;
-        if (a[key] > b[key]) return  1;
+        if (a[key] > b[key]) return 1;
         return 0;
     });
 }
@@ -87,7 +87,7 @@ function getNumericCols(jsonData) {
     for (let row of jsonData) {
         if (!numericCols.size) return [];
         Object.entries(row).forEach(([key, value]) => {
-            if (numericCols.has(key) && typeof(value) !== 'number') numericCols.delete(key);
+            if (numericCols.has(key) && typeof (value) !== 'number') numericCols.delete(key);
         });
     }
     return [...numericCols];
@@ -97,7 +97,7 @@ function initTooltips() {
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     [...tooltipTriggerList].map(tooltipTriggerEl => {
         const isHtml = tooltipTriggerEl.hasAttribute('allow-html');
-        new Tooltip(tooltipTriggerEl, {placement: 'top', html: isHtml, customClass: isHtml ? 'big-tooltip': ''})
+        new Tooltip(tooltipTriggerEl, { placement: 'top', html: isHtml, customClass: isHtml ? 'big-tooltip' : '' })
     });
 }
 
@@ -109,4 +109,41 @@ function getBestFormatter(values, locale) {
     return loc.format(',~d');
 }
 
-export { download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce, getNumericCols, initTooltips, getBestFormatter };
+function tapHold(node, threshold = 500) {
+    const handleMouseDown = () => {
+        let intervalTimeout;
+        const tapTimeout = setTimeout(() => {
+            intervalTimeout = setInterval(() => {
+                node.dispatchEvent(new CustomEvent('hold'));
+            }, 50);
+        }, threshold);
+        const cancel = () => {
+            clearTimeout(tapTimeout);
+            if (intervalTimeout) clearInterval(intervalTimeout);
+            node.removeEventListener('mousemove', cancel);
+            node.removeEventListener('mouseup', cancel);
+        };
+        node.addEventListener('mousemove', cancel);
+        node.addEventListener('mouseup', cancel);
+    }
+
+    node.addEventListener('mousedown', handleMouseDown);
+    return {
+        destroy() {
+            node.removeEventListener('mousedown', handleMouseDown);
+        }
+    };
+}
+
+function RGBAToHexA(rgba, forceRemoveAlpha = false) {
+    return "#" + rgba.replace(/^rgba?\(|\s+|\)$/g, '') // Get's rgba / rgb string values
+      .split(',') // splits them at ","
+      .filter((string, index) => !forceRemoveAlpha || index !== 3)
+      .map(string => parseFloat(string)) // Converts them to numbers
+      .map((number, index) => index === 3 ? Math.round(number * 255) : number) // Converts alpha to 255 number
+      .map(number => number.toString(16)) // Converts numbers to hex
+      .map(string => string.length === 1 ? "0" + string : string) // Adds 0 when length of one number is 1
+      .join("") // Puts the array to togehter to a string
+  }
+
+export { download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce, getNumericCols, initTooltips, getBestFormatter, tapHold, RGBAToHexA };

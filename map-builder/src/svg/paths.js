@@ -1,6 +1,8 @@
 import parsePath from 'parse-svg-path';
+import * as markers from './markerDefs';
+import { RGBAToHexA } from '../util/common';
 
-export function drawCustomPaths(pathDefs, svg, projection) {
+export function drawCustomPaths(pathDefs, svg, projection, inlineStyles = {}) {
     if (!pathDefs) return;
     let elem = svg.select('#paths');
     if (elem.empty()) elem = svg.append('g').attr('id', 'paths');
@@ -16,6 +18,15 @@ export function drawCustomPaths(pathDefs, svg, projection) {
             }
         }
         const id = `path-${index}`;
+        const pathElem = elem.append('path').attr('id', id);
+        if (pathDef.marker) {
+            let color = inlineStyles[id]?.stroke;
+            if (!color) {
+                color = RGBAToHexA(getComputedStyle(svg.select(`#path-${index}`).node())['stroke']);
+            }
+            const markerId = appendMarkerDef(svg, pathDef.marker, color);
+            pathElem.attr('marker-end', `url(#${markerId})`);
+        }
         pathDef.index = index;
         const newPath = pathDef.d.reduce((d, curGroup) => {
             const [instruction, ...data] = curGroup;
@@ -26,7 +37,7 @@ export function drawCustomPaths(pathDefs, svg, projection) {
             d +=  `${instruction}${newData}`;
             return d
         }, '');
-        elem.append('path').attr('id', id).attr('d', newPath);
+        pathElem.attr('d', newPath);
         appendImageAnimated(imagesElem, pathDef);
     });
     // remove node if no image
@@ -44,6 +55,26 @@ export function drawCustomPaths(pathDefs, svg, projection) {
                 .style('height', 'var(--height)')
         })
     }
+}
+
+function appendMarkerDef(svg, markerName, color) {
+    const id = `${markerName}${color ? '-' + color.substring(1) : ''}`;
+    const existingDef = svg.select(`defs #${id}`);
+    const markerDef = markers[markerName];
+    if (!existingDef.empty()) return id;
+    if (svg.select('defs').empty()) svg.append('defs');
+    svg.select('defs').append('marker')
+        .attr('id', id)
+        .attr('markerWidth', 5)
+        .attr('markerHeight', 5)
+        .attr('viewBox', `0 0 ${markerDef.width} ${markerDef.height}`)
+        .attr('orient', 'auto-start-reverse')
+        .attr('refX', markerDef.center[0])
+        .attr('refY', markerDef.center[1])
+        .attr('fill', color || 'black')
+        .attr('markerUnits', 'strokeWidth')
+        .append("path").attr('d', markerDef.d);
+    return id;
 }
 
 function appendImageAnimated(selection, pathDef) {

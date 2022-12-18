@@ -14,8 +14,9 @@ import PathEditor from './svg/pathEditor';
 import { paramDefs, defaultParams, helpParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
-import { download, downloadURI, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce, getBestFormatter } from './util/common';
+import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce, getBestFormatter } from './util/common';
 import * as shapes from './svg/shapeDefs';
+import * as markers from './svg/markerDefs';
 import { setTransformScale, closestDistance } from './svg/svg';
 import { drawShapes } from './svg/shape';
 import iso3Data from './assets/data/iso3_filtered.json';
@@ -51,7 +52,7 @@ const scalesHelp = `
     Those scales are only available when numeric data is associated with the layer. 
 </div>
 `;
-const defaultTooltipStyle = `will-change: opacity; font-size: 14px; padding: 10px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content; border-radius:7px;`;
+const defaultTooltipStyle = `will-change: opacity; font-size: 14px; padding: 5px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content; border-radius:7px;`;
 
 const iconsReq = require.context('./assets/img/.?inline', false, /\.svg$/);
 const icons = iconsReq.keys().reduce((acc, iconFile) => {
@@ -194,8 +195,9 @@ let zonesFilter = {'land': 'firstGlow'};
 let lastUsedLabelProps = {'font-size': '14px'};
 let contourParams = {
     strokeWidth: 1,
-    strokeColor: '#a0a0a0',
-    strokeDash: 0
+    strokeColor: "#a0a0a07d",
+    strokeDash: 0,
+    fillColor: "#ffffff"
 };
 let tooltipDefs = {
     countries: {
@@ -246,6 +248,7 @@ onMount(() => {
     restoreState();
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
+            const elemId = target.getAttribute('id');
             if (legendSample && legendSample.contains(target) && cssProp !== 'fill') {
                 legendDefs[currentTab].sampleHtml = legendSample.outerHTML;
                 colorizeAndLegend();
@@ -255,13 +258,33 @@ onMount(() => {
             }
             else if (eventType === 'inline') {
                 if (target.hasAttribute('id')) {
-                    const elemId = target.getAttribute('id');
                     if (elemId.includes('label')) {
                         lastUsedLabelProps[cssProp] = value;
                     }
                     if (elemId in inlineStyles) inlineStyles[elemId][cssProp] = value;
                     else inlineStyles[elemId] = {[cssProp]: value};
+                    // update path markers
+                    if (cssProp === 'stroke' && target.hasAttribute('marker-end')) {
+                        const markerId = target.getAttribute('marker-end').match(/url\(#(.*)\)/)[1];
+                        const newMarkerId = `${markerId.split('-')[0]}-${value.substring(1)}`;
+                        console.log(cssProp, value, newMarkerId);
+                        console.log(newMarkerId);
+                        console.log(d3.select(`#${markerId}`).node());
+                        d3.select(`#${markerId}`).attr('fill', value)
+                            .attr('id', newMarkerId);
+                        d3.select(target).attr('marker-end', `url(#${newMarkerId})`);
+                        // drawCustomPaths(providedPaths, svg, projection, inlineStyles);
+                    }
                 }
+            }
+            if ((eventType === 'inline' && target.classList.contains('country')) || (eventType?.selectorText === '.country')) {
+                computedOrderedTabs.forEach(tab => {
+                    if(tab.substring(0, tab.length - 5) == elemId) {
+                        const filter = zonesFilter[tab];
+                        const countryData = countries.features.find(country => country.properties.name === elemId);
+                        appendCountryImage.call(d3.select(`#${elemId}-img`).node(), countryData, filter);
+                    }
+                })
             }
             save();
         },
@@ -540,10 +563,13 @@ async function draw(simplified = false, _) {
             }
             groupData.push({ name: 'countries', data: countries, id: 'name', props: [], class: 'country', filter: filter });
         }
-        if (layer === 'land' && inlineProps.showLand) groupData.push({name: 'landImg', showSource: i === 0});
+        if (layer === 'land' && inlineProps.showLand) groupData.push({type: 'landImg', showSource: i === 0});
         // selected country
         else if (layer !== 'countries') {
-            groupData.push({ name: layer, data: resolvedAdm[layer], id: 'name', props: [], class: 'adm', filter: filter });
+            groupData.push({ name: layer, data: resolvedAdm[layer], id: 'name', props: [], class: 'adm', filter: null });
+            const countryOutlineId = layer.substring(0, layer.length - 5);
+            const countryData = countries.features.find(country => country.properties.name === countryOutlineId);
+            groupData.push({name: `${countryOutlineId}-img`, type:"filterImg", countryData, filter});
         }
     });
     groupData.push({ name: 'paths', data: [], id: null, props: [], class: null, filter: null });
@@ -553,7 +579,8 @@ async function draw(simplified = false, _) {
         // .attr('clip-path', 'url(#clipMapBorder)')
         .selectAll('g').data(groupData).join('g').attr('id', d => d.name);
     function drawPaths(data) {
-        if (data.name === 'landImg') return appendLandImage.call(this, data.showSource);
+        if (data.type === 'landImg') return appendLandImage.call(this, data.showSource);
+        if (data.type === 'filterImg') return appendCountryImage.call(this, data.countryData, data.filter);
         if (!data.data) return;
         const parentPathElem = d3.select(this).style('will-change', 'opacity'); 
         const pathElem = parentPathElem.selectAll('path')
@@ -568,7 +595,7 @@ async function draw(simplified = false, _) {
 
     groups.each(drawPaths);
 
-    drawCustomPaths(providedPaths, svg, projection);
+    drawCustomPaths(providedPaths, svg, projection, inlineStyles);
     const existingFilters = [...new Set(Object.entries(zonesFilter).filter(([key, fi]) => fi && key !== 'land').map(([key, value]) => value))];
     existingFilters.forEach(filterName => {
         appendGlow(svg, filterName, true, p(filterName));
@@ -595,6 +622,7 @@ function computeCss() {
     const borderCss = `
     #static-svg-map, #static-svg-map > svg {
         border-radius: ${p('borderRadius')}px;
+        ${p('frameShadow') ? 'filter: drop-shadow(2px 2px 8px rgba(0,0,0,.2));': ''}
     }
     #frame {
         fill: none;
@@ -609,7 +637,7 @@ function appendLandImage(showSource) {
     const landElem = d3.create('svg')
         .attr('xmlns', "http://www.w3.org/2000/svg");
     if (showSource) {
-        landElem.attr('fill', 'white');
+        landElem.attr('fill', contourParams.fillColor);
     }
 
     landElem.append('defs').append('g').attr('id', 'landshape').selectAll('path')
@@ -635,6 +663,34 @@ function appendLandImage(showSource) {
         .style('pointer-events', 'none')
         .style('will-change', 'opacity');
         // .attr('clip-path', 'url(#clipMapBorder)');
+}
+
+function appendCountryImage(countryData, filter) {
+    const countryName = countryData.properties.name;
+    const countryElem = d3.create('svg')
+        .attr('xmlns', "http://www.w3.org/2000/svg");
+        
+    countryElem.append('defs').append('path')
+        .attr('d', path(countryData))
+        .attr('id', 'countryshape');
+
+    if (filter) {
+        appendGlow(countryElem, filter, false, p(filter));
+        countryElem.append('use').attr('href', '#countryshape').attr('filter', `url(#${filter})`);
+    }
+    const elemStroke = countryElem.append('use').attr('href', '#countryshape').attr('fill', 'none');
+    const ref = document.getElementById(countryName);
+    if (ref) {
+        const strokeParams = ['stroke', 'stroke-width', 'stroke-linejoin', 'stroke-dasharray'];
+        const computedRef = window.getComputedStyle(ref);
+        strokeParams.forEach(p => elemStroke.attr(p, computedRef[p]));
+    }
+    
+    const countryImage = d3.create('image').attr('width', '100%').attr('height', '100%').attr('id', countryElem)
+        .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
+    d3.select(this).html(countryImage.node().outerHTML)
+        .style('pointer-events', 'none')
+        .style('will-change', 'opacity');
 }
 
 function save() {
@@ -679,8 +735,9 @@ function resetState() {
     };
     contourParams = {
         strokeWidth: 1,
-        strokeColor: '#a0a0a0',
-        strokeDash: 0
+        strokeColor: "#a0a0a07d",
+        strokeDash: 0,
+        fillColor: "#ffffff"
     };
     colorDataDefs = {
         countries: {...defaultColorDef}
@@ -787,13 +844,18 @@ function editPath() {
 function deletePath() {
     closeMenu();
     providedPaths.splice(selectedPathIndex, 1);
-    drawCustomPaths(providedPaths, svg, projection);
+    drawCustomPaths(providedPaths, svg, projection, inlineStyles);
 }
 
 function addImageToPath(e) {
     menuStates.pathSelected = false;
     menuStates.addingImageToPath = true;
 }
+
+function choseMarker(e) {
+    menuStates.pathSelected = false;
+    menuStates.chosingMarker = true;
+};
 
 function importImagePath(e) {
     const file = e.target.files[0];
@@ -807,7 +869,8 @@ function importImagePath(e) {
             providedPaths[selectedPathIndex].width = 20;
             providedPaths[selectedPathIndex].height = 10;
         }
-        drawCustomPaths(providedPaths, svg, projection);
+        drawCustomPaths(providedPaths, svg, projection, inlineStyles);
+        applyStyles();
         save();
     });
     reader.readAsDataURL(file);
@@ -816,21 +879,34 @@ function importImagePath(e) {
 const saveDebounced = debounce(save, 200);
 function changeDurationAnimation(e) {
     providedPaths[selectedPathIndex].duration = e.target.value;
-    drawCustomPaths(providedPaths, svg, projection);
+    drawCustomPaths(providedPaths, svg, projection, inlineStyles);
+    applyStyles();
     saveDebounced();
 }
 
 function changePathImageWidth(e) {
     providedPaths[selectedPathIndex].width = e.target.value;
-    drawCustomPaths(providedPaths, svg, projection);
+    drawCustomPaths(providedPaths, svg, projection, inlineStyles);
+    applyStyles();
     saveDebounced();
 }
 
 function changePathImageHeight(e) {
     providedPaths[selectedPathIndex].height = e.target.value;
-    drawCustomPaths(providedPaths, svg, projection);
+    drawCustomPaths(providedPaths, svg, PromiseRejectionEvent, inlineStyles);
+    applyStyles();
     saveDebounced();
 }
+
+function addMarker(markerName) {
+    closeMenu();
+    menuStates.chosingMarker = false;
+    providedPaths[selectedPathIndex].marker = markerName;
+    drawCustomPaths(providedPaths, svg, projection, inlineStyles);
+    applyStyles();
+    saveDebounced();
+}
+
 
 function getFirstDataRow(zonesDataDef) {
     if (!zonesData) return null;
@@ -1161,6 +1237,7 @@ function deleteCountry(country, drawAfter = true) {
     delete tooltipDefs[country];
     delete legendDefs[country];
     delete colorDataDefs[country];
+    delete zonesData[country];
     if(drawAfter) draw();
 }
 
@@ -1281,6 +1358,7 @@ async function colorizeAndLegend(e) {
         }
         let newCss = '';
         zonesData[tab].data.forEach(row => {
+            if (!row[dataColorDef.colorColumn]) return;
             const color = scale(row[dataColorDef.colorColumn]);
             const key = row.name;
             newCss += `path[id="${key}"]{fill:${color};}
@@ -1351,6 +1429,17 @@ function getLegendColors(dataColorDef, tab, scale) {
         <div role="button" class="px-2 py-1" on:click={editStyles}> Edit style </div>
         <div role="button" class="px-2 py-1" on:click={deletePath}> Delete path </div>
         <div role="button" class="px-2 py-1" on:click={addImageToPath}> Image along path </div>
+        <div role="button" class="px-2 py-1" on:click={choseMarker}> Chose marker </div>
+    {:else if menuStates.chosingMarker}
+        <div class="d-flex">
+            {#each Object.entries(markers) as [markerName, markerDef] (markerName)}
+                <div role="button" class="px-2 py-1" on:click={() => addMarker(markerName)}> 
+                    <svg width="30" height="30" viewBox={`0 0 ${markerDef.width} ${markerDef.height}`}>
+                        <path d={markerDef.d}/>
+                    </svg>
+                </div>
+            {/each}
+        </div>
     {:else if menuStates.addingImageToPath}
         <div class="m-1">
             <label for="image-select" class="m-2 d-flex align-items-center btn btn-sm btn-light"> File: {providedPaths[selectedPathIndex].image?.name || 'Import image'} </label>
@@ -1495,9 +1584,12 @@ function getLegendColors(dataColorDef, tab, scale) {
                 </div>
                 {/if}
                 {#if currentTab === "land"}
-                    <RangeInput title="Contour width" onChange={() => draw()} bind:value={contourParams.strokeWidth} min="0" max="5" step="0.5"></RangeInput>
+                    <RangeInput id="contourwidth" title="Contour width" onChange={() => draw()} bind:value={contourParams.strokeWidth} min="0" max="5" step="0.5"></RangeInput>
                     <ColorPickerPreview id="contourpicker" popupLoc="bottom" title="Contour color" value={contourParams.strokeColor} onChange={(col) => {contourParams.strokeColor = col; draw()}}> </ColorPickerPreview>
-                    <RangeInput title="Contour dash" onChange={() => draw()} bind:value={contourParams.strokeDash} min="0" max="20" step="0.5"></RangeInput>
+                    <RangeInput id="contour dash" title="Contour dash" onChange={() => draw()} bind:value={contourParams.strokeDash} min="0" max="20" step="0.5"></RangeInput>
+                    {#if computedOrderedTabs.findIndex(x => x === 'land') === 0}
+                        <ColorPickerPreview id="fillpicker" popupLoc="bottom" title="Fill color" value={contourParams.fillColor} onChange={(col) => {contourParams.fillColor = col; draw()}}> </ColorPickerPreview>
+                    {/if}
                 {/if}
                 {#if zonesData?.[currentTab]?.['data']}
                     <div class="d-flex align-items-center">
@@ -1541,7 +1633,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                                     {@html tooltipDefs[currentTab].template.formatUnicorn(getFirstDataRow(zonesData?.[currentTab]))}
                                 </div>
                                 {#if currentTemplateHasNumeric }
-                                    <div class="form-floating">
+                                    <div class="mt-1 form-floating">
                                         <select class="form-select form-select-sm" id="choseFormatLocale" bind:value={tooltipDefs[currentTab].locale} on:change={changeTooltipLocale}>
                                             {#each availableFormatLocales as locale}
                                                 <option value={locale}> {locale} </option>
@@ -1710,7 +1802,7 @@ function getLegendColors(dataColorDef, tab, scale) {
     overflow-y: scroll;
 }
 .tooltip-preview {
-    padding: 10px;
+    padding: 5px;
 }
 #map-container {
     margin: 0 auto;

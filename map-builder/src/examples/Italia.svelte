@@ -1,6 +1,6 @@
 <script>
-    import Navbar from "../Navbar.svelte";
-    import italiaSvg from '../../assets/examples/italia.svg?inline';
+    import Navbar from "../components/Navbar.svelte";
+    import italiaSvg from './italia.svg?inline';
 </script>
 
 <style>

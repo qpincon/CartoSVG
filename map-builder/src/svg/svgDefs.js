@@ -17,62 +17,70 @@ function appendGlow(selection, id = "glows", displaySource = false,
     const filter = defs.append('filter').attr('id', id).attr('filterUnits', 'userSpaceOnUse');
 
     // OUTER GLOW
-    filter.append('feMorphology')
-        .attr('in', 'SourceGraphic')
-        .attr('radius', outerStrength)
-        .attr('operator', 'dilate')
-        .attr('result', 'MASK_OUTER');
-    filter.append('feColorMatrix')
-        .attr('in', 'MASK_OUTER')
-        .attr('type', 'matrix')
-        .attr('values', `0 0 0 0 ${colorOuter.r / 255} 0 0 0 0 ${colorOuter.g / 255} 0 0 0 0 ${colorOuter.b / 255} 0 0 0 ${colorOuter.opacity} 0`) // apply color
-        .attr('result', 'OUTER_COLORED');
-    filter.append('feGaussianBlur')
-        .attr('in', 'OUTER_COLORED')
-        .attr('stdDeviation', outerBlur)
-        .attr('result', 'OUTER_BLUR');
-    filter.append('feComposite')
-        .attr('in', 'OUTER_BLUR')
-        .attr('in2', 'SourceGraphic')
-        .attr('operator', 'out')
-        .attr('result', 'OUTGLOW');
+    let hasOuterGlow = false;
+    if (outerStrength > 0) {
+        hasOuterGlow = true;
+        filter.append('feMorphology')
+            .attr('in', 'SourceGraphic')
+            .attr('radius', outerStrength)
+            .attr('operator', 'dilate')
+            .attr('result', 'MASK_OUTER');
+        filter.append('feColorMatrix')
+            .attr('in', 'MASK_OUTER')
+            .attr('type', 'matrix')
+            .attr('values', `0 0 0 0 ${colorOuter.r / 255} 0 0 0 0 ${colorOuter.g / 255} 0 0 0 0 ${colorOuter.b / 255} 0 0 0 ${colorOuter.opacity} 0`) // apply color
+            .attr('result', 'OUTER_COLORED');
+        filter.append('feGaussianBlur')
+            .attr('in', 'OUTER_COLORED')
+            .attr('stdDeviation', outerBlur)
+            .attr('result', 'OUTER_BLUR');
+        filter.append('feComposite')
+            .attr('in', 'OUTER_BLUR')
+            .attr('in2', 'SourceGraphic')
+            .attr('operator', 'out')
+            .attr('result', 'OUTGLOW');
+    }
 
     // INNER GLOW
-    filter.append('feMorphology')
-        .attr('in', 'SourceAlpha')
-        .attr('radius', innerStrength)
-        .attr('operator', 'erode')
-        .attr('result', 'INNER_ERODED_A');
-    filter.append('feComponentTransfer')
-        .attr('in', 'INNER_ERODED_A')
-        .attr('result', 'INNER_ERODED')
-        .append('feFuncA')
-        .attr('type', 'linear')
-        .attr('slope', '1000')
-        .attr('intercept', '0');
-
-    filter.append('feGaussianBlur')
-        .attr('in', 'INNER_ERODED')
-        .attr('stdDeviation', innerBlur)
-        .attr('result', 'INNER_BLURRED');
-
-    filter.append('feColorMatrix')
-        .attr('in', 'INNER_BLURRED')
-        .attr('type', 'matrix')
-        .attr('values', `0 0 0 0 ${colorInner.r / 255} 0 0 0 0 ${colorInner.g / 255} 0 0 0 0 ${colorInner.b / 255} 0 0 0 -1 ${colorInner.opacity}`) // inverse color
-        .attr('result', 'INNER_COLOR');
-
-    filter.append('feComposite')
-        .attr('in', 'INNER_COLOR')
-        .attr('in2', 'SourceGraphic')
-        .attr('operator', 'in')
-        .attr('result', 'INGLOW');
+    let hasInnerGlow = false;
+    if (innerStrength > 0) {
+        hasInnerGlow = true;
+        filter.append('feMorphology')
+            .attr('in', 'SourceAlpha')
+            .attr('radius', innerStrength)
+            .attr('operator', 'erode')
+            .attr('result', 'INNER_ERODED_A');
+        filter.append('feComponentTransfer')
+            .attr('in', 'INNER_ERODED_A')
+            .attr('result', 'INNER_ERODED')
+            .append('feFuncA')
+            .attr('type', 'linear')
+            .attr('slope', '1000')
+            .attr('intercept', '0');
+    
+        filter.append('feGaussianBlur')
+            .attr('in', 'INNER_ERODED')
+            .attr('stdDeviation', innerBlur)
+            .attr('result', 'INNER_BLURRED');
+    
+        filter.append('feColorMatrix')
+            .attr('in', 'INNER_BLURRED')
+            .attr('type', 'matrix')
+            .attr('values', `0 0 0 0 ${colorInner.r / 255} 0 0 0 0 ${colorInner.g / 255} 0 0 0 0 ${colorInner.b / 255} 0 0 0 -1 ${colorInner.opacity}`) // inverse color
+            .attr('result', 'INNER_COLOR');
+    
+        filter.append('feComposite')
+            .attr('in', 'INNER_COLOR')
+            .attr('in2', 'SourceGraphic')
+            .attr('operator', 'in')
+            .attr('result', 'INGLOW');
+    }
 
     // Merge
     const merge = filter.append('feMerge');
-    merge.append('feMergeNode').attr('in', 'OUTGLOW');
+    if (hasOuterGlow) merge.append('feMergeNode').attr('in', 'OUTGLOW');
     if (displaySource) merge.append('feMergeNode').attr('in', 'SourceGraphic');
-    merge.append('feMergeNode').attr('in', 'INGLOW');
+    if (hasInnerGlow) merge.append('feMergeNode').attr('in', 'INGLOW');
     filter.append(() => merge.node());
 
     defs.append(() => filter.node());

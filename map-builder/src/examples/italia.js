@@ -1,4 +1,4 @@
-import Italia from '../components/examples/Italia.svelte';
+import Italia from './Italia.svelte';
 import '../assets/navbar_only.scss';
 
 new Italia({

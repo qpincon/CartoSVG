@@ -1,17 +1,20 @@
-#static-svg-map, #canvas {
+#static-svg-map,
+#canvas {
     display: block;
     height: auto;
 }
 
-#paths > path {
+#paths>path {
     stroke: #7c490ea0;
     stroke-dasharray: 5px;
     stroke-width: 2;
     fill: none;
 }
+
 #outline {
     pointer-events: none;
 }
+
 #graticule {
     pointer-events: none;
     fill: none;
@@ -19,28 +22,27 @@
     stroke-width: .5px;
     stroke-opacity: .5;
 }
-#land {
-    pointer-events: none;
-    stroke: #00000000;
-    stroke-width: 1px;
-    fill: #ffffffff;
-}
 
 .country {
-    stroke: #d1beb0;
-    stroke-width: 2px;
+    stroke: #bfbfbf;
+    stroke-width: 1px;
     fill: #f3efec;
 }
+
 .country:hover {
-    fill: #eae3d1;
+    fill: #f9f2eb;
 }
+
 .adm {
-    stroke: #D1BEB038;
-    stroke-width: 2px;
+    stroke: #c4b8a3ff;
+    stroke-width: 1px;
     fill: #ffffffd0;
 }
+
 .adm:hover {
-    fill: #7c490ea0;
+    stroke: #d29d52ff;
+    fill: #ecd6b6ff;
+    stroke-width: 2px;
 }
 
 #tooltip {

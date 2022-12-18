@@ -8,8 +8,9 @@ let defaultParams = {
     },
     Border: {
         borderRadius: 15,
-        borderWidth: 3,
+        borderWidth: 1,
         borderColor: "#b8b8b8",
+        frameShadow: true,
     },
     Background: {
         showGraticule: true,
@@ -17,13 +18,18 @@ let defaultParams = {
         seaColor: "#dde2eeff",
         backgroundNoise: true,
     },
+    
     firstGlow: {
-        innerBlur: 2.1, innerStrength: 0.1, innerColor: "#7c490eff",
-        outerBlur: 3.5, outerStrength: 0.1, outerColor: '#ffffffff',
+        innerStrength: 0.3,
+        innerBlur: 4.8,
+        innerColor: "#ffbc6eff",
+        outerBlur: 3.5,
+        outerStrength: 0.2,
+        outerColor: "#ffffffff"
     },
     secondGlow: {
-        innerBlur: 0.2, innerStrength: 3.0, innerColor: "#2f65ffff",
-        outerBlur: 4, outerBlur: 3, outerColor: '#2d2626ff',
+        innerStrength: 1.5, innerBlur: 0.2, innerColor: "#ffffff",
+        outerBlur: 3, outerStrength: 0.1, outerColor: '#2d2626ff',
     },
 }
 
@@ -33,7 +39,7 @@ const paramDefs = {
     fieldOfView:    {type: 'range', min: 1, max: 180},
     altitude:       {type: 'range', min: 1, max: 300000, step: 10},
     innerBlur:           {type: 'range', min: 0, max: 10, step: 0.1},
-    innerStrength:       {type: 'range', min: 0.1, max: 6, step: 0.1},
+    innerStrength:       {type: 'range', min: 0, max: 6, step: 0.1},
     graticuleStep:  {type: 'range', min: 0.1, max: 10, step: 0.1},
     borderRadius:   {type: 'range', min: 0, max: 20},
     borderWidth:    {type: 'range', min: 0, max: 10},

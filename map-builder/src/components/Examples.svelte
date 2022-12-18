@@ -2,16 +2,15 @@
     import Icon from "./Icon.svelte";
     import mapIcon from "../assets/img/map.svg?inline";
     import htmlIcon from "../assets/img/html.svg?inline";
-    // import italiaProject from '../assets/examples/italia.svgscape';
+    import examplesDesc from '../../examples.json';
 
-    const italiaPath = '../assets/examples/italia.svgscape';
-    const exampleProjects = require.context('../assets/examples/', false, /\..*svgscape$/, 'lazy');
+    const exampleProjects = require.context('../examples/', false, /\..*svgscape$/, 'lazy');
     const exampleMap = exampleProjects.keys().reduce((acc, file) => {
         const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
         acc[name] = file;
         return acc;
     }, {});
-    console.log(exampleMap)
+    
     import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();
@@ -34,11 +33,13 @@
         Examples
     </button>
     <ul class="dropdown-menu">
-        <li class="dropdown-item">
-            <span> La Bella Italia</span>
-            <a title="Project" class="" href="#" on:click={() => loadExample('italia')}><Icon svg={mapIcon} /></a>
-            <a title="Exported example" class="" target="_blank" href="italia.html"><Icon svg={htmlIcon} /></a>
-        </li>
+        {#each Object.entries(examplesDesc) as [exampleTitle, exampleDesc]}
+            <li class="dropdown-item">
+                <span> {exampleDesc.title}</span>
+                <a title="Project" class="" href="#" on:click={() => loadExample(exampleTitle)}><Icon svg={mapIcon} /></a>
+                <a title="Exported example" class="" target="_blank" href="{exampleTitle}.html"><Icon svg={htmlIcon} /></a>
+            </li>
+        {/each}
     </ul>
 </div>
 

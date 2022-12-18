@@ -6,6 +6,8 @@ import TextToSVG from 'text-to-svg';
 import { htmlToElement } from '../util/common';
 import { indexBy, pick, download } from '../util/common';
 import { reportStyle, fontsToCss, getUsedInlineFonts } from '../util/dom';
+import test from '../../../test/test-bug-marker.svg?inline';
+
 const domParser = new DOMParser();
 
 const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`
