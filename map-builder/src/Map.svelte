@@ -879,29 +879,33 @@ function importImagePath(e) {
 const saveDebounced = debounce(save, 200);
 function changeDurationAnimation(e) {
     providedPaths[selectedPathIndex].duration = e.target.value;
-    drawCustomPaths(providedPaths, svg, projection, inlineStyles);
-    applyStyles();
-    saveDebounced();
+    drawShapesAndSave();
 }
 
 function changePathImageWidth(e) {
     providedPaths[selectedPathIndex].width = e.target.value;
-    drawCustomPaths(providedPaths, svg, projection, inlineStyles);
-    applyStyles();
-    saveDebounced();
+    drawShapesAndSave();
 }
 
 function changePathImageHeight(e) {
     providedPaths[selectedPathIndex].height = e.target.value;
-    drawCustomPaths(providedPaths, svg, PromiseRejectionEvent, inlineStyles);
-    applyStyles();
-    saveDebounced();
+    drawShapesAndSave();
 }
 
-function addMarker(markerName) {
+function changeMarker(markerName) {
     closeMenu();
     menuStates.chosingMarker = false;
-    providedPaths[selectedPathIndex].marker = markerName;
+    if (markerName === 'delete') delete providedPaths[selectedPathIndex].marker;
+    else providedPaths[selectedPathIndex].marker = markerName;
+    drawShapesAndSave();
+}
+
+function deleteImage() {
+    delete providedPaths[selectedPathIndex].image;
+    providedPaths[selectedPathIndex] = providedPaths[selectedPathIndex];
+    drawShapesAndSave();
+}
+function drawShapesAndSave() {
     drawCustomPaths(providedPaths, svg, projection, inlineStyles);
     applyStyles();
     saveDebounced();
@@ -1408,7 +1412,6 @@ function getLegendColors(dataColorDef, tab, scale) {
 </script>
 
 <svelte:head>
-    <!-- {@html `<${''}style id="test"> ${baseCss} </${''}style>`} -->
 	{@html `<${''}style> ${commonCss} </${''}style>`}
 	{@html `<${''}style> ${cssFonts} </${''}style>`}
 </svelte:head>
@@ -1432,8 +1435,9 @@ function getLegendColors(dataColorDef, tab, scale) {
         <div role="button" class="px-2 py-1" on:click={choseMarker}> Chose marker </div>
     {:else if menuStates.chosingMarker}
         <div class="d-flex">
+            <div role="button" class="px-2 py-1" on:click={() => changeMarker('delete')}> <Icon fillColor='red' svg={icons['trash']} /> </div>
             {#each Object.entries(markers) as [markerName, markerDef] (markerName)}
-                <div role="button" class="px-2 py-1" on:click={() => addMarker(markerName)}> 
+                <div role="button" class="px-2 py-1" on:click={() => changeMarker(markerName)}> 
                     <svg width="30" height="30" viewBox={`0 0 ${markerDef.width} ${markerDef.height}`}>
                         <path d={markerDef.d}/>
                     </svg>
@@ -1441,9 +1445,12 @@ function getLegendColors(dataColorDef, tab, scale) {
             {/each}
         </div>
     {:else if menuStates.addingImageToPath}
-        <div class="m-1">
-            <label for="image-select" class="m-2 d-flex align-items-center btn btn-sm btn-light"> File: {providedPaths[selectedPathIndex].image?.name || 'Import image'} </label>
-            <input type="file" id="image-select" accept=".png,.jpg,.svg" on:change={importImagePath}>
+        <div class="d-flex align-items-center">
+            <div class="m-1">
+                <label for="image-select" class="m-2 d-flex align-items-center btn btn-sm btn-light"> File: {providedPaths[selectedPathIndex].image?.name || 'Import image'} </label>
+                <input type="file" id="image-select" accept=".png,.jpg,.svg" on:change={importImagePath}>
+            </div>
+            <div role="button" class="" on:click={deleteImage}> <Icon fillColor='red' svg={icons['trash']} /> </div>
         </div>
         <div class="row m-1">
             <label for="duration-select" class="col-6 col-form-label col-form-label-sm"> Duration </label>
@@ -1476,8 +1483,8 @@ function getLegendColors(dataColorDef, tab, scale) {
     <div class="d-flex justify-content-between align-items-start p-3">
         <aside class="panel d-flex flex-column align-items-center">
             <div class="d-flex justify-content-center align-items-center">
-                <span class="m-2 btn btn-outline-primary" role="button" on:click={() => showInstructions = true} > 
-                    <Icon className="mb-1" marginRight="0px" width="1.8rem" svg={icons['help']}/>
+                <span class="m-2 px-2 py-1 btn btn-outline-primary" role="button" on:click={() => showInstructions = true} > 
+                    <Icon marginRight="0px" width="1.8rem" svg={icons['help']}/>
                     Instructions
                 </span>
                 <Examples on:example={loadExample}/>

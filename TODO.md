@@ -43,17 +43,22 @@
 - [ ] Instructions: how to tilt / rotate / zoom / drag
 - [x] Change zoom sensibility according to FOV
 - [x] Animate object along path
-- [ ] Clip path instead of border-radius, not working for viewBox (will drop)
-- [ ] Add validation on imported data (alpha-3 / shapeName)
+- [x] Add validation on imported data (alpha-3 / shapeName)
 - [x] Add conversion of final CSS rgb(x y z) => #hex
 - [x] Format tooltip when containing decimal values => determine formatter automatically
     - [ ] Allow to change format locale
 - [-] Choice to remove imported fonts -> export only used fonts
-- [ ] On delete country, delete legend + color def (+ else ?)
+- [x] On delete country, delete legend + color def (+ else ?)
 - [x] Export button => popup modal to select
     - [x] No redraw on resize
     - [x] Choice between "font(s) will be included in final file" & "best between embed font / transform text to paths"
 - [ ] SEO: title + meta tag + raw html for FAQ
 - [x] Redesign layout: accordions on right, data / colors / legend on left
-- [ ] Add line at the end of math (<marker>)
+- [ ] Add line at the end of path (<marker>)
 - [x] Delete paths on right click in menu
+- [ ] Sitemap
+- [x] Allow change fill color for land when base layer
+- [ ] README github: explain how optimizations work
+- [ ] Add example(s)
+- [x] Change default filter 2 
+- [x] Make more fine-tuning altitude/FOV more intuitive
