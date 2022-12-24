@@ -12,12 +12,14 @@
 
     const increment = () => {
         if (value === null) value = step;
+        else if (value === max) return;
         else value += step;
         onChange(value);
     };
     
     const decrement = () => {
-        if (value === null) value -= step;
+        if (value === null) value = min;
+        else if (value === min) return;
         else value -= step;
         onChange(value);
     };

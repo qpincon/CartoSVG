@@ -109,7 +109,7 @@ function getBestFormatter(values, locale) {
     return loc.format(',~d');
 }
 
-function tapHold(node, threshold = 500) {
+function tapHold(node, threshold = 300) {
     const handleMouseDown = () => {
         let intervalTimeout;
         const tapTimeout = setTimeout(() => {

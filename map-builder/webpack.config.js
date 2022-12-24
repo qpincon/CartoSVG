@@ -4,7 +4,6 @@ const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const fs = require('fs');
 
-
 const examplesMeta = JSON.parse(fs.readFileSync('./examples.json'));
 
 const config = {
@@ -51,7 +50,13 @@ const config = {
                             scss: {
                                 renderSync: true,
                             },
-                        })
+                        }),
+                        onwarn: (warning, handler) => {
+                            if (warning.code.includes('a11y')) return;
+                            if (warning.code === 'security-anchor-rel-noreferrer') return;
+                            handler(warning);
+                        },
+
                     }
                 },
             },
@@ -102,6 +107,7 @@ const config = {
                 description: 'SVGscape is an online editor to create, tweak and export rich and splendid SVG map visualizations. It allows customization by binding data, displaying tooltips, drawing choropleth, and provides optimizations for exporting the SVG file as light as possible.'
             },
             chunks: ['main'],
+            favicon: './src/assets/img/logo_transparent.webp'
         }),
         new HtmlWebpackPlugin({
             title: 'About',
@@ -110,6 +116,7 @@ const config = {
             },
             filename: 'about.html',
             chunks: ['about'],
+            favicon: './src/assets/img/logo_transparent.webp'
         })
     ],
     mode: 'development',
@@ -124,6 +131,7 @@ Object.entries(examplesMeta).forEach(([exampleName, description]) => {
         },
         filename: `${exampleName}.html`,
         chunks: [exampleName],
+        favicon: './src/assets/img/logo_transparent.webp'
     });
     config.plugins.push(plugin);
 });

@@ -6,7 +6,6 @@ import TextToSVG from 'text-to-svg';
 import { htmlToElement } from '../util/common';
 import { indexBy, pick, download } from '../util/common';
 import { reportStyle, fontsToCss, getUsedInlineFonts } from '../util/dom';
-import test from '../../../test/test-bug-marker.svg?inline';
 
 const domParser = new DOMParser();
 

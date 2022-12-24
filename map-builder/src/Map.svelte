@@ -11,9 +11,11 @@ import dataExplanation from './assets/dataColor.svg';
 import svgoConfig from './svgoExport.config';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import PathEditor from './svg/pathEditor';
-import { paramDefs, defaultParams, helpParams } from './params';
+import { paramDefs, defaultParams, helpParams, noSatelliteParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
+import { getProjection, updateAltitudeRange } from './util/projections';
+
 import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce, getBestFormatter } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import * as markers from './svg/markerDefs';
@@ -121,10 +123,7 @@ String.prototype.formatUnicorn = String.prototype.formatUnicorn || function () {
 
 const p = (propName, obj = params) => findProp(propName, obj);
 
-const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView'];
-const earthRadius = 6371;
-const degrees = 180 / Math.PI;
-const offCanvasPx = 10;
+const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView', 'projection'];
 let timeoutId;
 let countries = null;
 let land = null;
@@ -145,7 +144,7 @@ const verySimpleLand = import('./assets/layers/world_land_very_simplified.topojs
         const firstKey = Object.keys(land.objects)[0];
         simpleLand = topojson.feature(land, land.objects[firstKey]);
     });
-Promise.all([adm0Land, verySimpleLand]).then(() => draw());
+Promise.all([adm0Land, verySimpleLand]).then(() => projectAndDraw());
 
 let path = null;
 let projection = null;
@@ -180,6 +179,8 @@ let chosenCountriesAdm = [];
 let inlineProps = {
     longitude: 15,
     latitude: 42.5,
+    translateX: 0,
+    translateY: 0,
     altitude: null,
     rotation: 0,
     tilt: 8.7,
@@ -267,9 +268,6 @@ onMount(() => {
                     if (cssProp === 'stroke' && target.hasAttribute('marker-end')) {
                         const markerId = target.getAttribute('marker-end').match(/url\(#(.*)\)/)[1];
                         const newMarkerId = `${markerId.split('-')[0]}-${value.substring(1)}`;
-                        console.log(cssProp, value, newMarkerId);
-                        console.log(newMarkerId);
-                        console.log(d3.select(`#${markerId}`).node());
                         d3.select(`#${markerId}`).attr('fill', value)
                             .attr('id', newMarkerId);
                         d3.select(target).attr('marker-end', `url(#${newMarkerId})`);
@@ -346,6 +344,16 @@ function detachListeners() {
     container.on(".zoom", null);
 }
 
+function redraw(propName) {
+    if (positionVars.includes(propName)) {
+        projectAndDraw(true);
+    }
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+        draw(false);
+    }, 300);
+}
+
 let altScale = d3.scaleLinear().domain([1, 0]).range([100, 10000]);
 function zoomed(event) {
     if (!event.sourceEvent) return;
@@ -353,20 +361,25 @@ function zoomed(event) {
     event.transform.k = Math.max(Math.min(event.transform.k, 1), 0.00001)
     const newAltitude = Math.round(altScale(event.transform.k));
     params["General"].altitude = newAltitude;
+    inlineProps.altitude = newAltitude;
     redraw('altitude');
 }
 
 const sensitivity = 75;
 function dragged(event) {
-    if (event.sourceEvent.shiftKey) {
+    inlineProps.translateX += event.dx;
+    inlineProps.translateY += event.dy;
+    const isSatellite = params["General"].projection === "satellite";
+    if (isSatellite && event.sourceEvent.shiftKey) {
         inlineProps.tilt += event.dy / 10;
     }
-    else if (event.sourceEvent.metaKey || event.sourceEvent.ctrlKey) {
+    else if (isSatellite && (event.sourceEvent.metaKey || event.sourceEvent.ctrlKey)) {
         inlineProps.rotation -= event.dx / 10;
     }
-    else {
+    else if (projection.rotate) {
         const rotate = projection.rotate();
-        const rotRad =  (inlineProps.rotation / 180) * Math.PI;
+        let rotRad =  (inlineProps.rotation / 180) * Math.PI;
+        if (!isSatellite) rotRad = 0;
         const [xPartX, xPartY] = [Math.cos(rotRad), Math.sin(rotRad)]; 
         const [yPartX, yPartY] = [-Math.sin(rotRad), Math.cos(rotRad)];
         const k = sensitivity / projection.scale();
@@ -376,6 +389,46 @@ function dragged(event) {
         inlineProps.latitude = -rotate[1] + (adjustedDy);
     }
     redraw('longitude');
+}
+
+
+function changeAltitudeScale() {
+    const projName = p('projection');
+    const fov =  p('fieldOfView');
+    let invertAlt = false;
+    if (projName === 'satellite') {
+        const newAltScale = updateAltitudeRange(fov);
+        if (newAltScale) altScale = newAltScale;
+        invertAlt = true;
+    }
+    else {
+        altScale = d3.scaleLinear().domain([0, 1]).range([90, 1000]);
+    }
+    const altitude = inlineProps.altitude || params["General"].altitude;
+    let altChanged = false;
+    const firstScaleVal = altScale(invertAlt ? 1 : 0);
+    const secondScaleVal = altScale(invertAlt ? 0 : 1);
+    if (altitude < firstScaleVal) { inlineProps.altitude = firstScaleVal; altChanged = true;}
+    if (altitude > secondScaleVal) { inlineProps.altitude = secondScaleVal; altChanged = true;}
+    if (altChanged) {
+        params['General'].altitude = inlineProps.altitude;
+    }
+}
+
+let accordionVisiblityParams = {};
+function changeProjection() {
+    const projName = p('projection');
+    if (projName !== 'satellite') {
+        accordionVisiblityParams = noSatelliteParams;
+    }
+    else accordionVisiblityParams = {};
+    const projectionParams = {
+        projectionName: projName, fov: p('fieldOfView'), width: p('width'), height: p('height'),
+        translateX: inlineProps.translateX, translateY: inlineProps.translateY,
+        longitude: inlineProps.longitude, latitude: inlineProps.latitude, rotation: inlineProps.rotation,
+        altitude: inlineProps.altitude || params['General'].altitude, tilt: inlineProps.tilt, borderWidth: p('borderWidth')
+    };
+    projection = getProjection(projectionParams);
 }
 
 let firstDraw = true;
@@ -421,71 +474,9 @@ async function draw(simplified = false, _) {
             };
         }
     }
-    const fov = p('fieldOfView');
-    const width = p('width'), height = p('height'), altitude = p('altitude');
-    const snyderP = 1.0 + altitude / earthRadius;
-    const dY = altitude * Math.sin(inlineProps.tilt / degrees);
-    const dZ = altitude * Math.cos(inlineProps.tilt / degrees);
-    const fovExtent = Math.tan(0.5 * fov / degrees);
-    const visibleYextent = 2 * dZ * fovExtent;
-    const altRange = [(1/fovExtent) * 500, (1/fovExtent) * 4000];
-    altScale = d3.scaleLinear().domain([1, 0]).range(altRange);
-    if (altitude < altScale[0]) { params["General"].altitude = altScale[0]; redraw('altitude');}
-    if (altitude > altScale[1]) { params["General"].altitude = altScale[1]; redraw('altitude');}
-    const yShift = dY * 600 / visibleYextent;
-    const scale = earthRadius * 600 / visibleYextent;
-    const tilt = inlineProps.tilt / degrees;
-    const alpha = Math.acos(snyderP * Math.cos(tilt) * 0.999);
-    const clipDistance = d3.geoClipCircle(Math.acos(1 / snyderP) - 1e-6);
-    const preclip = alpha ? geoPipeline(
-        clipDistance,
-        geoRotatePhi(Math.PI + tilt),
-        d3.geoClipCircle(Math.PI - alpha - 1e-4), // Extra safety factor needed for large tilt values
-        geoRotatePhi(-Math.PI - tilt)
-    ) : clipDistance;
-
-    function geoRotatePhi(deltaPhi) {
-        const cosDeltaPhi = Math.cos(deltaPhi);
-        const sinDeltaPhi = Math.sin(deltaPhi);
-        return sink => ({
-            point(lambda, phi) {
-                const cosPhi = Math.cos(phi);
-                const x = Math.cos(lambda) * cosPhi;
-                const y = Math.sin(lambda) * cosPhi;
-                const z = Math.sin(phi);
-                const k = z * cosDeltaPhi + x * sinDeltaPhi;
-                sink.point(Math.atan2(y, x * cosDeltaPhi - z * sinDeltaPhi), Math.asin(k));
-            },
-            lineStart() { sink.lineStart(); },
-            lineEnd() { sink.lineEnd(); },
-            polygonStart() { sink.polygonStart(); },
-            polygonEnd() { sink.polygonEnd(); },
-            sphere() { sink.sphere(); }
-        });
-    }
-
-    function geoPipeline(...transforms) {
-        return sink => {
-            for (let i = transforms.length - 1; i >= 0; --i) {
-                sink = transforms[i](sink);
-            }
-            return sink;
-        };
-    }
-
+    const width = p('width'), height = p('height');
     const container = d3.select('#map-container');
     container.html('');
-    const offCanvasWithBorder = offCanvasPx - (p('borderWidth')/2);
-    projection = geoSatellite()
-        .scale(scale)
-        .translate([((width / 2)), (yShift + height / 2)])
-        .rotate([-inlineProps.longitude, -inlineProps.latitude, inlineProps.rotation])
-        .tilt(inlineProps.tilt)
-        .distance(snyderP)
-        .preclip(preclip)
-        .postclip(d3.geoClipRectangle(-offCanvasWithBorder, -offCanvasWithBorder, width + offCanvasWithBorder, height + offCanvasWithBorder))
-        .precision(0.1);
-   
     const outline = {type: "Sphere"};
     const graticule = d3.geoGraticule().step([p('graticuleStep'), p('graticuleStep')])();
     if (!p('showGraticule')) graticule.coordinates = [];
@@ -616,6 +607,12 @@ async function draw(simplified = false, _) {
     firstDraw = false;
 }
 
+function projectAndDraw(simplified = false) {
+    changeAltitudeScale();
+    changeProjection();
+    draw(simplified);
+}
+
 let totalCommonCss;
 function computeCss() {
     const finalColorsCss = Object.values(colorsCss).reduce((acc, cur) => {acc += cur; return acc;}, '');
@@ -714,6 +711,8 @@ function resetState() {
     inlineProps = {
         longitude: 15,
         latitude: 42.5,
+        translateX: 0,
+        translateY: 0,
         altitude: null,
         rotation: 0,
         tilt: 8.7,
@@ -743,7 +742,7 @@ function resetState() {
         countries: {...defaultColorDef}
     };
     legendDefs = {countries: JSON.parse(JSON.stringify(defaultLegendDef))};
-    draw();
+    projectAndDraw();
 }
 
 function restoreState(givenState) {
@@ -783,7 +782,7 @@ function loadProject(e) {
             const providedState = JSON.parse(reader.result);
             restoreState(providedState);
             save();
-            draw();
+            projectAndDraw();
         } catch(e) {
             console.error('Unable to parse provided file. Should be valid JSON.');
         }
@@ -795,7 +794,7 @@ function loadExample(e) {
     if (!window.confirm('Caution: Loading the example will discard your current project. Please save it first if you want to keep it.')) return;
     restoreState(e.detail.projectParams);
     save();
-    draw();
+    projectAndDraw();
 }
 
 function applyStyles() {
@@ -981,19 +980,19 @@ function addPath() {
     });
 }
 
-function redraw(propName) {
-    if (positionVars.includes(propName)) {
-        draw(true);
-    }
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
-        draw(false);
-    }, 300);
-}
-
 function handleChangeProp(event) {
     if (firstDraw) return;
     const {prop, value} = event.detail;
+    if (positionVars.includes(prop)) {
+        inlineProps[prop] = value;
+    }
+    if (prop === 'projection' || prop === 'fieldOfView') {
+        changeAltitudeScale();
+    }
+    if (prop == 'projection') {
+        inlineProps.translateX = 0;
+        inlineProps.translateY = 0;
+    }
     redraw(prop);
 }
 
@@ -1490,7 +1489,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                 <Examples on:example={loadExample}/>
             </div>
             <div class="rounded p-0 border mx-2">
-                <NestedAccordions sections={params} paramDefs={paramDefs} helpParams={helpParams} on:change={handleChangeProp} ></NestedAccordions>
+                <NestedAccordions sections={params} {paramDefs} {helpParams} otherParams={accordionVisiblityParams}  on:change={handleChangeProp} ></NestedAccordions>
             </div>
         </aside>
         <div class="w-auto d-flex flex-column justify-content-center">
@@ -1826,10 +1825,10 @@ input[type="file"] {
     display: none;
 }
 
-.is-dnd-hovering-right {
+:global(.is-dnd-hovering-right) {
     border-right: 3px solid black;
 }
-.is-dnd-hovering-left {
+:global(.is-dnd-hovering-left) {
     border-left: 3px solid black;
 }
 .delete-tab {

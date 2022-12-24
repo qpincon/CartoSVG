@@ -36,8 +36,8 @@
         {#each Object.entries(examplesDesc) as [exampleTitle, exampleDesc]}
             <li class="dropdown-item">
                 <span> {exampleDesc.title}</span>
-                <a title="Project" class="" href="#" on:click={() => loadExample(exampleTitle)}><Icon svg={mapIcon} /></a>
-                <a title="Exported example" class="" target="_blank" href="{exampleTitle}.html"><Icon svg={htmlIcon} /></a>
+                <a title="Project" href="#" on:click={() => loadExample(exampleTitle)}><Icon svg={mapIcon} /></a>
+                <a title="Exported example"  target="_blank" href="{exampleTitle}.html"><Icon svg={htmlIcon} /></a>
             </li>
         {/each}
     </ul>

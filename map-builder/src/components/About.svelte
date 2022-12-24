@@ -78,9 +78,10 @@
 
     <h3 class="mt-2">Note on performance</h3>
     <section>
-        The glow filters use SVG filter primitives. I made some efforts to make
-        them as performant as possible, however such filters are generally quite
-        resource intensive, so use them wisely.
+        The glow filters use SVG filter primitives. Such filters are generally
+        qui resource intensive, but some efforts went into making them more
+        performant. The first draw can take some time, buf afterwards it should
+        be quite responsive.
     </section>
 
     <h3 class="mt-2">Licence ?</h3>

@@ -3,6 +3,7 @@ let defaultParams = {
         width: 600,
         height: 670,
         useViewBox: false,
+        projection: 'satellite',
         fieldOfView: 50,
         altitude: 3200,
     },
@@ -36,15 +37,26 @@ let defaultParams = {
 const paramDefs = {
     width:          {type: 'range', min: 100, max: 800},
     height:         {type: 'range', min: 100, max: 800},
-    fieldOfView:    {type: 'range', min: 1, max: 180},
-    altitude:       {type: 'range', min: 1, max: 300000, step: 10},
+    fieldOfView:    {type: 'range', min: 15, max: 180},
+    altitude:       {type: 'range', min: 1, max: 30000, step: 10},
     innerBlur:           {type: 'range', min: 0, max: 10, step: 0.1},
     innerStrength:       {type: 'range', min: 0, max: 6, step: 0.1},
     graticuleStep:  {type: 'range', min: 0.1, max: 10, step: 0.1},
     borderRadius:   {type: 'range', min: 0, max: 20},
     borderWidth:    {type: 'range', min: 0, max: 10},
-    filter:         {type: 'select', choices: ['none', 'firstGlow', 'secondGlow']}
+    filter:         {type: 'select', choices: ['none', 'firstGlow', 'secondGlow']},
+    projection:         {type: 'select', choices: ['satellite', 'mercator', 'equalEarth', 'geoNaturalEarth', 'geoAlbersUsa']}
 };
+
+const noSatelliteParams = {
+    'fieldOfView': {
+        disabled: true,
+    },
+    'altitude': {
+        rename: 'scale',
+    }
+};
+
 paramDefs['outerBlur'] = paramDefs['innerBlur'];
 paramDefs['outerStrength'] = paramDefs['innerStrength'];
 
@@ -59,4 +71,4 @@ const helpParams = {
     useViewBox: `If checked, the exported SVG will fit to its container and will not define its own width/height.`,
 };
 
-export {defaultParams, paramDefs, helpParams };
+export {defaultParams, paramDefs, helpParams, noSatelliteParams };
