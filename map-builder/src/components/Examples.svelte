@@ -1,6 +1,5 @@
 <script>
     import Icon from "./Icon.svelte";
-    import mapIcon from "../assets/img/map.svg?inline";
     import htmlIcon from "../assets/img/html.svg?inline";
     import examplesDesc from '../../examples.json';
 
@@ -34,10 +33,9 @@
     </button>
     <ul class="dropdown-menu">
         {#each Object.entries(examplesDesc) as [exampleTitle, exampleDesc]}
-            <li class="dropdown-item">
-                <span> {exampleDesc.title}</span>
-                <a title="Project" href="#" on:click={() => loadExample(exampleTitle)}><Icon svg={mapIcon} /></a>
-                <a title="Exported example"  target="_blank" href="{exampleTitle}.html"><Icon svg={htmlIcon} /></a>
+            <li class="d-flex">
+                <a class="dropdown-item text-decoration-none" title="Project" href="#" on:click={() => loadExample(exampleTitle)}> {exampleDesc.title} </a>
+                <a class="dropdown-item html-btm" title="Exported example"  target="_blank" href="{exampleTitle}.html"><Icon svg={htmlIcon} /></a>
             </li>
         {/each}
     </ul>
@@ -45,4 +43,7 @@
 
 <style>
     a { color: inherit !important; }
+    .html-btm {
+        width: 3rem;
+    }
 </style>
