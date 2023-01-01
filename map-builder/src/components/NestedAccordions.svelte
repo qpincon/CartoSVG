@@ -86,11 +86,11 @@
                             }}
                         />
                         {:else if paramDefs[key].type == "select"}
-                        <div class="d-flex">
-                            <label class="me-2" for={`form-${key}`}>{getLabel(key)}</label>
+                        <div class="row">
+                            <label class="col-4 col-form-label" for={`form-${key}`}>{getLabel(key)}</label>
                             <select
                                 id={`form-${key}`}
-                                class="form-select form-select-sm me-2"
+                                class="form-select form-select-sm me-4 col"
                                 bind:value={sections[key]}
                                 on:change={(e) =>
                                     propChanged(key, e.target.value)}
@@ -102,9 +102,10 @@
                         </div>
                     {/if}
                 {:else if typeof sections[key] === "boolean"}
-                    <div class="input-type form-check">
+                    <div class="input-type form-check form-switch">
                         <input
                             type="checkbox"
+                            role="switch"
                             class="form-check-input"
                             id={`form-${key}`}
                             bind:checked={sections[key]}

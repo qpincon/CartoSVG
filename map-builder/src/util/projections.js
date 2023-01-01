@@ -1,5 +1,5 @@
 import { geoMercator, geoEqualEarth, geoAlbersUsa, geoNaturalEarth1 } from 'd3-geo';
-import { geoSatellite } from 'd3-geo-projection';
+import { geoSatellite, geoBaker } from 'd3-geo-projection';
 import { scaleLinear, geoClipCircle, geoClipRectangle } from 'd3';
 
 const degrees = 180 / Math.PI;
@@ -69,7 +69,8 @@ function geoSatelliteCustom({ fov, width, height, longitude, latitude, rotation,
 const standardProjection = {
     'mercator': geoMercatorProj,
     'equalEarth': geoEqualEarthProj,
-    'geoNaturalEarth': geoNaturalEarthProj
+    'geoNaturalEarth': geoNaturalEarthProj,
+    'geoBaker': geoBakerProj,
 }
 
 function standardProj(projFunc, { width, height, translateX, translateY, altitude, latitude, longitude, rotation, borderWidth } = {}) {
@@ -96,12 +97,15 @@ function geoEqualEarthProj(params) {
 function geoNaturalEarthProj(params) {
     return standardProj(geoNaturalEarth1, params);
 }
+function geoBakerProj(params) {
+    return standardProj(geoBaker, params);
+}
 
 
 function updateAltitudeRange(fov = null) {
     if (fov) {
         const fovExtent = Math.tan(0.5 * fov / degrees);
-        const altRange = [(1/fovExtent) * 500, (1/fovExtent) * 4000];
+        const altRange = [Math.round((1/fovExtent) * 500), Math.round((1/fovExtent) * 4000)];
         const altScale = scaleLinear().domain([1, 0]).range(altRange);
         return altScale;
     }

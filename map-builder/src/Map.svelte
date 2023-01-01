@@ -402,7 +402,7 @@ function changeAltitudeScale() {
         invertAlt = true;
     }
     else {
-        altScale = d3.scaleLinear().domain([0, 1]).range([90, 1000]);
+        altScale = d3.scaleLinear().domain([0, 1]).range([90, 2000]);
     }
     const altitude = inlineProps.altitude || params["General"].altitude;
     let altChanged = false;
@@ -608,7 +608,7 @@ async function draw(simplified = false, _) {
 }
 
 function projectAndDraw(simplified = false) {
-    changeAltitudeScale();
+    // changeAltitudeScale();
     changeProjection();
     draw(simplified);
 }
@@ -1488,7 +1488,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                 </span>
                 <Examples on:example={loadExample}/>
             </div>
-            <div class="rounded p-0 border mx-2">
+            <div class="accordions rounded p-0 border mx-2">
                 <NestedAccordions sections={params} {paramDefs} {helpParams} otherParams={accordionVisiblityParams}  on:change={handleChangeProp} ></NestedAccordions>
             </div>
         </aside>
@@ -1796,10 +1796,6 @@ function getLegendColors(dataColorDef, tab, scale) {
 </Modal>
 
 <style lang="scss" scoped>
-.panel {
-    min-width: 20rem;
-    max-width: 30rem;
-}
 #country-select:hover ~ span {
     color: #aeafaf;
 }
@@ -1838,5 +1834,9 @@ input[type="file"] {
 }
 .grabbable {
     cursor: grab !important;
+}
+.accordions, aside {
+    min-width: 20rem;
+    max-width: 30rem;
 }
 </style>

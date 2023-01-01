@@ -41,11 +41,11 @@ const paramDefs = {
     altitude:       {type: 'range', min: 1, max: 30000, step: 10},
     innerBlur:           {type: 'range', min: 0, max: 10, step: 0.1},
     innerStrength:       {type: 'range', min: 0, max: 6, step: 0.1},
-    graticuleStep:  {type: 'range', min: 0.1, max: 10, step: 0.1},
+    graticuleStep:  {type: 'range', min: 0.1, max: 20, step: 0.1},
     borderRadius:   {type: 'range', min: 0, max: 20},
     borderWidth:    {type: 'range', min: 0, max: 10},
     filter:         {type: 'select', choices: ['none', 'firstGlow', 'secondGlow']},
-    projection:         {type: 'select', choices: ['satellite', 'mercator', 'equalEarth', 'geoNaturalEarth', 'geoAlbersUsa']}
+    projection:         {type: 'select', choices: ['satellite', 'mercator', 'equalEarth', 'geoNaturalEarth', 'geoAlbersUsa', 'geoBaker']}
 };
 
 const noSatelliteParams = {

@@ -65,3 +65,4 @@
 - [ ] Allow minification of JS
 - [ ] Implement Undo / Redo on points / labels moving 
 - [x] Allow more projections
+- [ ] Add categorical colors by hand

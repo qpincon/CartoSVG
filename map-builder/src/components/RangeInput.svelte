@@ -1,5 +1,5 @@
 <script>
-    import { tapHold } from '../util/common';
+    import { tapHold } from "../util/common";
 
     export let value;
     export let title;
@@ -7,7 +7,7 @@
     export let max = 10;
     export let step = 1;
     export let onChange = (newVal) => {};
-    export let id = 'rangeinputid'; 
+    export let id = "rangeinputid";
     export let helpText;
 
     const increment = () => {
@@ -16,53 +16,78 @@
         else value += step;
         onChange(value);
     };
-    
+
     const decrement = () => {
         if (value === null) value = min;
         else if (value === min) return;
         else value -= step;
         onChange(value);
     };
-
 </script>
 
 <div class="row">
-    <label for={id} class="d-flex col-4 col-form-label align-items-center"> {title}
-        <div class="d-inline-flex flex-column align-items-center arrows">
-            <svg use:tapHold on:hold={increment} role="button" on:click={increment} height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg">
-                <path d="m3 19h18c.372 0 .713-.207.886-.536s.148-.727-.063-1.033l-9-13c-.373-.539-1.271-.539-1.645 0l-9 13c-.212.306-.236.704-.063 1.033.172.329.513.536.885.536z" />
-            </svg>
-            <svg use:tapHold on:hold={decrement} role="button" on:click={decrement} height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg">
-                <path d="m11.178 19.569c.186.27.494.431.822.431s.636-.161.822-.431l9-13c.212-.306.236-.704.063-1.033-.172-.329-.513-.536-.885-.536h-18c-.372 0-.713.207-.886.536s-.148.727.064 1.033z" />
-            </svg>
-        </div> 
+    <label for={id} class="d-flex col-4 col-form-label align-items-center">
+        {title}
     </label>
-    
+
     {#if helpText}
-        <span class="help-tooltip fs-6" data-bs-toggle="tooltip" data-bs-title={helpText}>?</span>
+        <span
+            class="help-tooltip fs-6"
+            data-bs-toggle="tooltip"
+            data-bs-title={helpText}>?</span
+        >
     {/if}
     <div class="d-flex align-items-center col">
         <input
             type="range"
             class="form-range"
-            id={id}
-            bind:value={value}
-            min={min}
-            max={max}
-            step={step}
+            {id}
+            bind:value
+            {min}
+            {max}
+            {step}
             on:change={(e) => onChange(e.target.value)}
         />
         <span
-            class="range-label text-center text-primary mx-1 text-opacity-75 fs-6"
+            class="range-label text-center d-flex text-primary mx-1 text-opacity-75 fs-6"
         >
             {value}
+            <div class="ms-2 d-inline-flex flex-column align-items-center justify-content-center arrows">
+                <svg
+                    use:tapHold
+                    on:hold={increment}
+                    role="button"
+                    on:click={increment}
+                    height="10"
+                    viewBox="0 0 20 15"
+                    width="10"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path
+                        d="m1 15h18c.4 0 .7-.2.9-.5s.1-.7-.1-1l-9-13c-.4-.5-1.3-.5-1.6 0l-9 13c-.2.3-.2.7-.1 1 .2.3.5.5.9.5z"
+                    />
+                </svg>
+                <svg
+                    use:tapHold
+                    on:hold={decrement}
+                    role="button"
+                    on:click={decrement}
+                    height="10"
+                    viewBox="0 0 20 15"
+                    width="10"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path
+                        d="m9.2 14.6c.2.3.5.4.8.4s.6-.2.8-.4l9-13c.2-.3.2-.7.1-1-.2-.3-.5-.5-.9-.5h-18c-.4 0-.7.2-.9.5s-.1.7.1 1z"
+                    />
+                </svg>
+            </div>
         </span>
     </div>
 </div>
 
 <style>
     .arrows {
-        height: 25px;
         fill: #5c5f62;
     }
 </style>
