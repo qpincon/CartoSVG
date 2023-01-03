@@ -2,7 +2,8 @@
 
 export let data = [];
 
-$: headers = data.length ? Object.keys(data[1]) : [];
+
+$: headers = data.length ? Object.keys(data[0]) : [];
 
 </script>
 

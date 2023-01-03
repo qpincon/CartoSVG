@@ -251,7 +251,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
     scriptElem.innerHTML = finalScript;
     optimizedSVG.firstChild.append(scriptElem);
-    download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'mySvg.svg');
+    download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'svgscape-export.svg');
 }
 
 function getFinalTooltipTemplate(groupId, tooltipDefs) {

@@ -1,6 +1,5 @@
 <script>
 import { onMount, tick } from 'svelte';
-import { geoSatellite } from 'd3-geo-projection';
 import * as topojson from 'topojson-client';
 import * as d3 from "d3";
 import SVGO from 'svgo/dist/svgo.browser';
@@ -15,6 +14,8 @@ import { paramDefs, defaultParams, helpParams, noSatelliteParams } from './param
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
 import { getProjection, updateAltitudeRange } from './util/projections';
+import ColorPicker from "./components/ColorPicker.svelte";
+import PaletteEditor from "./components/PaletteEditor.svelte";
 
 import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce, getBestFormatter } from './util/common';
 import * as shapes from './svg/shapeDefs';
@@ -214,6 +215,7 @@ let colorDataDefs = {
 };
 let legendDefs = {countries: JSON.parse(JSON.stringify(defaultLegendDef))};
 let orderedTabs = ['countries', 'land'];
+let customCategoricalPalette = ['#ff0000ff', '#00ff00ff', '#0000ffff'];
 
 // ==== End state =====
 
@@ -695,7 +697,7 @@ function save() {
     saveState({params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
-        tooltipDefs, contourParams, colorDataDefs, legendDefs,
+        tooltipDefs, contourParams, colorDataDefs, legendDefs, customCategoricalPalette
     });
 }
 
@@ -742,6 +744,7 @@ function resetState() {
         countries: {...defaultColorDef}
     };
     legendDefs = {countries: JSON.parse(JSON.stringify(defaultLegendDef))};
+    customCategoricalPalette = ['#ff0000ff', '#00ff00ff', '#0000ffff'];
     projectAndDraw();
 }
 
@@ -755,7 +758,7 @@ function restoreState(givenState) {
     ({  params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
-        tooltipDefs, contourParams, colorDataDefs, legendDefs,
+        tooltipDefs, contourParams, colorDataDefs, legendDefs, customCategoricalPalette
     } = state);
     if (!baseCss) baseCss = defaultBaseCss;
     commonStyleSheetElem.innerHTML = baseCss;
@@ -769,7 +772,7 @@ function saveProject() {
     const state = {params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
-        tooltipDefs, contourParams, colorDataDefs, legendDefs,
+        tooltipDefs, contourParams, colorDataDefs, legendDefs, customCategoricalPalette
     };
     download(JSON.stringify(state), 'text/json', 'project.svgscape');
 }
@@ -1296,7 +1299,7 @@ const numericPalettes =  [
 ];
 
 const categoricalPalettes = [
-    "Category10", "Accent", "Dark2", "Paired", "Pastel1",
+    "Category10", "Custom", "Accent", "Dark2", "Paired", "Pastel1",
     "Pastel2", "Set1", "Set2", "Set3", "Tableau10"
 ];
 
@@ -1334,7 +1337,9 @@ let legendSample;
 let displayedLegend = {};
 let sampleLegend = {
     color: 'black', text: 'test'
-}
+};
+let showCustomPalette = false;
+
 async function colorizeAndLegend(e) {
     initTooltips();
     legendDefs = legendDefs;
@@ -1353,7 +1358,10 @@ async function colorizeAndLegend(e) {
         const data = zonesData[tab].data.map(row => row[dataColorDef.colorColumn]);
         let scale;
         if (dataColorDef.colorScale === "category" ) {
-            scale = d3.scaleOrdinal(d3[paletteName]);
+            if (dataColorDef.colorPalette === 'Custom') {
+                scale = d3.scaleOrdinal(customCategoricalPalette);
+            }
+            else scale = d3.scaleOrdinal(d3[paletteName]);
         } else if(dataColorDef.colorScale === "quantile") {
             scale = d3.scaleQuantile().domain(data).range(d3[paletteName][dataColorDef.nbBreaks]);
         } else if(dataColorDef.colorScale === "quantize") {
@@ -1552,7 +1560,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                     ondragover="return false"
                     on:dragenter={() => hoveringTab = index}
                     class:is-dnd-hovering-right={hoveringTab === index && index > dragStartIndex}
-                    class:is-dnd-hois-dnd-hoveringvering-left={hoveringTab === index && index < dragStartIndex}
+                    class:is-dnd-hovering-left={hoveringTab === index && index < dragStartIndex}
                     class:grabbable={isLand}>
                     <a href="javascript:;"
                     class:active={currentTab === tabTitle}
@@ -1612,7 +1620,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                     <div class="mx-2 form-check">
                         <input
                             type="checkbox" class="form-check-input" id='showTooltip' bind:checked={tooltipDefs[currentTab].enabled} 
-                            on:click={() => setTimeout(() => {initTooltips()}, 0)}
+                            on:click={() => setTimeout(() => {initTooltips(); save(); }, 0)}
                         />
                         <label for='showTooltip' class="form-check-label"> Show tooltip on hover </label>
                     </div>
@@ -1632,7 +1640,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                         </div>
                         <div class="mx-2 d-flex align-items-center">
                             <label for="tooltip-preview-{currentTab}"> Example tooltip:
-                                <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click on the example to update style">?</span>
+                                <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click on the example to update style. Pro tip: changes made in the developer panel are also reported.">?</span>
                             </label>
                             <div class="tooltip-preview">
                                 <div id="tooltip-preview-{currentTab}" bind:this={htmlTooltipElem} on:click={editTooltip} style="${defaultTooltipStyle}">
@@ -1673,7 +1681,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                             <span class="help-tooltip" data-bs-toggle="tooltip" allow-html="true" data-bs-title="{scalesHelp}">?</span>
                         </div>
 
-                        <div class="d-flex justify-content-between ">
+                        <div class="d-flex align-items-center justify-content-between ">
                             <div class="flex-grow-1 m-1 form-floating">
                                 <select class="form-select form-select-sm" id="choseColorColumn" bind:value={curDataDefs.colorColumn}
                                     on:change={e => legendDefs[currentTab].title = e.target.value}>
@@ -1691,6 +1699,9 @@ function getLegendColors(dataColorDef, tab, scale) {
                                 </select>
                                 <label for="choseColorPalette"> Palette </label>
                             </div>
+                            {#if curDataDefs.colorPalette === 'Custom'}
+                                <span class="btn btn-outline-primary" on:click={() => showCustomPalette = true}> Edit palette</span>
+                            {/if}
                         </div>
                         {#if curDataDefs.colorScale !== 'category'}
                             <div>
@@ -1724,7 +1735,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                                     on:click={openEditor}> {sampleLegend.text} </text>
                             </g>
                         </svg>
-                        <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click to update style (the legend is SVG)">?</span>
+                        <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click to update style (the legend is SVG).">?</span>
                     {/if}
                 {/if}    
             </div> 
@@ -1795,10 +1806,17 @@ function getLegendColors(dataColorDef, tab, scale) {
     </div>
 </Modal>
 
+<Modal open={showCustomPalette} onClosed={() => showCustomPalette = false} >
+    <div slot="content">
+        <PaletteEditor customCategoricalPalette={customCategoricalPalette} onChange={draw}></PaletteEditor>
+    </div>
+</Modal>
+
 <style lang="scss" scoped>
 #country-select:hover ~ span {
     color: #aeafaf;
 }
+
 .data-table {
     max-height: 10rem;
     overflow-y: scroll;
