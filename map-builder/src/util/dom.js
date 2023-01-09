@@ -10,7 +10,10 @@ function reportStyle(reference, target) {
 }
 
 function reportStyleElem(ref, target) {
-    target.setAttribute('style', ref.getAttribute('style'));
+    const refStyle = ref.getAttribute('style');
+    if (refStyle && refStyle !== "null") {
+        target.setAttribute('style', refStyle);
+    }
 }
 
 function fontsToCss(fonts) {

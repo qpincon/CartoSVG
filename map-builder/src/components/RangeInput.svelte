@@ -25,7 +25,7 @@
     };
 </script>
 
-<div class="row">
+<div class="row w-100">
     <label for={id} class="d-flex col-4 col-form-label align-items-center">
         {title}
     </label>
@@ -37,7 +37,7 @@
             data-bs-title={helpText}>?</span
         >
     {/if}
-    <div class="d-flex align-items-center col">
+    <div class="p-0 d-flex align-items-center col">
         <input
             type="range"
             class="form-range"
@@ -48,11 +48,15 @@
             {step}
             on:change={(e) => onChange(e.target.value)}
         />
-        <span
-            class="range-label text-center d-flex text-primary mx-1 text-opacity-75 fs-6"
-        >
-            {value}
-            <div class="ms-2 d-inline-flex flex-column align-items-center justify-content-center arrows">
+        <div class="d-flex">
+            <span
+                class="range-label text-center d-flex text-primary mx-1 text-opacity-75 fs-6"
+            >
+                {value}
+            </span>
+            <div
+                class="ms-2 d-inline-flex flex-column align-items-center justify-content-center arrows"
+            >
                 <svg
                     use:tapHold
                     on:hold={increment}
@@ -82,7 +86,7 @@
                     />
                 </svg>
             </div>
-        </span>
+        </div>
     </div>
 </div>
 

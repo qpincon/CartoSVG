@@ -65,4 +65,12 @@
 - [ ] Allow minification of JS
 - [ ] Implement Undo / Redo on points / labels moving 
 - [x] Allow more projections
-- [ ] Add categorical colors by hand
+- [x] Add categorical colors by hand
+- [x] Formatting language: chose for legend + tooltip
+- [ ] Store deleted elements. Button to reset deleted ?
+- [x] Disable double-click zoom
+- [x] Legend: style not applied on template
+- [x] Legend: color width/height not reported immediatly
+- [x] Tooltip check/uncheck: style not applied to template
+- [x] Altitude bounds not correct when satellite directly used
+- [ ] Allow for undefined values in quantil/ze, with a checkbox appearing if there are undefined values

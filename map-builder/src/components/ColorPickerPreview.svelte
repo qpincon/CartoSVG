@@ -7,13 +7,15 @@
     export let title = '';
     export let id = 'colorpickerid'; 
     export let onChange = (newCol) => {};
-    $: _onChange = (color, reinit = true) => {
+    $: _onChange = (color) => {
+        console.log('_onChange');
         onChange(color)
         changedManually = true;
     };
     export let popup = 'left';
+
     $: if(value) {
-        if (!changedManually) setTimeout(() => {colorPicker.init();}, 0);
+        if (!changedManually && colorPicker) setTimeout(() => {colorPicker.init();}, 0);
         changedManually = false;
     }
 </script>

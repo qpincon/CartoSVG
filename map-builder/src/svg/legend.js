@@ -40,12 +40,12 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
     const offsetY = legendDef.changes[groupId].dy;
     const legendGroup = legendSelection.append('g')
         .attr('id', groupId)
-        .attr('transform', `translate(${legendDef.x + offsetX}, ${offsetY + (legendDef.y ? legendDef.y : 100)})`)
+        .attr('transform', `translate(${legendDef.x + offsetX} ${offsetY + (legendDef.y ? legendDef.y : 100)})`)
 
     const legendTitle = legendGroup.append('text')
         .attr('x', 0)
         .attr('y', 0)
-        .attr('transform', `translate(${legendDef.changes[titleId].dx}, ${legendDef.changes[titleId].dy -20})`)
+        .attr('transform', `translate(${legendDef.changes[titleId].dx} ${legendDef.changes[titleId].dy -20})`)
         .attr('id', `${tabName}-legend-title`)
         .style('font-size', '20px')
         .text(legendDef.title)
@@ -95,7 +95,7 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
         .attr('transform', (d, i) => {
             const x = computeX();
             const y = computeY(i);
-            return `translate(${x},${y})`;
+            return `translate(${x} ${y})`;
         });
 
     legendEntries.append('rect')
@@ -127,10 +127,6 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
         });
     }
     return legendSelection;
-}
-
-function dragLegendEntry() {
-
 }
 
 

@@ -359,6 +359,7 @@ function redraw(propName) {
 let altScale = d3.scaleLinear().domain([1, 0]).range([100, 10000]);
 function zoomed(event) {
     if (!event.sourceEvent) return;
+    if (event.sourceEvent.type === 'dblclick') return;
     if (!projection) return;
     event.transform.k = Math.max(Math.min(event.transform.k, 1), 0.00001)
     const newAltitude = Math.round(altScale(event.transform.k));
@@ -610,7 +611,6 @@ async function draw(simplified = false, _) {
 }
 
 function projectAndDraw(simplified = false) {
-    // changeAltitudeScale();
     changeProjection();
     draw(simplified);
 }
@@ -746,6 +746,7 @@ function resetState() {
     legendDefs = {countries: JSON.parse(JSON.stringify(defaultLegendDef))};
     customCategoricalPalette = ['#ff0000ff', '#00ff00ff', '#0000ffff'];
     projectAndDraw();
+    changeAltitudeScale();
 }
 
 function restoreState(givenState) {
@@ -765,6 +766,7 @@ function restoreState(givenState) {
     const tabsWoLand = orderedTabs.filter(x => x !== 'land');
     if (tabsWoLand.length) onTabChanged(tabsWoLand[0]);
     getZonesDataFormatters();
+    changeAltitudeScale();
 }
 
 function saveProject() {
@@ -925,12 +927,9 @@ function getFirstDataRow(zonesDataDef) {
 
 let currentTemplateHasNumeric = false;
 function templateHasNumeric(layerName) {
-    const toFind = zonesData[layerName].numericCols.map(col => (`{${col}}`));
-    const template = tooltipDefs[layerName].template;
-    if (toFind.some(str => template.includes(str))) {
-        return true;
-    }
-    return false;
+    const toFind = zonesData[layerName]?.numericCols.map(col => (`{${col}}`));
+    const template = tooltipDefs[layerName]?.template;
+    return toFind?.some(str => template.includes(str));
 }
 // function handleInput(e) {
 //     const file = e.target.files[0];
@@ -1196,24 +1195,28 @@ function onTemplateChange() {
     save(); 
 }
 
-function changeTooltipLocale() {
+function changeNumericFormatter() {
     getZonesDataFormatters();
+    colorizeAndLegend();
 }
 
 async function onTabChanged(newTabTitle) {
     currentTab = newTabTitle;
+    currentTemplateHasNumeric = templateHasNumeric(currentTab) === true;
     await tick();
     initTooltips();
-    if (!tooltipDefs[newTabTitle]) return;
-    if (tooltipDefs[newTabTitle].enabled) {
-        const tmpElem = htmlToElement(tooltipDefs[newTabTitle].content);
+    applyStylesToTemplate();
+}
+
+function applyStylesToTemplate() {
+    if (tooltipDefs[currentTab]?.enabled) {
+        const tmpElem = htmlToElement(tooltipDefs[currentTab].content);
         reportStyle(tmpElem, htmlTooltipElem);
     }
-    if (colorDataDefs[newTabTitle].legendEnabled) {
-        const tmpElem = htmlToElement(legendDefs[newTabTitle].sampleHtml);
+    if (colorDataDefs[currentTab]?.legendEnabled) {
+        const tmpElem = htmlToElement(legendDefs[currentTab].sampleHtml);
         reportStyle(tmpElem, legendSample);
     }
-    currentTemplateHasNumeric = templateHasNumeric(currentTab);
 }
 
 async function addNewCountry(e) {
@@ -1233,7 +1236,6 @@ async function addNewCountry(e) {
     e.target.selectedIndex = null;
     await draw();
     onTabChanged(newLayerName);
-    // setTimeout(() => {onTabChanged(e.target.value);}, 2000);
 }
 
 function deleteCountry(country, drawAfter = true) {
@@ -1305,9 +1307,10 @@ const categoricalPalettes = [
 
 // --- Computed ---
 let availableColumns = [], availablePalettes = [];
-
 $: availableColorTypes = zonesData?.[currentTab]?.numericCols?.length ? ['category', 'quantile', 'quantize'] : ['category'];
 $: curDataDefs = colorDataDefs?.[currentTab];
+let currentIsColorByNumeric = ['quantile', 'quantize'].includes(curDataDefs?.colorScale)
+
 function autoSelectColors() {
     if (!zonesData[currentTab]) return;
     if (curDataDefs.colorScale === null) {
@@ -1341,6 +1344,7 @@ let sampleLegend = {
 let showCustomPalette = false;
 
 async function colorizeAndLegend(e) {
+    await tick();
     initTooltips();
     legendDefs = legendDefs;
     const legendEntries = d3.select('#svg-map-legend');
@@ -1384,6 +1388,7 @@ async function colorizeAndLegend(e) {
     });
     computeCss();
     applyStyles();
+    applyStylesToTemplate();
 }
 
 // ==== Legend === 
@@ -1402,7 +1407,7 @@ function getLegendColors(dataColorDef, tab, scale) {
         threshValues = [...new Set(data)];
     }
     else {
-        formatter = d3.format(`,.${legendDefs[tab].significantDigits}r`);
+        formatter = d3.formatLocale(resolvedLocales[tooltipDefs[tab].locale]).format(`,.${legendDefs[tab].significantDigits}r`);
         const minValue = Math.min(...data);
         if (scale.quantiles) threshValues = scale.quantiles();
         else if (scale.thresholds) threshValues = scale.thresholds();
@@ -1617,10 +1622,10 @@ function getLegendColors(dataColorDef, tab, scale) {
                     <div class="data-table mb-2" on:click={() => (showModal = true)}>
                         <DataTable data={zonesData?.[currentTab]?.['data']}> </DataTable>
                     </div>
-                    <div class="mx-2 form-check">
+                    <div class="mx-2 form-check form-switch">
                         <input
-                            type="checkbox" class="form-check-input" id='showTooltip' bind:checked={tooltipDefs[currentTab].enabled} 
-                            on:click={() => setTimeout(() => {initTooltips(); save(); }, 0)}
+                            type="checkbox" role="switch" class="form-check-input" id='showTooltip' bind:checked={tooltipDefs[currentTab].enabled} 
+                            on:click={() => setTimeout(() => {initTooltips(); save(); applyStylesToTemplate();}, 0)}
                         />
                         <label for='showTooltip' class="form-check-label"> Show tooltip on hover </label>
                     </div>
@@ -1629,12 +1634,12 @@ function getLegendColors(dataColorDef, tab, scale) {
                             <label for="templatetooltip" class="form-label"> Tooltip template
                                 <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="The template must be valid HTML (<br/> can be used to break lines). Brackets  &#123; &#125; can be used to reference variables.  ">?</span>
                             </label>
-                            <textarea class="form-control" 
+                            <textarea class="form-control"
                             class:is-invalid="{templateErrorMessages[currentTab]}"
                             id="templatetooltip" rows="3" bind:value={tooltipDefs[currentTab].template} on:change={onTemplateChange}/>
                             {#if templateErrorMessages[currentTab]}
                                 <div class="invalid-feedback"> 
-                                    <span> Malformed HTML. Please fix the template: </span> <br/>
+                                    <span> Malformed HTML. Please fix the template </span> <br/>
                                     <!-- {templateErrorMessages[currentTab]} -->
                                 </div> {/if}
                         </div>
@@ -1646,23 +1651,13 @@ function getLegendColors(dataColorDef, tab, scale) {
                                 <div id="tooltip-preview-{currentTab}" bind:this={htmlTooltipElem} on:click={editTooltip} style="${defaultTooltipStyle}">
                                     {@html tooltipDefs[currentTab].template.formatUnicorn(getFirstDataRow(zonesData?.[currentTab]))}
                                 </div>
-                                {#if currentTemplateHasNumeric }
-                                    <div class="mt-1 form-floating">
-                                        <select class="form-select form-select-sm" id="choseFormatLocale" bind:value={tooltipDefs[currentTab].locale} on:change={changeTooltipLocale}>
-                                            {#each availableFormatLocales as locale}
-                                                <option value={locale}> {locale} </option>
-                                            {/each}
-                                        </select>
-                                        <label for="choseFormatLocale">Formatting language</label>
-                                    </div>
-                                {/if}
                             </div>
                         </div>
                     {/if}
                     <!-- COLORING -->
-                    <div class="mx-2 form-check">
+                    <div class="mx-2 form-check form-switch">
                         <input
-                            type="checkbox" class="form-check-input" id='colorData'
+                            type="checkbox" role="switch" class="form-check-input" id='colorData'
                             bind:checked={curDataDefs.enabled}
                             on:change={colorizeAndLegend}
                         />
@@ -1709,9 +1704,9 @@ function getLegendColors(dataColorDef, tab, scale) {
                             </div>
                         {/if}
                             <!-- LEGEND -->
-                            <div class="mx-2 form-check">
+                            <div class="mx-2 form-check form-switch">
                                 <input
-                                    type="checkbox" class="form-check-input" id='showLegend' 
+                                    type="checkbox" class="form-check-input" id='showLegend' role="switch"
                                     bind:checked={colorDataDefs[currentTab].legendEnabled}
                                     on:change={colorizeAndLegend}
                                 />
@@ -1737,7 +1732,17 @@ function getLegendColors(dataColorDef, tab, scale) {
                         </svg>
                         <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click to update style (the legend is SVG).">?</span>
                     {/if}
-                {/if}    
+                {/if}
+                {#if currentIsColorByNumeric || currentTemplateHasNumeric }
+                    <div class="mt-1 form-floating">
+                        <select class="form-select form-select-sm" id="choseFormatLocale" bind:value={tooltipDefs[currentTab].locale} on:change={changeNumericFormatter}>
+                            {#each availableFormatLocales as locale}
+                                <option value={locale}> {locale} </option>
+                            {/each}
+                        </select>
+                        <label for="choseFormatLocale">Formatting language</label>
+                    </div>
+                {/if}
             </div> 
         </aside>
     </div>
@@ -1856,5 +1861,8 @@ input[type="file"] {
 .accordions, aside {
     min-width: 20rem;
     max-width: 30rem;
+}
+textarea {
+    font-size: 0.82rem;
 }
 </style>

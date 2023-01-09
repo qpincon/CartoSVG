@@ -99,6 +99,7 @@
             <div class="modal-content">
                 <div class="modal-header p-0">
                     <slot name="header"/>
+                    <button type="button" class="btn-close me-2" data-bs-dismiss="modal" aria-label="Close" on:click={() => open = false}></button>
                 </div>
                 <div class="modal-body p-3">
                     <slot name="content"/>
