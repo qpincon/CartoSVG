@@ -1,9 +1,11 @@
 <script>
 
+import {getColumns} from '../util/common';
+
 export let data = [];
 
 
-$: headers = data.length ? Object.keys(data[0]) : [];
+$: headers = getColumns(data);
 
 </script>
 

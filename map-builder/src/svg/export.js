@@ -12,10 +12,10 @@ const domParser = new DOMParser();
 const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`
 
 const exportFontChoices = Object.freeze({
-    noExport: "0",
-    convertToPath: "1",
-    embedFont: "2",
-    smallest: "3"
+    noExport: 0,
+    convertToPath: 1,
+    embedFont: 2,
+    smallest: 3,
 });
 
 const domBaselineToBaseline = {
@@ -93,9 +93,10 @@ async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
 }
 
 async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, providedFonts, downloadExport = true, commonCss,
-    { exportFonts = exportFontChoices.smallest, hideOnResize = false }) {
+    { exportFonts = exportFontChoices.convertToPath, hideOnResize = false }) {
 
     const fo = svg.select('foreignObject').node();
+    // remove foreign object from dom when exporting
     if (fo) document.body.append(fo);
     const svgNode = svg.node();
     
@@ -123,7 +124,8 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         const functionStr = ttTemplate.replaceAll(/\{(\w+)\}/gi, '${data.$1}');
         finalDataByGroup.tooltips[groupId] = functionStr;
         const zonesDataDup = JSON.parse(JSON.stringify(zonesData[groupId].data));
-        zonesData[groupId].numericCols.forEach(col => {
+        zonesData[groupId].numericCols.forEach(colDef => {
+            const col = colDef.column;
             zonesDataDup.forEach(row => {
                 row[col] = zonesData[groupId].formatters[col](row[col]);
             });

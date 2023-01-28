@@ -8,7 +8,6 @@
     export let id = 'colorpickerid'; 
     export let onChange = (newCol) => {};
     $: _onChange = (color) => {
-        console.log('_onChange');
         onChange(color)
         changedManually = true;
     };

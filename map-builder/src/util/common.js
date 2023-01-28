@@ -83,14 +83,34 @@ function sortBy(data, key) {
 }
 
 function getNumericCols(jsonData) {
-    const numericCols = new Set(Object.keys(jsonData[0]));
-    for (let row of jsonData) {
-        if (!numericCols.size) return [];
+    const nonNumericoCols = new Set();
+    const allCols = new Set();
+    const colWithNullOrUndef = new Set();
+    for (const row of jsonData) {
         Object.entries(row).forEach(([key, value]) => {
-            if (numericCols.has(key) && typeof (value) !== 'number') numericCols.delete(key);
+            allCols.add(key);
+            const isNullOrUndef = value === undefined || value === null;
+            if (isNullOrUndef) colWithNullOrUndef(key);
+            if (!isNullOrUndef && typeof (value) !== 'number') nonNumericoCols.add(key);
         });
     }
-    return [...numericCols];
+    return [...allCols].reduce((acc, col) => {
+        if (nonNumericoCols.has(col)) return acc;
+        acc.push({
+            column: col,
+            hasNull: colWithNullOrUndef.has(col),
+        });
+        return acc;
+    }, []);
+}
+
+function getColumns(data) {
+    if (!data.length) return [];
+    const cols = new Set();
+    data.forEach(row => {
+        Object.keys(row).forEach(col => cols.add(col));
+    });
+    return [...cols];
 }
 
 function initTooltips() {
@@ -146,4 +166,4 @@ function RGBAToHexA(rgba, forceRemoveAlpha = false) {
       .join("") // Puts the array to togehter to a string
   }
 
-export { download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce, getNumericCols, initTooltips, getBestFormatter, tapHold, RGBAToHexA };
+export { download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce, getNumericCols, initTooltips, getBestFormatter, tapHold, RGBAToHexA, getColumns };

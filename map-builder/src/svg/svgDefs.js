@@ -112,19 +112,21 @@ function appendBgPattern(selection, id, seaColor, backgroundNoise = false, image
 }
 
 
-function appendClip(selection, width, height, rectRadius) {
-    // let defs = selection.select('defs');
-    // if (defs.empty()) defs = selection.append('defs')
+function appendClip(selection, width, height, rectRadius, x=0, y=0) {
+    let defs = selection.select('defs');
+    if (defs.empty()) defs = selection.append('defs');
     const existing = d3.select('#clipMapBorder');
     if (!existing.empty()) existing.remove();
-    const clip = selection.append('clipPath')
+    const clip = defs.append('clipPath')
         .attr('id', "clipMapBorder")
         .attr('clipPathUnits', 'userSpaceOnUse');
 
     clip.append('rect')
         .attr('width', width)
         .attr('height', height)
-        .attr('rx', rectRadius);
+        .attr('rx', rectRadius)
+        .attr('x', x)
+        .attr('y', y);
 }
 
 function frontFilter(selection) {

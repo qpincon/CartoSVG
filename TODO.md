@@ -63,7 +63,7 @@
 - [x] Change default filter 2 
 - [x] Make more fine-tuning altitude/FOV more intuitive
 - [ ] Allow minification of JS
-- [ ] Implement Undo / Redo on points / labels moving 
+- [-] Implement Undo / Redo on points / labels moving 
 - [x] Allow more projections
 - [x] Add categorical colors by hand
 - [x] Formatting language: chose for legend + tooltip
@@ -74,3 +74,9 @@
 - [x] Tooltip check/uncheck: style not applied to template
 - [x] Altitude bounds not correct when satellite directly used
 - [ ] Allow for undefined values in quantil/ze, with a checkbox appearing if there are undefined values
+- [-] Legend can go off-canvas when resizing -> Not a big deal
+- [x] On small canvas, there seems to be off-canvas drawings
+- [x] Export as raster no working when legend is present
+- [x] Dynamic bounds for border radius depending on max of width/height
+- [ ] inline style editor: no css selection by attribute with [id=]
+- [x] geoclip to accomodate border-radius ? at least use masking

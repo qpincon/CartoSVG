@@ -67,7 +67,8 @@ function onMouseMove(e, map, tooltipDefs, zonesData, tooltip) {
     }
     else {
         const data = {...zonesData[groupId].data.find(row => row.name === shapeId)};
-        zonesData[groupId].numericCols.forEach(col => {
+        zonesData[groupId].numericCols.forEach(colDef => {
+            const col = colDef.column;
             data[col] = zonesData[groupId].formatters[col](data[col]);
         });
         if (!data) {

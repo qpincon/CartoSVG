@@ -14,13 +14,12 @@ import { paramDefs, defaultParams, helpParams, noSatelliteParams } from './param
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
 import { getProjection, updateAltitudeRange } from './util/projections';
-import ColorPicker from "./components/ColorPicker.svelte";
 import PaletteEditor from "./components/PaletteEditor.svelte";
 
-import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce, getBestFormatter } from './util/common';
+import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce, getBestFormatter, getColumns } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import * as markers from './svg/markerDefs';
-import { setTransformScale, closestDistance } from './svg/svg';
+import { setTransformScale, closestDistance, encodeSVGDataImage } from './svg/svg';
 import { drawShapes } from './svg/shape';
 import iso3Data from './assets/data/iso3_filtered.json';
 import DataTable from './components/DataTable.svelte';
@@ -38,7 +37,7 @@ import ColorPickerPreview from './components/ColorPickerPreview.svelte';
 import Instructions from './components/Instructions.svelte';
 import Icon from './components/Icon.svelte';
 import RangeInput from './components/RangeInput.svelte';
-import { reportStyle, fontsToCss, exportStyleSheet } from './util/dom';
+import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts } from './util/dom';
 import { saveState, getState } from './util/save';
 import { svgToPng } from './svg/toPng';
 import { exportSvg, exportFontChoices } from './svg/export';
@@ -124,7 +123,7 @@ String.prototype.formatUnicorn = String.prototype.formatUnicorn || function () {
 
 const p = (propName, obj = params) => findProp(propName, obj);
 
-const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView', 'projection'];
+const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView', 'projection', 'width', 'height'];
 let timeoutId;
 let countries = null;
 let land = null;
@@ -273,7 +272,6 @@ onMount(() => {
                         d3.select(`#${markerId}`).attr('fill', value)
                             .attr('id', newMarkerId);
                         d3.select(target).attr('marker-end', `url(#${newMarkerId})`);
-                        // drawCustomPaths(providedPaths, svg, projection, inlineStyles);
                     }
                 }
             }
@@ -570,8 +568,8 @@ async function draw(simplified = false, _) {
     groupData.push({ name: 'points-labels', data: [], id: null, props: [], class: null, filter: null });
     // const groups = svg.selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
     const groups = svg.append('svg')
+    .selectAll('g').data(groupData).join('g').attr('id', d => d.name);
         // .attr('clip-path', 'url(#clipMapBorder)')
-        .selectAll('g').data(groupData).join('g').attr('id', d => d.name);
     function drawPaths(data) {
         if (data.type === 'landImg') return appendLandImage.call(this, data.showSource);
         if (data.type === 'filterImg') return appendCountryImage.call(this, data.countryData, data.filter);
@@ -595,17 +593,26 @@ async function draw(simplified = false, _) {
         appendGlow(svg, filterName, true, p(filterName));
     });
     appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
+    const borderWidth = p('borderWidth');
+    const borderRadius = p('borderRadius');
+    const rx = Math.max(width, height) * (borderRadius / 100);
+    // const rx = width * (borderRadius / 100);
+    // const ry = height * (borderRadius / 100);
     d3.select('#outline').style('fill', "url(#noise)");
     colorizeAndLegend();
     computeCss();
     svg.append('rect')
+        .attr('x', borderWidth / 2)
+        .attr('y', borderWidth / 2)
         .attr('id', 'frame')
-        .attr('width', width)
-        .attr('height', height)
-        .attr('rx', p('borderRadius'));
+        .attr('width', width - borderWidth) 
+        .attr('height', height - borderWidth)
+        .attr('rx', rx)
+        // .attr('ry', ry);
     drawAndSetupShapes();
     const map = document.getElementById('static-svg-map');
     if(!map) return;
+    await tick();
     addTooltipListener(map, tooltipDefs, zonesData);
     firstDraw = false;
 }
@@ -618,10 +625,18 @@ function projectAndDraw(simplified = false) {
 let totalCommonCss;
 function computeCss() {
     const finalColorsCss = Object.values(colorsCss).reduce((acc, cur) => {acc += cur; return acc;}, '');
+    const width = p('width');
+    const height = p('height');
+    const borderRadius = p('borderRadius');
+    const wantedRadiusInPx = Math.max(width, height) * (borderRadius / 100);
+    const radiusX = Math.min((wantedRadiusInPx * 100) / width, 50);
+    const radiusY = Math.min((wantedRadiusInPx * 100) / height, 50);
     const borderCss = `
-    #static-svg-map, #static-svg-map > svg {
-        border-radius: ${p('borderRadius')}px;
+    #static-svg-map {
         ${p('frameShadow') ? 'filter: drop-shadow(2px 2px 8px rgba(0,0,0,.2));': ''}
+    }
+    #static-svg-map > svg {
+        border-radius: ${radiusX}%/${radiusY}%;
     }
     #frame {
         fill: none;
@@ -655,8 +670,10 @@ function appendLandImage(showSource) {
         .attr('stroke-dasharray', contourParams.strokeDash)
         .attr('fill', 'none');
 
+    // const optimized = encodeSVGDataImage(SVGO.optimize(landElem.node().outerHTML, svgoConfig).data);
     const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
         .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(landElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
+        // .attr('href', optimized);
         
     d3.select(this).html(landImage.node().outerHTML)
         .style('pointer-events', 'none')
@@ -684,9 +701,10 @@ function appendCountryImage(countryData, filter) {
         const computedRef = window.getComputedStyle(ref);
         strokeParams.forEach(p => elemStroke.attr(p, computedRef[p]));
     }
-    
+    // const optimized = encodeSVGDataImage(SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data);
     const countryImage = d3.create('image').attr('width', '100%').attr('height', '100%').attr('id', countryElem)
         .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
+        // .attr('href', optimized);
     d3.select(this).html(countryImage.node().outerHTML)
         .style('pointer-events', 'none')
         .style('will-change', 'opacity');
@@ -848,7 +866,7 @@ function editPath() {
 function deletePath() {
     closeMenu();
     providedPaths.splice(selectedPathIndex, 1);
-    drawCustomPaths(providedPaths, svg, projection, inlineStyles);
+    drawShapesAndSave();
 }
 
 function addImageToPath(e) {
@@ -919,7 +937,8 @@ function drawShapesAndSave() {
 function getFirstDataRow(zonesDataDef) {
     if (!zonesData) return null;
     const row = {...zonesDataDef.data[0]};
-    zonesDataDef.numericCols.forEach(col => {
+    zonesDataDef.numericCols.forEach(colDef => {
+        const col = colDef.column;
         row[col] = zonesDataDef.formatters[col](row[col]);
     });
     return row;
@@ -927,7 +946,7 @@ function getFirstDataRow(zonesDataDef) {
 
 let currentTemplateHasNumeric = false;
 function templateHasNumeric(layerName) {
-    const toFind = zonesData[layerName]?.numericCols.map(col => (`{${col}}`));
+    const toFind = zonesData[layerName]?.numericCols.map(colDef => (`{${colDef.column}}`));
     const template = tooltipDefs[layerName]?.template;
     return toFind?.some(str => template.includes(str));
 }
@@ -991,12 +1010,13 @@ function handleChangeProp(event) {
     if (prop === 'projection' || prop === 'fieldOfView') {
         changeAltitudeScale();
     }
-    if (prop == 'projection') {
+    if (prop === 'projection') {
         inlineProps.translateX = 0;
         inlineProps.translateY = 0;
     }
     redraw(prop);
 }
+
 
 function closeMenu() {
     contextualMenu.style.display = 'none';
@@ -1123,7 +1143,8 @@ function getZonesDataFormatters() {
         const locale = tooltipDefs[name].locale;
         const formatters = {};
         if (def.numericCols.length) {
-            def.numericCols.forEach(col => {
+            def.numericCols.forEach(colDef => {
+                const col = colDef.column;
                 formatters[col] = getBestFormatter(def.data.map(row => row[col]), resolvedLocales[locale]);
             });
         }
@@ -1287,10 +1308,18 @@ function validateExport() {
 // === Export as PNG behaviour ===
 
 async function exportRaster() {
-    const optimized = await exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, false, totalCommonCss, {});
-    svgToPng('data:image/svg+xml;base64,' + window.btoa(optimized), p('width'), p('height'));
+    let optimized = await exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, false, totalCommonCss, {});
+    optimized = encodeSVGDataImage(optimized);
+    svgToPng(optimized, p('width'), p('height'));
 }
 
+let inlineFontUsed = false;
+function onExportSvgClicked() {
+    showExportConfirm = true;
+    const usedFonts = getUsedInlineFonts(svg.node());
+    const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
+    inlineFontUsed = usedProvidedFonts.length > 0;
+}
 // === Colorize by data behaviour ===
 
 const numericPalettes =  [
@@ -1315,14 +1344,14 @@ function autoSelectColors() {
     if (!zonesData[currentTab]) return;
     if (curDataDefs.colorScale === null) {
         if (curDataDefs.colorColumn !== null) {
-            if (zonesData[currentTab].numericCols.includes(curDataDefs.colorColumn)) {
+            if (zonesData[currentTab].numericCols.find(x => x.column === curDataDefs.colorColumn)) {
                 curDataDefs.colorScale = 'quantile';
             }
             else curDataDefs.colorScale = 'category';
         }
         else curDataDefs.colorScale = 'category';
     }
-    availableColumns = curDataDefs.colorScale === "category" ? Object.keys(zonesData[currentTab].data[0]) : zonesData?.[currentTab]?.numericCols;
+    availableColumns = curDataDefs.colorScale === "category" ? getColumns(zonesData[currentTab].data) : zonesData?.[currentTab]?.numericCols.map(x => x.column);
     availablePalettes = curDataDefs.colorScale === "category" ? categoricalPalettes : numericPalettes;
     if (!availableColumns.includes(curDataDefs.colorColumn)) {
         curDataDefs.colorColumn = availableColumns[0];
@@ -1349,7 +1378,8 @@ async function colorizeAndLegend(e) {
     legendDefs = legendDefs;
     const legendEntries = d3.select('#svg-map-legend');
     if (!legendEntries.empty()) legendEntries.remove();
-    const legendSelection = svg.append('g').attr('id', 'svg-map-legend');
+    const legendSelection = svg.select('svg').append('g').attr('id', 'svg-map-legend');
+    let hasNullOrUndef = false;
     Object.entries(colorDataDefs).forEach(([tab, dataColorDef]) => {
         if (!dataColorDef.enabled) {
             dataColorDef.legendEnabled = false;
@@ -1359,7 +1389,17 @@ async function colorizeAndLegend(e) {
             return;
         }
         const paletteName = `scheme${dataColorDef.colorPalette}`;
-        const data = zonesData[tab].data.map(row => row[dataColorDef.colorColumn]);
+        // filter out undef or null data
+        const data = zonesData[tab].data.reduce((acc, row) => {
+            const d = row[dataColorDef.colorColumn];
+            if (d === null || d === undefined) {
+                hasNullOrUndef = true;
+                return acc;
+            }
+            acc.push(d);
+            return acc;
+        }, []);
+        console.log(data);
         let scale;
         if (dataColorDef.colorScale === "category" ) {
             if (dataColorDef.colorPalette === 'Custom') {
@@ -1380,11 +1420,11 @@ async function colorizeAndLegend(e) {
             path[id="${key}"]:hover{fill:${d3.color(color).brighter(.2).hex()};}`;
         });
         colorsCss[tab] = newCss;
-        const legendColors = getLegendColors(dataColorDef, tab, scale);
+        const legendColors = getLegendColors(dataColorDef, tab, scale, data);
         if (!legendColors) return;
         if (tab === currentTab) sampleLegend = {color: legendColors[0][0], text: legendColors[0][1]};
         const sampleElem = htmlToElement(legendDefs[tab].sampleHtml);
-        displayedLegend[tab] = drawLegend(legendSelection, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', sampleElem, tab);
+        displayedLegend[tab] = drawLegend(legendSelection, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', sampleElem, tab, hasNullOrUndef);
     });
     computeCss();
     applyStyles();
@@ -1393,7 +1433,7 @@ async function colorizeAndLegend(e) {
 
 // ==== Legend === 
 
-function getLegendColors(dataColorDef, tab, scale) {
+function getLegendColors(dataColorDef, tab, scale, data) {
     if (!dataColorDef.legendEnabled) {
         if (displayedLegend[tab]) displayedLegend[tab].remove();
         return;
@@ -1401,7 +1441,6 @@ function getLegendColors(dataColorDef, tab, scale) {
     if (legendSample && legendDefs[tab].sampleHtml === null) legendDefs[tab].sampleHtml = legendSample.outerHTML;
     if (legendDefs[tab].title === null) legendDefs[tab].title = dataColorDef.colorColumn;
     let threshValues;
-    const data = zonesData[tab].data.map(row => row[dataColorDef.colorColumn]);
     let formatter = (x) => x;
     if (dataColorDef.colorScale === "category" ) {
         threshValues = [...new Set(data)];
@@ -1493,7 +1532,7 @@ function getLegendColors(dataColorDef, tab, scale) {
 <Navbar></Navbar>
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-start p-3">
-        <aside class="panel d-flex flex-column align-items-center">
+        <aside class="panel d-flex flex-column align-items-center me-4">
             <div class="d-flex justify-content-center align-items-center">
                 <span class="m-2 px-2 py-1 btn btn-outline-primary" role="button" on:click={() => showInstructions = true} > 
                     <Icon marginRight="0px" width="1.8rem" svg={icons['help']}/>
@@ -1510,7 +1549,7 @@ function getLegendColors(dataColorDef, tab, scale) {
             <div class="mt-4 d-flex align-items-center justify-content-center">
                 <div class="mx-2">
                     <label for="fontinput" class="m-2 d-flex align-items-center btn btn-outline-primary"> <Icon svg={icons['font']}/> Add font</label>
-                    <input type="file" id="fontinput" accept=".ttf,.woff,.woff2" on:change={handleInputFont}>
+                    <input type="file" id="fontinput" accept=".ttf,.woff,.woff2,.otf" on:change={handleInputFont}>
                 </div>
                 <div class="dropdown mx-2">
                     <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -1535,7 +1574,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                         <Icon fillColor="none" svg={icons['download']}/> Export
                     </button>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#" on:click={() => showExportConfirm = true}> Export SVG </a></li>
+                        <li><a class="dropdown-item" href="#" on:click={onExportSvgClicked}> Export SVG </a></li>
                         <li><a class="dropdown-item" href="#" on:click={exportRaster}> Export raster </a></li>
                     </ul>
                 </div>
@@ -1555,7 +1594,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                 </div>
             </div>
             
-            <ul class="nav nav-tabs">
+            <ul class="nav nav-tabs align-items-center flex-nowrap">
                 {#each computedOrderedTabs as tabTitle, index (tabTitle) }
                 {@const isLand = tabTitle === "land"}
                 <li class="nav-item d-flex align-items-center"
@@ -1636,7 +1675,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                             </label>
                             <textarea class="form-control"
                             class:is-invalid="{templateErrorMessages[currentTab]}"
-                            id="templatetooltip" rows="3" bind:value={tooltipDefs[currentTab].template} on:change={onTemplateChange}/>
+                            id="templatetooltip" rows="7" bind:value={tooltipDefs[currentTab].template} on:change={onTemplateChange}/>
                             {#if templateErrorMessages[currentTab]}
                                 <div class="invalid-feedback"> 
                                     <span> Malformed HTML. Please fix the template </span> <br/>
@@ -1740,7 +1779,7 @@ function getLegendColors(dataColorDef, tab, scale) {
                                 <option value={locale}> {locale} </option>
                             {/each}
                         </select>
-                        <label for="choseFormatLocale">Formatting language</label>
+                        <label for="choseFormatLocale">Number formatting language</label>
                     </div>
                 {/if}
             </div> 
@@ -1756,7 +1795,7 @@ function getLegendColors(dataColorDef, tab, scale) {
         <h2 class="fs-3 p-2 m-0"> Export options </h2>
     </div>
     <form slot="content" bind:this={exportForm}>
-        {#if providedFonts.length}
+        {#if inlineFontUsed}
             <h3 class="fs-4"> Font export </h3>
             <div class="form-check">
                 <input class="form-check-input" type="radio" name="exportFonts" value={exportFontChoices.noExport} id="exportFonts1">

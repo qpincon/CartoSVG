@@ -119,8 +119,9 @@ html {
     fill: black;
 }
 .color-preview {
-    width: 2rem;
-    height: 2rem;
+    width: 23px;
+    height: 23px;
+    flex: 0 0 auto;
 }
 .accordion-item > .input-type {
     padding-right: 6px;

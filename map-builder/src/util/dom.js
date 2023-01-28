@@ -27,7 +27,7 @@ function fontsToCss(fonts) {
 
 function getUsedInlineFonts(svg) {
     const fonts = new Set();
-    for (let node of document.querySelectorAll('*')) {
+    for (let node of svg.querySelectorAll('*')) {
         if (!node.style) continue
         const fontFamily = node.style['font-family'] || null;
         if (fontFamily) fonts.add(fontFamily);

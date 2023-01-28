@@ -1,7 +1,9 @@
 
 
-function svgToPng(b64, width, height) {
-    base64SvgToBase64Png(b64, width, height).then(pngSrc => {
+import { encodeSVGDataImage } from "./svg";
+
+function svgToPng(encodedSvg, width, height) {
+    encodedSvgToBase64Png(encodedSvg, width, height).then(pngSrc => {
         const link = document.createElement("a");
         link.download = 'map.png';
         link.href = pngSrc;
@@ -11,19 +13,21 @@ function svgToPng(b64, width, height) {
 
 /**
  * converts a base64 encoded data url SVG image to a PNG image
- * @param originalBase64 data url of svg image
+ * @param encodedSvg data url of svg image
  * @param width target width in pixel of PNG image
  * @param secondTry used internally to prevent endless recursion
  * @return {Promise<unknown>} resolves to png data url of the image
  */
-function base64SvgToBase64Png(originalBase64, width, height, secondTry) {
+function encodedSvgToBase64Png(encodedSvg, width, height, secondTry) {
     return new Promise(resolve => {
         const img = document.createElement('img');
         img.onload = function () {
             if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
-                const svgDoc = base64ToSvgDocument(originalBase64);
+                const svgDoc = encodedSvgToSvgDocument(encodedSvg);
+                console.log(svgDoc);
                 const fixedDoc = fixSvgDocumentFF(svgDoc);
-                return base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                console.log(fixedDoc);
+                return encodedSvgToBase64Png(encodeSVGDataImage(fixedDoc.firstChild.outerHTML), width, height, true).then(result => {
                     resolve(result);
                 });
             }
@@ -41,9 +45,10 @@ function base64SvgToBase64Png(originalBase64, width, height, secondTry) {
                 resolve(null);
             }
         };
-        img.src = originalBase64;
+        img.src = encodedSvg;
     });
 }
+
 
 //needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
 function fixSvgDocumentFF(svgDocument) {
@@ -58,17 +63,10 @@ function fixSvgDocumentFF(svgDocument) {
     }
 }
 
-function svgDocumentToBase64(svgDocument) {
-    try {
-        let base64EncodedSVG = window.btoa(new XMLSerializer().serializeToString(svgDocument));
-        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
-    } catch (e) {
-        return null;
-    }
-}
 
-function base64ToSvgDocument(base64) {
-    let svg = window.atob(base64.substring(base64.indexOf('base64,') + 7));
+function encodedSvgToSvgDocument(encodedSvg) {
+    let svg = decodeURIComponent(encodedSvg);
+    // let svg = window.atob(base64.substring(base64.indexOf('base64,') + 7));
     svg = svg.substring(svg.indexOf('<svg'));
     let parser = new DOMParser();
     return parser.parseFromString(svg, "image/svg+xml");

@@ -1,5 +1,5 @@
 {
-  "name": "d3-viz-webpack",
+  "name": "svgscape",
   "version": "1.0.0",
   "description": "Design gorgeous SVG map easily ",
   "main": "index.js",

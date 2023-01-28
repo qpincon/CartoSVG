@@ -46,7 +46,7 @@
             {min}
             {max}
             {step}
-            on:change={(e) => onChange(e.target.value)}
+            on:change={(e) => onChange(parseFloat(e.target.value))}
         />
         <div class="d-flex">
             <span

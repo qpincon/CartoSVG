@@ -27,6 +27,7 @@
     stroke: #bfbfbf;
     stroke-width: 1px;
     fill: #f3efec;
+    stroke-linejoin: round;
 }
 
 .country:hover {
@@ -37,6 +38,7 @@
     stroke: #c4b8a3ff;
     stroke-width: 1px;
     fill: #ffffffd0;
+    stroke-linejoin: round;
 }
 
 .adm:hover {

@@ -11,6 +11,7 @@ const config = {
         main: './src/entrypoints/index.js',
         about: './src/entrypoints/about.js',
     },
+    devtool: 'source-map',
     resolve: {
         alias: {
             svelte: path.resolve('node_modules', 'svelte')
@@ -119,7 +120,6 @@ const config = {
             favicon: './src/assets/img/logo_transparent.webp'
         })
     ],
-    mode: 'development',
 };
 
 Object.entries(examplesMeta).forEach(([exampleName, description]) => {
