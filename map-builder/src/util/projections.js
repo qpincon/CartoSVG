@@ -4,9 +4,9 @@ import { scaleLinear, geoClipCircle, geoClipRectangle } from 'd3';
 
 const degrees = 180 / Math.PI;
 const earthRadius = 6371;
-const offCanvasPx = 10;
+const offCanvasPx = 20;
 
-function geoSatelliteCustom({ fov, width, height, longitude, latitude, rotation, altitude, tilt, borderWidth } = {}) {
+function geoSatelliteCustom({ fov, width, height, longitude, latitude, rotation, altitude, tilt, borderWidth, larger = false } = {}) {
     const snyderP = 1.0 + altitude / earthRadius;
     const dY = altitude * Math.sin(tilt / degrees);
     const dZ = altitude * Math.cos(tilt / degrees);
@@ -55,7 +55,7 @@ function geoSatelliteCustom({ fov, width, height, longitude, latitude, rotation,
         };
     }
     const offCanvasWithBorder = offCanvasPx - (borderWidth / 2);
-    return geoSatellite()
+    let proj = geoSatellite()
         .scale(scale)
         .translate([((width / 2)), (yShift + height / 2)])
         .rotate([-longitude, -latitude, rotation])
@@ -64,6 +64,13 @@ function geoSatelliteCustom({ fov, width, height, longitude, latitude, rotation,
         .preclip(preclip)
         .postclip(geoClipRectangle(-offCanvasWithBorder, -offCanvasWithBorder, width + offCanvasWithBorder, height + offCanvasWithBorder))
         .precision(0.1);
+    if (larger) {
+        proj = proj.postclip(geoClipRectangle(-offCanvasWithBorder, -offCanvasWithBorder, width + offCanvasWithBorder, height + offCanvasWithBorder))
+    }
+    else {
+        proj = proj.postclip(geoClipRectangle(0, 0, width, height))
+    }
+    return proj;
 }
 
 const standardProjection = {
@@ -73,18 +80,28 @@ const standardProjection = {
     'geoBaker': geoBakerProj,
 }
 
-function standardProj(projFunc, { width, height, translateX, translateY, altitude, latitude, longitude, rotation, borderWidth } = {}) {
-    return projFunc()
+function standardProj(projFunc, { width, height, translateX, translateY, altitude, latitude, longitude, rotation, borderWidth, larger = false } = {}) {
+    const offCanvasWithBorder = offCanvasPx - (borderWidth / 2);
+    let proj = projFunc()
         .scale(altitude)
         .translate([(width / 2), (height / 2) + translateY])
         .rotate([-longitude, 0, 0])
         .precision(0.1);
+    if (larger) {
+        proj = proj.postclip(geoClipRectangle(-offCanvasWithBorder, -offCanvasWithBorder, width + offCanvasWithBorder, height + offCanvasWithBorder))
+    }
+    return proj;
 }
-function geoAlbersUsaProj({ width, height, translateX, translateY, altitude, latitude, longitude, rotation, borderWidth } = {}) {
-    return geoAlbersUsa()
-        .scale(altitude)
-        .translate([(width / 2) + translateX, (height / 2) + translateY])
-        .precision(0.1);
+function geoAlbersUsaProj({ width, height, translateX, translateY, altitude, latitude, longitude, rotation, borderWidth, larger = false } = {}) {
+    const offCanvasWithBorder = offCanvasPx - (borderWidth / 2);
+    let proj = geoAlbersUsa()
+    .scale(altitude)
+    .translate([(width / 2) + translateX, (height / 2) + translateY])
+    .precision(0.1);
+    if (larger) {
+        proj = proj.postclip(geoClipRectangle(-offCanvasWithBorder, -offCanvasWithBorder, width + offCanvasWithBorder, height + offCanvasWithBorder))
+    }
+    return proj;
 }
 
 function geoMercatorProj(params) {

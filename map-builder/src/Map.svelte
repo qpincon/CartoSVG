@@ -2,12 +2,10 @@
 import { onMount, tick } from 'svelte';
 import * as topojson from 'topojson-client';
 import * as d3 from "d3";
-import SVGO from 'svgo/dist/svgo.browser';
 import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
 import 'bootstrap/js/dist/dropdown';
-
+import { debounce, throttle} from 'lodash-es';
 import dataExplanation from './assets/dataColor.svg';
-import svgoConfig from './svgoExport.config';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import PathEditor from './svg/pathEditor';
 import { paramDefs, defaultParams, helpParams, noSatelliteParams } from './params';
@@ -16,10 +14,11 @@ import { splitMultiPolygons } from './util/geojson';
 import { getProjection, updateAltitudeRange } from './util/projections';
 import PaletteEditor from "./components/PaletteEditor.svelte";
 
-import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, debounce, getBestFormatter, getColumns } from './util/common';
+import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, getBestFormatter, getColumns } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import * as markers from './svg/markerDefs';
-import { setTransformScale, closestDistance, encodeSVGDataImage } from './svg/svg';
+import { setTransformScale, closestDistance, encodeSVGDataImage, duplicateContours } from './svg/svg';
+import { appendLandImageNew,  appendCountryImageNew } from './svg/contourMethods';
 import { drawShapes } from './svg/shape';
 import iso3Data from './assets/data/iso3_filtered.json';
 import DataTable from './components/DataTable.svelte';
@@ -42,6 +41,7 @@ import { saveState, getState } from './util/save';
 import { svgToPng } from './svg/toPng';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
+    import { filter } from 'd3';
 
 const scalesHelp = `
 <div class="inline-tooltip">  
@@ -147,7 +147,9 @@ const verySimpleLand = import('./assets/layers/world_land_very_simplified.topojs
 Promise.all([adm0Land, verySimpleLand]).then(() => projectAndDraw());
 
 let path = null;
+let pathLarger = null;
 let projection = null;
+let projectionLarger = null;
 let svg = null;
 const defaultLegendDef =  {
     x: 20,
@@ -280,7 +282,7 @@ onMount(() => {
                     if(tab.substring(0, tab.length - 5) == elemId) {
                         const filter = zonesFilter[tab];
                         const countryData = countries.features.find(country => country.properties.name === elemId);
-                        appendCountryImage.call(d3.select(`#${elemId}-img`).node(), countryData, filter);
+                        appendCountryImageNew.call(d3.select(`#${elemId}-img`).node(), countryData, filter, applyStyles, path);
                     }
                 })
             }
@@ -333,7 +335,11 @@ function attachListeners() {
             closeMenu();
         });
 
-    zoomFunc = d3.zoom().on('zoom', zoomed).on('start', () => closeMenu());
+    zoomFunc = d3.zoom()
+    .wheelDelta((event) => -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002))
+    .on('zoom', zoomed).on('start', () => {
+        closeMenu();
+    });
     container.call(dragFunc);
     container.call(zoomFunc);
 }
@@ -344,6 +350,7 @@ function detachListeners() {
     container.on(".zoom", null);
 }
 
+const redrawThrottle = throttle(redraw, 50);
 function redraw(propName) {
     if (positionVars.includes(propName)) {
         projectAndDraw(true);
@@ -363,7 +370,7 @@ function zoomed(event) {
     const newAltitude = Math.round(altScale(event.transform.k));
     params["General"].altitude = newAltitude;
     inlineProps.altitude = newAltitude;
-    redraw('altitude');
+    redrawThrottle('altitude');
 }
 
 const sensitivity = 75;
@@ -430,12 +437,15 @@ function changeProjection() {
         altitude: inlineProps.altitude || params['General'].altitude, tilt: inlineProps.tilt, borderWidth: p('borderWidth')
     };
     projection = getProjection(projectionParams);
+    projectionLarger = getProjection({...projectionParams, larger:true});
 }
 
+const countryFilteredImages = new Set();
 let firstDraw = true;
 // without 'countries' if unchecked
 let computedOrderedTabs = [];
 async function draw(simplified = false, _) {
+    countryFilteredImages.clear();
     computedOrderedTabs = orderedTabs.filter(x => {
         if (x === 'countries') return inlineProps.showCountries;
         if (x === 'land') return inlineProps.showLand;
@@ -476,6 +486,8 @@ async function draw(simplified = false, _) {
         }
     }
     const width = p('width'), height = p('height');
+    const borderWidth = p('borderWidth');
+    const borderRadius = p('borderRadius');
     const container = d3.select('#map-container');
     container.html('');
     const outline = {type: "Sphere"};
@@ -494,12 +506,12 @@ async function draw(simplified = false, _) {
             (context.strokeStyle = "#ddf"),
             (context.globalAlpha = 0.8),
             context.stroke();
-        return context.canvas;
+        // console.log(context.canvas);
+        return;
     }
     svg = container.select('svg');
     if (svg.empty()) svg = container.append('svg')
         .attr('xmlns', "http://www.w3.org/2000/svg")
-        .attr('xmlns:xlink', "http://www.w3.org/1999/xlink")
         .attr('id', 'static-svg-map');
 
     if (p('useViewBox')) {
@@ -509,11 +521,12 @@ async function draw(simplified = false, _) {
         svg.attr('width', `${width }`)
         .attr('height', `${height}`)
     }
-    
     container.style('width', `${width}px`).style('height', `${height}px`);
     
     path = d3.geoPath(projection);
+    pathLarger = d3.geoPath(projectionLarger)
     svg.html('');
+    svg.append('defs');
     svg.on('contextmenu', function(e) {
         if (editingPath) return;
         e.preventDefault();
@@ -538,7 +551,12 @@ async function draw(simplified = false, _) {
     svg.on("click", function(e) {
         closeMenu();
     });
-    
+
+    Object.values(zonesFilter).forEach(filterName => {
+        if (!filterName) return;
+        appendGlow(svg, filterName, false, p(filterName));
+    });
+
     const groupData = [];
     groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
     groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
@@ -561,6 +579,7 @@ async function draw(simplified = false, _) {
             groupData.push({ name: layer, data: resolvedAdm[layer], id: 'name', props: [], class: 'adm', filter: null });
             const countryOutlineId = layer.substring(0, layer.length - 5);
             const countryData = countries.features.find(country => country.properties.name === countryOutlineId);
+            countryFilteredImages.add(countryOutlineId);
             groupData.push({name: `${countryOutlineId}-img`, type:"filterImg", countryData, filter});
         }
     });
@@ -571,8 +590,8 @@ async function draw(simplified = false, _) {
     .selectAll('g').data(groupData).join('g').attr('id', d => d.name);
         // .attr('clip-path', 'url(#clipMapBorder)')
     function drawPaths(data) {
-        if (data.type === 'landImg') return appendLandImage.call(this, data.showSource);
-        if (data.type === 'filterImg') return appendCountryImage.call(this, data.countryData, data.filter);
+        if (data.type === 'landImg') return appendLandImageNew.call(this, data.showSource, zonesFilter, width, height, borderRadius, contourParams, land, pathLarger);
+        if (data.type === 'filterImg') return appendCountryImageNew.call(this, data.countryData, data.filter, applyStyles, path);
         if (!data.data) return;
         const parentPathElem = d3.select(this).style('will-change', 'opacity'); 
         const pathElem = parentPathElem.selectAll('path')
@@ -588,16 +607,10 @@ async function draw(simplified = false, _) {
     groups.each(drawPaths);
 
     drawCustomPaths(providedPaths, svg, projection, inlineStyles);
-    const existingFilters = [...new Set(Object.entries(zonesFilter).filter(([key, fi]) => fi && key !== 'land').map(([key, value]) => value))];
-    existingFilters.forEach(filterName => {
-        appendGlow(svg, filterName, true, p(filterName));
-    });
+    
     appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
-    const borderWidth = p('borderWidth');
-    const borderRadius = p('borderRadius');
+    
     const rx = Math.max(width, height) * (borderRadius / 100);
-    // const rx = width * (borderRadius / 100);
-    // const ry = height * (borderRadius / 100);
     d3.select('#outline').style('fill', "url(#noise)");
     colorizeAndLegend();
     computeCss();
@@ -608,12 +621,12 @@ async function draw(simplified = false, _) {
         .attr('width', width - borderWidth) 
         .attr('height', height - borderWidth)
         .attr('rx', rx)
-        // .attr('ry', ry);
     drawAndSetupShapes();
     const map = document.getElementById('static-svg-map');
     if(!map) return;
     await tick();
     addTooltipListener(map, tooltipDefs, zonesData);
+    duplicateContours(svg.node());
     firstDraw = false;
 }
 
@@ -635,7 +648,7 @@ function computeCss() {
     #static-svg-map {
         ${p('frameShadow') ? 'filter: drop-shadow(2px 2px 8px rgba(0,0,0,.2));': ''}
     }
-    #static-svg-map > svg {
+    #static-svg-map, #static-svg-map > svg {
         border-radius: ${radiusX}%/${radiusY}%;
     }
     #frame {
@@ -647,68 +660,7 @@ function computeCss() {
     totalCommonCss = exportStyleSheet('#paths > path') + commonCss;
 }
 
-function appendLandImage(showSource) {
-    const landElem = d3.create('svg')
-        .attr('xmlns', "http://www.w3.org/2000/svg");
-    if (showSource) {
-        landElem.attr('fill', contourParams.fillColor);
-    }
 
-    landElem.append('defs').append('g').attr('id', 'landshape').selectAll('path')
-        .data(land.features ? land.features : land)
-        .join('path')
-            .attr('d', (d) => {return path(d)});
-            
-    if(zonesFilter['land']) {
-        const filterName = zonesFilter['land'];
-        landElem.append('use').attr('href', '#landshape').attr('filter', `url(#${filterName})`);
-        appendGlow(landElem, filterName, showSource, p(filterName));
-    }
-    landElem.append('use').attr('href', '#landshape')
-        .attr('stroke', contourParams.strokeColor)
-        .attr('stroke-width', contourParams.strokeWidth)
-        .attr('stroke-dasharray', contourParams.strokeDash)
-        .attr('fill', 'none');
-
-    // const optimized = encodeSVGDataImage(SVGO.optimize(landElem.node().outerHTML, svgoConfig).data);
-    const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
-        .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(landElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
-        // .attr('href', optimized);
-        
-    d3.select(this).html(landImage.node().outerHTML)
-        .style('pointer-events', 'none')
-        .style('will-change', 'opacity');
-        // .attr('clip-path', 'url(#clipMapBorder)');
-}
-
-function appendCountryImage(countryData, filter) {
-    const countryName = countryData.properties.name;
-    const countryElem = d3.create('svg')
-        .attr('xmlns', "http://www.w3.org/2000/svg");
-        
-    countryElem.append('defs').append('path')
-        .attr('d', path(countryData))
-        .attr('id', 'countryshape');
-
-    if (filter) {
-        appendGlow(countryElem, filter, false, p(filter));
-        countryElem.append('use').attr('href', '#countryshape').attr('filter', `url(#${filter})`);
-    }
-    const elemStroke = countryElem.append('use').attr('href', '#countryshape').attr('fill', 'none');
-    const ref = document.getElementById(countryName);
-    if (ref) {
-        const strokeParams = ['stroke', 'stroke-width', 'stroke-linejoin', 'stroke-dasharray'];
-        const computedRef = window.getComputedStyle(ref);
-        strokeParams.forEach(p => elemStroke.attr(p, computedRef[p]));
-    }
-    // const optimized = encodeSVGDataImage(SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data);
-    const countryImage = d3.create('image').attr('width', '100%').attr('height', '100%').attr('id', countryElem)
-        .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
-        // .attr('href', optimized);
-    d3.select(this).html(countryImage.node().outerHTML)
-        .style('pointer-events', 'none')
-        .style('will-change', 'opacity');
-}
 
 function save() {
     baseCss = exportStyleSheet('#paths > path');
@@ -820,9 +772,10 @@ function loadExample(e) {
     projectAndDraw();
 }
 
-function applyStyles() {
+function applyStyles(styleAll = false) {
     // apply inline styles
     Object.entries(inlineStyles).forEach((([elemId, style]) => {
+        if (!styleAll && countryFilteredImages.has(elemId)) return;
         const elem = document.getElementById(elemId);
         if (!elem) return;
         Object.entries(style).forEach(([cssProp, cssValue]) => {
@@ -1014,7 +967,7 @@ function handleChangeProp(event) {
         inlineProps.translateX = 0;
         inlineProps.translateY = 0;
     }
-    redraw(prop);
+    redrawThrottle(prop);
 }
 
 

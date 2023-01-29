@@ -4,6 +4,7 @@ import svgoConfigText from '../svgoExportText.config';
 
 import TextToSVG from 'text-to-svg';
 import { htmlToElement } from '../util/common';
+import { duplicateContours } from './svg';
 import { indexBy, pick, download } from '../util/common';
 import { reportStyle, fontsToCss, getUsedInlineFonts } from '../util/dom';
 
@@ -94,16 +95,23 @@ async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
 
 async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, providedFonts, downloadExport = true, commonCss,
     { exportFonts = exportFontChoices.convertToPath, hideOnResize = false }) {
-
     const fo = svg.select('foreignObject').node();
     // remove foreign object from dom when exporting
     if (fo) document.body.append(fo);
     const svgNode = svg.node();
-    
+    let contours = Array.from(svg.node().querySelectorAll('.contour-to-dup[filter]'));
+    contours = contours.map(el => {
+        const parent = el.parentNode;
+        document.body.append(el);
+        return [el, parent];
+    });
     const usedFonts = getUsedInlineFonts(svgNode);
     const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
     const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig).data;
     if (fo) svg.node().append(fo);
+    contours.forEach(([el, parent]) => {
+        parent.insertBefore(el, parent.firstChild);
+    });
     const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
     let pathIsBetter = false;
     if (exportFonts === exportFontChoices.smallest || exportFonts === exportFontChoices.convertToPath) {
@@ -142,7 +150,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
 
     const onResize = hideOnResize ? `
     let resizeTimeout;
-    const contentSvg = mapElement.firstChild;
+    const contentSvg = mapElement.querySelector('svg');
     window.addEventListener('resize', e => {
         contentSvg.style.display = "none"; clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => { contentSvg.style.display = 'block' }, 300);
@@ -150,10 +158,12 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
 
     const finalScript = `
     <![CDATA[
+        ${duplicateContours.toString()}
         window.addEventListener('DOMContentLoaded', () => {
         const parser = new DOMParser();
         const width = ${width}, height = ${height};
         const mapElement = document.getElementById('static-svg-map');
+        duplicateContours(mapElement);
         const frameElement = document.getElementById('frame');
         const tooltip = {shapeId: null, element: null};
         tooltip.element = constructTooltip({}, '');

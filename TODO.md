@@ -80,3 +80,4 @@
 - [x] Dynamic bounds for border radius depending on max of width/height
 - [ ] inline style editor: no css selection by attribute with [id=]
 - [x] geoclip to accomodate border-radius ? at least use masking
+- [ ] modifications on stroke of country not exported when saving

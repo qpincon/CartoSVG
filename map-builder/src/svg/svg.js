@@ -107,5 +107,14 @@ function encodeSVGDataImage(data) {
     return `data:image/svg+xml,${data}`
 }
 
+function duplicateContours(svgElem) {
+    Array.from(svgElem.querySelectorAll('.contour-to-dup')).forEach(el => {
+        if (!el.hasAttribute('filter-name')) return;
+        const clone = el.cloneNode();
+        clone.setAttribute('href', el.getAttribute('href').replace(`fill='none'`, ''))
+        clone.setAttribute('filter', `url(#${el.getAttribute('filter-name')})`);
+        el.parentNode.insertBefore(clone, el);
+    });
+}
 
-export { createSvgFromPart, setTransformScale, setTransformTranslate, getTranslateFromTransform, closestDistance, encodeSVGDataImage };
+export { createSvgFromPart, setTransformScale, setTransformTranslate, getTranslateFromTransform, closestDistance, encodeSVGDataImage, duplicateContours };
