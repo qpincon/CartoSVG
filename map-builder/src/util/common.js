@@ -19,21 +19,6 @@ function downloadURI(uri, filename) {
     link.remove();
 }
 
-function debounce(func, wait, immediate = false) {
-    let timeout;
-    return function () {
-        const context = this, args = arguments;
-        const later = function () {
-            timeout = null;
-            if (!immediate) func.apply(context, args);
-        };
-        const callNow = immediate && !timeout;
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-        if (callNow) func.apply(context, args);
-    };
-};
-
 function capitalizeFirstLetter(str) {
     return str[0].toUpperCase() + str.slice(1);
 }
@@ -166,4 +151,4 @@ function RGBAToHexA(rgba, forceRemoveAlpha = false) {
       .join("") // Puts the array to togehter to a string
   }
 
-export { download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, debounce, getNumericCols, initTooltips, getBestFormatter, tapHold, RGBAToHexA, getColumns };
+export { download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, getNumericCols, initTooltips, getBestFormatter, tapHold, RGBAToHexA, getColumns };

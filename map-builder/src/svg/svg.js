@@ -107,6 +107,10 @@ function encodeSVGDataImage(data) {
     return `data:image/svg+xml,${data}`
 }
 
+function duplicateContourCleanFirst(svgElem) {
+    Array.from(svgElem.querySelectorAll('.contour-to-dup[filter]')).forEach(el => el.remove());
+    duplicateContours(svgElem);
+}
 function duplicateContours(svgElem) {
     Array.from(svgElem.querySelectorAll('.contour-to-dup')).forEach(el => {
         if (!el.hasAttribute('filter-name')) return;
@@ -117,4 +121,7 @@ function duplicateContours(svgElem) {
     });
 }
 
-export { createSvgFromPart, setTransformScale, setTransformTranslate, getTranslateFromTransform, closestDistance, encodeSVGDataImage, duplicateContours };
+export {
+    createSvgFromPart, setTransformScale, setTransformTranslate, getTranslateFromTransform, 
+    closestDistance, encodeSVGDataImage, duplicateContours, duplicateContourCleanFirst,
+};

@@ -2,8 +2,11 @@ import * as d3 from "d3";
 import { reportStyle } from '../util/dom';
 import { setTransformTranslate, getTranslateFromTransform } from '../svg/svg';
 
-const noDataColor = "#AAAAAA";
-function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, hasNullOrUndef, entryWidth = legendDef.lineWidth) {
+function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, entryWidth = legendDef.lineWidth) {
+    const colors = [...legendColors];
+    if (legendDef.noData.active) {
+        colors.unshift([legendDef.noData.color, legendDef.noData.text]);
+    }
     const horizontal = legendDef.direction === 'h';
     const gap = isCategorical ? 5 : 0;
     const textBaseline = !isCategorical && horizontal ? 'hanging' : 'middle';
@@ -92,7 +95,7 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
             else draggingElem = legendGroup.node();
         })
     );
-    const legendEntries = legendGroup.selectAll('g').data(legendColors).join('g')
+    const legendEntries = legendGroup.selectAll('g').data(colors).join('g')
         .attr('transform', (d, i) => {
             const x = computeX();
             const y = computeY(i);
@@ -120,7 +123,7 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
             maxWidth = Math.max(maxWidth, d3.select(this).node().getBBox().width);
         });
         legendGroup.remove();
-        return drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, hasNullOrUndef, maxWidth);
+        return drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, maxWidth);
     }
     else if (sampleElem) {
         legendEntries.each(function () {

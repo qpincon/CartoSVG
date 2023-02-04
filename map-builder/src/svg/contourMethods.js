@@ -1,9 +1,10 @@
 import SVGO from 'svgo/dist/svgo.browser';
 import svgoConfig from '../svgoExport.config';
 import * as d3 from 'd3';
-import { duplicateContours, encodeSVGDataImage} from './svg';
+import { duplicateContourCleanFirst, encodeSVGDataImage} from './svg';
 
 function appendLandImageNew(showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger) {
+    // for not having glow effect on sides of view where there is land
     const offCanvasWithBorder = 20 - (borderWidth / 2);
     d3.select(this).style('pointer-events', 'none')
         .style('will-change', 'opacity');
@@ -68,7 +69,6 @@ function appendCountryImageNew(countryData, filter, applyStyles, path) {
         strokeParams.forEach(p => {
             countryElem.attr(p, computedRef[p])
         });
-        // strokeParams.forEach(p => countryElem.attr(p, computedRef[p]));
         ref.style['stroke-width'] = '0px';
     }
     const optimized = encodeSVGDataImage(SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data);
@@ -81,7 +81,7 @@ function appendCountryImageNew(countryData, filter, applyStyles, path) {
     // remove all cloned filter elements
     const svgElem = document.getElementById('static-svg-map');
     Array.from(svgElem.querySelectorAll('.contour-to-dup[filter]')).forEach(el => el.remove());
-    duplicateContours(svgElem);
+    duplicateContourCleanFirst(svgElem);
 }
 
 
@@ -148,7 +148,7 @@ function appendCountryDefAndUse(countryData, filter) {
 // see https://bugs.webkit.org/show_bug.cgi?id=104169#c6
 // using this method would be much better performance-wise, since it is the best way (to my knowledge)
 // to tell the browser that the element will never change. Embedding the SVG results in worse performance
-// when interacting
+// when interacting. The "new" methods is just a workaround to mimick this method
 function appendLandImage(showSource) {
     const landElem = d3.create('svg')
         .attr('xmlns', "http://www.w3.org/2000/svg");

@@ -24,9 +24,7 @@ function encodedSvgToBase64Png(encodedSvg, width, height, secondTry) {
         img.onload = function () {
             if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
                 const svgDoc = encodedSvgToSvgDocument(encodedSvg);
-                console.log(svgDoc);
                 const fixedDoc = fixSvgDocumentFF(svgDoc);
-                console.log(fixedDoc);
                 return encodedSvgToBase64Png(encodeSVGDataImage(fixedDoc.firstChild.outerHTML), width, height, true).then(result => {
                     resolve(result);
                 });

@@ -8,7 +8,7 @@ let defaultParams = {
         altitude: 3200,
     },
     Border: {
-        borderRadius: 15,
+        borderRadius: 1.5,
         borderWidth: 1,
         borderColor: "#b8b8b8",
         frameShadow: true,

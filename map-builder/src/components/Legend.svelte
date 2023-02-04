@@ -1,8 +1,8 @@
-
 <script>
     import { createEventDispatcher } from "svelte";
 
     import RangeInput from "./RangeInput.svelte";
+    import ColorPickerPreview from "./ColorPickerPreview.svelte";
     const dispatch = createEventDispatcher();
 
     export let definition = {
@@ -15,16 +15,20 @@
         maxWidth: 200,
         direction: "v",
         title: "Hello",
+        noData: {
+            active: false,
+            text: "N/A",
+            color: "#AAAAAA",
+        },
     };
     export let categorical = false;
 
     // dispatch event on each change
     function sendChange(e) {
-        const id = e.target.getAttribute('id')
-        if (id === 'vhSwitchV') {
+        const id = e.target.getAttribute("id");
+        if (id === "vhSwitchV") {
             definition.rectHeight = definition.rectWidth = 30;
-        }
-        else if (id === 'vhSwitchH' && !categorical) {
+        } else if (id === "vhSwitchH" && !categorical) {
             definition.rectHeight = 20;
             definition.rectWidth = 70;
         }
@@ -56,7 +60,7 @@
         />
         <label class="btn btn-outline-primary" for="vhSwitchV">Vertical</label>
     </div>
-    {#if definition.direction === 'h' && categorical}
+    {#if definition.direction === "h" && categorical}
         <RangeInput
             title="Max legend width"
             bind:value={definition.maxWidth}
@@ -83,4 +87,22 @@
         min="10"
         max="100"
     />
+    {#if definition.noData.active}
+        <div class="d-flex">
+            <ColorPickerPreview
+                id="nodatapicker"
+                popup="top"
+                title="No data color"
+                value={definition.noData.color}
+                onChange={(col) => {
+                    definition.noData.color = col;
+                    dispatch("change", {});
+                }}
+            />
+            <div class="form-floating ms-3">
+                <input type="text" class="form-control" id="nodatatext" placeholder="N/A" bind:value={definition.noData.text}>
+                <label for="nodatatext">No data text</label>
+            </div>
+        </div>
+    {/if}
 </form>

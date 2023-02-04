@@ -2,7 +2,7 @@
     import Icon from "./Icon.svelte";
     import ColorPicker from "./ColorPicker.svelte";
     import addIcon from "../assets/img/add.svg?inline";
-    import { debounce } from '../util/common';
+    import { debounce } from 'lodash-es';
 
     export let customCategoricalPalette = [];
     export let onChange = () => {};

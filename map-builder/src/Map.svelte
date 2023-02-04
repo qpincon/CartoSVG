@@ -17,7 +17,7 @@ import PaletteEditor from "./components/PaletteEditor.svelte";
 import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, getBestFormatter, getColumns } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import * as markers from './svg/markerDefs';
-import { setTransformScale, closestDistance, encodeSVGDataImage, duplicateContours } from './svg/svg';
+import { setTransformScale, closestDistance, encodeSVGDataImage, duplicateContourCleanFirst } from './svg/svg';
 import { appendLandImageNew,  appendCountryImageNew } from './svg/contourMethods';
 import { drawShapes } from './svg/shape';
 import iso3Data from './assets/data/iso3_filtered.json';
@@ -41,7 +41,6 @@ import { saveState, getState } from './util/save';
 import { svgToPng } from './svg/toPng';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
-    import { filter } from 'd3';
 
 const scalesHelp = `
 <div class="inline-tooltip">  
@@ -162,6 +161,11 @@ const defaultLegendDef =  {
     direction: 'v',
     title: null,
     sampleHtml: null,
+    noData: {
+        active: false,
+        text: 'N/A',
+        color: '#AAAAAA'
+    },
     changes: {},
 };
 const defaultColorDef = {
@@ -400,7 +404,7 @@ function dragged(event) {
 }
 
 
-function changeAltitudeScale() {
+function changeAltitudeScale(autoAdjustAltitude = true) {
     const projName = p('projection');
     const fov =  p('fieldOfView');
     let invertAlt = false;
@@ -412,6 +416,7 @@ function changeAltitudeScale() {
     else {
         altScale = d3.scaleLinear().domain([0, 1]).range([90, 2000]);
     }
+    if (!autoAdjustAltitude) return;
     const altitude = inlineProps.altitude || params["General"].altitude;
     let altChanged = false;
     const firstScaleVal = altScale(invertAlt ? 1 : 0);
@@ -626,7 +631,7 @@ async function draw(simplified = false, _) {
     if(!map) return;
     await tick();
     addTooltipListener(map, tooltipDefs, zonesData);
-    duplicateContours(svg.node());
+    duplicateContourCleanFirst(svg.node());
     firstDraw = false;
 }
 
@@ -716,6 +721,7 @@ function resetState() {
     legendDefs = {countries: JSON.parse(JSON.stringify(defaultLegendDef))};
     customCategoricalPalette = ['#ff0000ff', '#00ff00ff', '#0000ffff'];
     projectAndDraw();
+    // auto adjust altitude when reseting
     changeAltitudeScale();
 }
 
@@ -736,7 +742,7 @@ function restoreState(givenState) {
     const tabsWoLand = orderedTabs.filter(x => x !== 'land');
     if (tabsWoLand.length) onTabChanged(tabsWoLand[0]);
     getZonesDataFormatters();
-    changeAltitudeScale();
+    changeAltitudeScale(false);
 }
 
 function saveProject() {
@@ -1332,8 +1338,8 @@ async function colorizeAndLegend(e) {
     const legendEntries = d3.select('#svg-map-legend');
     if (!legendEntries.empty()) legendEntries.remove();
     const legendSelection = svg.select('svg').append('g').attr('id', 'svg-map-legend');
-    let hasNullOrUndef = false;
-    Object.entries(colorDataDefs).forEach(([tab, dataColorDef]) => {
+    Object.entries(colorDataDefs).forEach(([tab, dataColorDef], tabIndex) => {
+        legendDefs[tab].noData.active = false;
         if (!dataColorDef.enabled) {
             dataColorDef.legendEnabled = false;
             colorsCss[tab] = '';
@@ -1346,13 +1352,12 @@ async function colorizeAndLegend(e) {
         const data = zonesData[tab].data.reduce((acc, row) => {
             const d = row[dataColorDef.colorColumn];
             if (d === null || d === undefined) {
-                hasNullOrUndef = true;
+                legendDefs[tab].noData.active = true;
                 return acc;
             }
             acc.push(d);
             return acc;
         }, []);
-        console.log(data);
         let scale;
         if (dataColorDef.colorScale === "category" ) {
             if (dataColorDef.colorPalette === 'Custom') {
@@ -1364,20 +1369,34 @@ async function colorizeAndLegend(e) {
         } else if(dataColorDef.colorScale === "quantize") {
             scale = d3.scaleQuantile().domain(d3.extent(data)).range(d3[paletteName][dataColorDef.nbBreaks]);
         }
-        let newCss = '';
+        const usedColors = [];
         zonesData[tab].data.forEach(row => {
-            if (!row[dataColorDef.colorColumn]) return;
-            const color = scale(row[dataColorDef.colorColumn]);
+            const d = row[dataColorDef.colorColumn];
             const key = row.name;
-            newCss += `path[id="${key}"]{fill:${color};}
-            path[id="${key}"]:hover{fill:${d3.color(color).brighter(.2).hex()};}`;
+            const elem = document.getElementById(key);
+            if (!elem) return;
+            let color;
+            if (d === null || d === undefined) {
+                color = legendDefs[tab].noData.color;
+            }
+            else {
+                color = scale(row[dataColorDef.colorColumn]);
+            }
+            if (!usedColors.includes(color)) usedColors.push(color);
+            const cssClass = `ssc-${tabIndex}-${usedColors.indexOf(color)}`;
+            elem.classList.add(cssClass);
+        });
+        let newCss = '';
+        usedColors.forEach((color, i) => {
+            newCss += `path.ssc-${tabIndex}-${i}{fill:${color};}
+            path.ssc-${tabIndex}-${i}:hover{fill:${d3.color(color).brighter(.2).hex()};}`;
         });
         colorsCss[tab] = newCss;
         const legendColors = getLegendColors(dataColorDef, tab, scale, data);
         if (!legendColors) return;
         if (tab === currentTab) sampleLegend = {color: legendColors[0][0], text: legendColors[0][1]};
         const sampleElem = htmlToElement(legendDefs[tab].sampleHtml);
-        displayedLegend[tab] = drawLegend(legendSelection, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', sampleElem, tab, hasNullOrUndef);
+        displayedLegend[tab] = drawLegend(legendSelection, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', sampleElem, tab);
     });
     computeCss();
     applyStyles();
@@ -1596,10 +1615,10 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                 {/if}
                 {#if currentTab === "land"}
                     <RangeInput id="contourwidth" title="Contour width" onChange={() => draw()} bind:value={contourParams.strokeWidth} min="0" max="5" step="0.5"></RangeInput>
-                    <ColorPickerPreview id="contourpicker" popupLoc="bottom" title="Contour color" value={contourParams.strokeColor} onChange={(col) => {contourParams.strokeColor = col; draw()}}> </ColorPickerPreview>
+                    <ColorPickerPreview id="contourpicker" popup="bottom" title="Contour color" value={contourParams.strokeColor} onChange={(col) => {contourParams.strokeColor = col; draw()}}> </ColorPickerPreview>
                     <RangeInput id="contour dash" title="Contour dash" onChange={() => draw()} bind:value={contourParams.strokeDash} min="0" max="20" step="0.5"></RangeInput>
                     {#if computedOrderedTabs.findIndex(x => x === 'land') === 0}
-                        <ColorPickerPreview id="fillpicker" popupLoc="bottom" title="Fill color" value={contourParams.fillColor} onChange={(col) => {contourParams.fillColor = col; draw()}}> </ColorPickerPreview>
+                        <ColorPickerPreview id="fillpicker" popup="bottom" title="Fill color" value={contourParams.fillColor} onChange={(col) => {contourParams.fillColor = col; draw()}}> </ColorPickerPreview>
                     {/if}
                 {/if}
                 {#if zonesData?.[currentTab]?.['data']}
@@ -1719,7 +1738,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                                 <text x={legendDefs[currentTab].rectWidth + 15}
                                     y={(legendDefs[currentTab].rectHeight / 2) + 10}
                                     text-anchor="start" dominant-baseline="middle"
-                                    on:click={openEditor}> {sampleLegend.text} </text>
+                                    on:click={openEditor} style="font-size: 12px;"> {sampleLegend.text} </text>
                             </g>
                         </svg>
                         <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click to update style (the legend is SVG).">?</span>
