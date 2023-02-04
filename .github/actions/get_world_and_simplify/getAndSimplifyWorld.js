@@ -3,13 +3,17 @@ import fs from'fs';
 import mapshaper from 'mapshaper';
 
 // const assetsPath = 'map-builder/src/assets/layers';
-// const assetsPath = '~/Documents/static-map-builder/map-builder/src/assets/layers';
-const assetsPath = '/home/quentin/Documents/static-map-builder/map-builder/src/assets/layers';
+const assetsPath = '/home/quentin/Tests/SVGscape/map-builder/src/assets/layers';
+// const assetsPath = '/home/quentin/Documents/static-map-builder/map-builder/src/assets/layers';
 async function getWorldTopojson(){
+    if(fs.existsSync(assetsPath)) {
+        fs.rmSync(assetsPath, {recursive: true});
+    }
+    fs.mkdirSync(assetsPath);
     let topology = await fetch('https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/main/releaseData/CGAZ/geoBoundariesCGAZ_ADM1.topojson');
     topology = await topology.json();
     console.log('Topology adm1 downloaded');
-    let simplified = await mapshaper.applyCommands('-i topo.topojson -rename-fields name=shapeName -simplify 2% -clean -o output.geojson', {'topo.topojson': topology});
+    let simplified = await mapshaper.applyCommands('-i topo.topojson -rename-fields name=shapeName -simplify 3.5% -clean -o output.geojson', {'topo.topojson': topology});
     console.log('Simplification ADM1 done');
     simplified = JSON.parse(Buffer.from(simplified['output.geojson']).toString('utf-8'));
     fs.writeFileSync(`${assetsPath}/adm1_simplified.geojson`, JSON.stringify(simplified));

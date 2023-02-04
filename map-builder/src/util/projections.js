@@ -129,7 +129,6 @@ function updateAltitudeRange(fov = null) {
 }
 
 function getProjection(params) {
-    // console.log(params);
     if (params.projectionName === 'satellite') {
         return geoSatelliteCustom(params);
     }

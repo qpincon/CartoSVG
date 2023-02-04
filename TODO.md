@@ -4,7 +4,6 @@
 - [x] "Save current geo params" -> localstorage. If defined, to moving on import new file
 - [x] Support import geojson
 - [x] Create tooltips on hover: have a builder to chose properties on geometries
-- [ ] Default themes (pirate map style, brand style...)
 - [-] Add possibility to change background image (noise for now)
 - [x] Import geojson instead of topojson
 - [x] Draw on canvas on move, using simplified geometries
@@ -80,4 +79,5 @@
 - [x] Dynamic bounds for border radius depending on max of width/height
 - [ ] inline style editor: no css selection by attribute with [id=]
 - [x] geoclip to accomodate border-radius ? at least use masking
-- [ ] modifications on stroke of country not exported when saving
+- [x] modifications on stroke of country not exported when saving
+- [ ] Allow for multi-line labels

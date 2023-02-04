@@ -105,7 +105,7 @@ const config = {
         new HtmlWebpackPlugin({
             title: 'SVGscape - Design gorgeous interactive maps',
             meta: {
-                description: 'SVGscape is an online editor to create, tweak and export rich and splendid SVG map visualizations. It allows customization by binding data, displaying tooltips, drawing choropleth, and provides optimizations for exporting the SVG file as light as possible.'
+                description: 'SVGscape is a SVG map editor to create, tweak and export rich and splendid visualizations. It allows customization by binding data, displaying tooltips, drawing choropleth, and provides optimizations for exporting the SVG file as light as possible.'
             },
             chunks: ['main'],
             favicon: './src/assets/img/logo_transparent.webp'

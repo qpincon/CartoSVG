@@ -4,7 +4,6 @@ import svgoConfigText from '../svgoExportText.config';
 
 import TextToSVG from 'text-to-svg';
 import { htmlToElement } from '../util/common';
-import { duplicateContours } from './svg';
 import { indexBy, pick, download } from '../util/common';
 import { reportStyle, fontsToCss, getUsedInlineFonts } from '../util/dom';
 
@@ -114,10 +113,10 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     });
     const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
     let pathIsBetter = false;
-    if (exportFonts === exportFontChoices.smallest || exportFonts === exportFontChoices.convertToPath) {
+    if (exportFonts == exportFontChoices.smallest || exportFonts == exportFontChoices.convertToPath) {
         pathIsBetter = await inlineFontVsPath(optimizedSVG.firstChild, providedFonts);
     }
-    else if (exportFonts === exportFontChoices.noExport) {
+    else if (exportFonts == exportFontChoices.noExport) {
         pathIsBetter = true;
     }
     const finalDataByGroup = { data: {}, tooltips: {} };
@@ -158,7 +157,15 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
 
     const finalScript = `
     <![CDATA[
-        ${duplicateContours.toString()}
+        function duplicateContours(svgElem) {
+            Array.from(svgElem.querySelectorAll('.contour-to-dup')).forEach(el => {
+                if (!el.hasAttribute('filter-name')) return;
+                const clone = el.cloneNode();
+                clone.setAttribute('href', el.getAttribute('href').replace(\`fill='none'\`, ''))
+                clone.setAttribute('filter', \`url(#\${el.getAttribute('filter-name')})\`);
+                el.parentNode.insertBefore(clone, el);
+            });
+        }
         window.addEventListener('DOMContentLoaded', () => {
         const parser = new DOMParser();
         const width = ${width}, height = ${height};

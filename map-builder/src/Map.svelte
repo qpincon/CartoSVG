@@ -517,6 +517,7 @@ async function draw(simplified = false, _) {
     svg = container.select('svg');
     if (svg.empty()) svg = container.append('svg')
         .attr('xmlns', "http://www.w3.org/2000/svg")
+        .attr('xmlns:xlink', "http://www.w3.org/1999/xlink")
         .attr('id', 'static-svg-map');
 
     if (p('useViewBox')) {
