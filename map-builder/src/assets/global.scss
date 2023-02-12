@@ -133,3 +133,17 @@ html {
 #static-svg-map text{
     font-family: none;
 }
+aside .nav-link.active {
+    border-top: 2px solid #6776b7 !important;
+}
+// aside {
+//     background-color: #f8f9fa;
+// }
+.nav-tabs > .nav-item > a {
+    position: relative;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 10rem;
+    display: block !important;
+}

@@ -97,7 +97,7 @@
             out:fly={{ y: -50, duration: 300, easing: quintOut }}
         >
             <div class="modal-content">
-                <div class="modal-header p-0">
+                <div class="modal-header p-3">
                     <slot name="header"/>
                     <button type="button" class="btn-close me-2" data-bs-dismiss="modal" aria-label="Close" on:click={() => open = false}></button>
                 </div>

@@ -1,8 +1,9 @@
 import * as d3 from "d3";
 import { reportStyle } from '../util/dom';
 import { setTransformTranslate, getTranslateFromTransform } from '../svg/svg';
+import { addSvgText } from './shape';
 
-function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, entryWidth = legendDef.lineWidth) {
+function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, saveFunc, entryWidth = legendDef.lineWidth) {
     const colors = [...legendColors];
     if (legendDef.noData.active) {
         colors.unshift([legendDef.noData.color, legendDef.noData.text]);
@@ -46,20 +47,20 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
         .attr('id', groupId)
         .attr('transform', `translate(${legendDef.x + offsetX} ${offsetY + (legendDef.y ? legendDef.y : 100)})`)
 
-    const legendTitle = legendGroup.append('text')
+    const legendTitle = legendGroup.append(() => addSvgText(legendDef.title).node())
         .attr('x', 0)
         .attr('y', 0)
         .attr('transform', `translate(${legendDef.changes[titleId].dx} ${legendDef.changes[titleId].dy -20})`)
         .attr('id', `${tabName}-legend-title`)
         .style('font-size', '20px')
-        .text(legendDef.title)
         .on('dblclick', e => {
-            let inputVal = legendDef.title;
+            const inputVal = legendDef.title;
             const closeInput = () => {
-                legendTitle.text(input.value);
+                legendTitle.html(addSvgText(input.value).node().innerHTML);
                 legendDef.title = input.value;
                 legendDef.titleChanged = true;
                 input.remove();
+                saveFunc();
             };
             const input = d3.select(document.body).append('input')
                 .attr('value', inputVal)
@@ -87,9 +88,10 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
             legendDef.changes[id].dy += e.dy;
             const [x, y] = getTranslateFromTransform(draggingElem);
             setTransformTranslate(draggingElem, `translate(${x + e.dx} ${y + e.dy})`);
+            saveFunc();
         })
         .on('start', (e) => {
-            if (e.sourceEvent.target == legendTitle.node()) {
+            if (e.sourceEvent.target == legendTitle.node() || e.sourceEvent.target.parentNode == legendTitle.node()) {
                 draggingElem = legendTitle.node();
             }
             else draggingElem = legendGroup.node();

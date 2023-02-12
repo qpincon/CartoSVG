@@ -76,12 +76,12 @@ const config = {
                     {
                         resourceQuery: /inline/,
                         type: 'asset/source',
-                        use: [
-                            {
-                                loader: 'svgo-loader',
-                                options: {},
-                            },
-                        ],
+                        // use: [
+                        //     {
+                        //         loader: 'svgo-loader',
+                        //         options: {},
+                        //     },
+                        // ],
                     },
                     {
                         type: 'asset/resource',
@@ -103,6 +103,7 @@ const config = {
     plugins: [
         new NodePolyfillPlugin(),
         new HtmlWebpackPlugin({
+            template: './src/index.ejs',
             title: 'SVGscape - Design gorgeous interactive maps',
             meta: {
                 description: 'SVGscape is a SVG map editor to create, tweak and export rich and splendid visualizations. It allows customization by binding data, displaying tooltips, drawing choropleth, and provides optimizations for exporting the SVG file as light as possible.'
@@ -111,6 +112,7 @@ const config = {
             favicon: './src/assets/img/logo_transparent.webp'
         }),
         new HtmlWebpackPlugin({
+            template: './src/index.ejs',
             title: 'About',
             meta: {
                 description: 'SVGscape aims to be a easy, beautiful and lightweight datamaps replacement.'
@@ -118,20 +120,22 @@ const config = {
             filename: 'about.html',
             chunks: ['about'],
             favicon: './src/assets/img/logo_transparent.webp'
-        })
+        }),
     ],
 };
 
 Object.entries(examplesMeta).forEach(([exampleName, description]) => {
     config.entry[exampleName] = `./src/examples/${exampleName}.js`;
     const plugin = new HtmlWebpackPlugin({
+        template: './src/index.ejs',
         title: description.title,
         meta: {
             description: description.description
         },
         filename: `${exampleName}.html`,
         chunks: [exampleName],
-        favicon: './src/assets/img/logo_transparent.webp'
+        favicon: './src/assets/img/logo_transparent.webp',
+        svgcontent: fs.readFileSync(`./src/examples/${exampleName}.svg`),
     });
     config.plugins.push(plugin);
 });

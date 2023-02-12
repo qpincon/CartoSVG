@@ -61,7 +61,7 @@
 - [ ] Add example(s)
 - [x] Change default filter 2 
 - [x] Make more fine-tuning altitude/FOV more intuitive
-- [ ] Allow minification of JS
+- [x] Allow minification of JS
 - [-] Implement Undo / Redo on points / labels moving 
 - [x] Allow more projections
 - [x] Add categorical colors by hand
@@ -80,4 +80,6 @@
 - [ ] inline style editor: no css selection by attribute with [id=]
 - [x] geoclip to accomodate border-radius ? at least use masking
 - [x] modifications on stroke of country not exported when saving
-- [ ] Allow for multi-line labels
+- [x] Allow for multi-line labels
+- [x] Inline style editor: give name to other elements. Add parent <text> element for <tspan>
+- [x] Only include code for tooltip when one tooltip included

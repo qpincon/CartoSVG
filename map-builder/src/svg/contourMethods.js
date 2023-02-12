@@ -2,8 +2,9 @@ import SVGO from 'svgo/dist/svgo.browser';
 import svgoConfig from '../svgoExport.config';
 import * as d3 from 'd3';
 import { duplicateContourCleanFirst, encodeSVGDataImage} from './svg';
+import { appendGlow } from './svgDefs';
 
-function appendLandImageNew(showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger) {
+function appendLandImageNew(showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, glowParams) {
     // for not having glow effect on sides of view where there is land
     const offCanvasWithBorder = 20 - (borderWidth / 2);
     d3.select(this).style('pointer-events', 'none')
@@ -13,20 +14,20 @@ function appendLandImageNew(showSource, zonesFilter, width, height, borderWidth,
         .attr('viewBox', `${-offCanvasWithBorder/2} ${-offCanvasWithBorder/2} ${width + offCanvasWithBorder} ${height + offCanvasWithBorder}`)
         .attr('preserveAspectRatio', 'none');
 
-    if (showSource) {
-        landElem.attr('fill', contourParams.fillColor);
-    }
-
+        
     landElem.append('g')
         .attr('stroke', contourParams.strokeColor)
         .attr('stroke-width', contourParams.strokeWidth)
         .attr('stroke-dasharray', contourParams.strokeDash)
         .attr('fill', 'none')
         .selectAll('path')
-            .data(land.features ? land.features : land)
-            .join('path')
-                .attr('d', (d) => {return pathLarger(d)});
-
+        .data(land.features ? land.features : land)
+        .join('path')
+        .attr('d', (d) => {return pathLarger(d)});
+        
+    if (showSource) {
+        landElem.select('g').attr('fill', contourParams.fillColor);
+    }
     const optimized = encodeSVGDataImage(SVGO.optimize(landElem.node().outerHTML, svgoConfig).data);
     
     const img = d3.select(this).append('image')
@@ -42,7 +43,7 @@ function appendLandImageNew(showSource, zonesFilter, width, height, borderWidth,
     if(filterName) {
         if (showSource) {
             filterName = `${zonesFilter['land']}-with-source`;
-            appendGlow(svg, filterName, showSource, p(zonesFilter['land']));
+            appendGlow(d3.select('#static-svg-map'), filterName, showSource, glowParams);
         }
         img.attr('filter-name', filterName);
     }
@@ -80,7 +81,6 @@ function appendCountryImageNew(countryData, filter, applyStyles, path) {
             .attr('filter-name', filter);
     // remove all cloned filter elements
     const svgElem = document.getElementById('static-svg-map');
-    Array.from(svgElem.querySelectorAll('.contour-to-dup[filter]')).forEach(el => el.remove());
     duplicateContourCleanFirst(svgElem);
 }
 

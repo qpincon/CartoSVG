@@ -1,13 +1,12 @@
 <script>
     import Navbar from "../components/Navbar.svelte";
-    import italiaSvg from './italia.svg?inline';
 </script>
 
 <style>
     h1 {
         margin-top: 0;
     }
-    :global(.content > svg) {
+    :global(svg) {
         max-width: 700px;
         margin: auto;
     }
@@ -20,5 +19,4 @@
         target="_blank" href="https://kartograph.org/showcase/italia/"> Kartograph's La Bella Italia.</a><br />
         The labels are set in the Aquiline font, created by Manfred Klein.
     </p>
-    {@html italiaSvg}
 </div>

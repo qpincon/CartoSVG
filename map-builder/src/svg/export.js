@@ -93,7 +93,7 @@ async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
 }
 
 async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, providedFonts, downloadExport = true, commonCss,
-    { exportFonts = exportFontChoices.convertToPath, hideOnResize = false }) {
+    { exportFonts = exportFontChoices.convertToPath, hideOnResize = false, minifyJs = false }) {
     const fo = svg.select('foreignObject').node();
     // remove foreign object from dom when exporting
     if (fo) document.body.append(fo);
@@ -120,15 +120,19 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         pathIsBetter = true;
     }
     const finalDataByGroup = { data: {}, tooltips: {} };
+    let tooltipEnabled = false;
     [...chosenCountries, 'countries'].forEach(groupId => {
         const group = optimizedSVG.getElementById(groupId);
         if (!group || !tooltipDefs[groupId].enabled) return;
+        tooltipEnabled = true;
         const ttTemplate = getFinalTooltipTemplate(groupId, tooltipDefs);
         let usedVars = [...ttTemplate.matchAll(/\{(\w+)\}/g)].map(group => {
             return group[1];
         });
         usedVars = [...new Set(usedVars)];
-        const functionStr = ttTemplate.replaceAll(/\{(\w+)\}/gi, '${data.$1}');
+        usedVars = usedVars.filter(v => v != 'name');
+        let functionStr = ttTemplate.replaceAll(/\{(\w+)\}/gi, '${data.$1}');
+        functionStr = functionStr.replace('data.name', 'shapeId');
         finalDataByGroup.tooltips[groupId] = functionStr;
         const zonesDataDup = JSON.parse(JSON.stringify(zonesData[groupId].data));
         zonesData[groupId].numericCols.forEach(colDef => {
@@ -139,7 +143,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         });
         const indexed = indexBy(zonesDataDup, 'name');
         const finalData = {};
-        for (let child of group.children) {
+        for (const child of group.children) {
             const id = child.getAttribute('id');
             if (!id) continue;
             finalData[id] = pick(indexed[id], usedVars);
@@ -154,9 +158,99 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         contentSvg.style.display = "none"; clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => { contentSvg.style.display = 'block' }, 300);
     });`: '';
+    const tooltipCode = tooltipEnabled ? `
+    const parser = new DOMParser();
+    const width = ${width}, height = ${height};
+    const frameElement = document.getElementById('frame');
+    const tooltip = {shapeId: null, element: null};
+    tooltip.element = constructTooltip({}, '');
+    mapElement.append(tooltip.element);
+    tooltip.element.style.display = 'none';
+    const dataByGroup = ${JSON.stringify(finalDataByGroup)};
+    function constructTooltip(data, templateStr, shapeId) {
+        if(!data) return;
+        const elem = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+        elem.setAttribute('width', 1);
+        elem.setAttribute('height', 1);
+        elem.style.overflow = 'visible';
+        const parsed = parser.parseFromString(eval('\`' + templateStr + '\`' ), 'text/html').querySelector('body');
+        elem.appendChild(parsed);
+        return elem;
+    }
+    mapElement.addEventListener('mouseleave', hideTooltip);
+    mapElement.addEventListener('mousemove', (e) => {
+        onMouseMove(e);
+        const parent = e.target.parentNode;
+        if (e.target.tagName === 'path' && parent.tagName === 'g') {
+            if (e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
+            if (e.target !== parent.lastElementChild) parent.append(e.target);
+        } 
+    });
 
-    const finalScript = `
-    <![CDATA[
+    mapElement.addEventListener('mouseout', (e) => {
+        const previousPos = e.target.previousPos;
+        if (previousPos) {
+            const parent = e.target.parentNode;
+            parent.insertBefore(e.target, parent.children[previousPos]);
+        }
+    });
+
+    function hideTooltip() {
+        tooltip.element.style.display = 'none';
+        tooltip.element.style.opacity = 0;
+    }
+
+    function onMouseMove(e) {
+        const parent = e.target.parentNode;
+        if (!parent?.hasAttribute?.("id")) return hideTooltip();
+        const mapBounds = frameElement.getBoundingClientRect();
+        const transformX = width / mapBounds.width;
+        const transformY = height / mapBounds.height;
+        const ttBounds = tooltip.element.firstChild?.firstChild?.getBoundingClientRect();
+        let posX = (e.clientX - mapBounds.left + 10) * transformX, posY = (e.clientY - mapBounds.top + 10) * transformY;
+        let tooltipVisibleOpacity = 1;
+        const groupId = parent.getAttribute('id');
+        const shapeId = e.target.getAttribute('id');
+        if (ttBounds?.width > 0) {
+            if (mapBounds.right - ttBounds.width < e.clientX + 10) {
+                posX = (e.clientX - mapBounds.left - ttBounds.width - 20) * transformX;
+            }
+            if (mapBounds.bottom - ttBounds.height < e.clientY + 10) {
+                posY = (e.clientY - mapBounds.top - ttBounds.height - 20) * transformY;
+            }
+        }
+        else if (shapeId && groupId in dataByGroup.data) {
+            tooltipVisibleOpacity = 0;
+            setTimeout(() => {
+                onMouseMove(e);
+            }, 0);
+        }
+        if (!(groupId in dataByGroup.data)) {
+            hideTooltip();
+        }
+        else if (shapeId && tooltip.shapeId === shapeId) {
+            tooltip.element.setAttribute('x', posX);
+            tooltip.element.setAttribute('y', posY);
+            tooltip.element.style.display = 'block';
+            tooltip.element.style.opacity = tooltipVisibleOpacity;
+        }
+        else {
+            parent.append(e.target);
+            const data = dataByGroup.data[groupId][shapeId];
+            if (!data) {
+                tooltip.element.style.display = 'none';
+                return;
+            }
+            const tt = constructTooltip(data, dataByGroup.tooltips[groupId], shapeId);
+            tooltip.element.replaceWith(tt);
+            tooltip.element = tt;
+            tooltip.shapeId = shapeId;
+            tooltip.element.setAttribute('x', posX);
+            tooltip.element.setAttribute('y', posY);
+            tooltip.element.style.opacity = tooltipVisibleOpacity;
+        }
+    }` : '';
+    let finalScript = `
         function duplicateContours(svgElem) {
             Array.from(svgElem.querySelectorAll('.contour-to-dup')).forEach(el => {
                 if (!el.hasAttribute('filter-name')) return;
@@ -166,109 +260,25 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
                 el.parentNode.insertBefore(clone, el);
             });
         }
-        window.addEventListener('DOMContentLoaded', () => {
-        const parser = new DOMParser();
-        const width = ${width}, height = ${height};
-        const mapElement = document.getElementById('static-svg-map');
-        duplicateContours(mapElement);
-        const frameElement = document.getElementById('frame');
-        const tooltip = {shapeId: null, element: null};
-        tooltip.element = constructTooltip({}, '');
-        mapElement.append(tooltip.element);
-        tooltip.element.style.display = 'none';
-        ${onResize}    
-        const dataByGroup = ${JSON.stringify(finalDataByGroup)};
-        function constructTooltip(data, templateStr) {
-            if(!data) return;
-            const elem = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
-            elem.setAttribute('width', 1);
-            elem.setAttribute('height', 1);
-            elem.style.overflow = 'visible';
-            const parsed = parser.parseFromString(eval('\`' + templateStr + '\`' ), 'text/html').querySelector('body');
-            elem.appendChild(parsed);
-            return elem;
-        }
-        mapElement.addEventListener('mouseleave', hideTooltip);
-        mapElement.addEventListener('mousemove', (e) => {
-            onMouseMove(e);
-            const parent = e.target.parentNode;
-            if (e.target.tagName === 'path' && parent.tagName === 'g') {
-                if (e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
-                if (e.target !== parent.lastElementChild) parent.append(e.target);
-            } 
-        });
-
-        mapElement.addEventListener('mouseout', (e) => {
-            const previousPos = e.target.previousPos;
-            if (previousPos) {
-                const parent = e.target.parentNode;
-                parent.insertBefore(e.target, parent.children[previousPos]);
-            }
-        });
-
-        function hideTooltip() {
-            tooltip.element.style.display = 'none';
-            tooltip.element.style.opacity = 0;
-        }
-
-        function onMouseMove(e) {
-            const parent = e.target.parentNode;
-            if (!parent?.hasAttribute?.("id")) return hideTooltip();
-            const mapBounds = frameElement.getBoundingClientRect();
-            const transformX = width / mapBounds.width;
-            const transformY = height / mapBounds.height;
-            const ttBounds = tooltip.element.firstChild?.firstChild?.getBoundingClientRect();
-            let posX = (e.clientX - mapBounds.left + 10) * transformX, posY = (e.clientY - mapBounds.top + 10) * transformY;
-            let tooltipVisibleOpacity = 1;
-            const groupId = parent.getAttribute('id');
-            const shapeId = e.target.getAttribute('id');
-            if (ttBounds?.width > 0) {
-                if (mapBounds.right - ttBounds.width < e.clientX + 10) {
-                    posX = (e.clientX - mapBounds.left - ttBounds.width - 20) * transformX;
-                }
-                if (mapBounds.bottom - ttBounds.height < e.clientY + 10) {
-                    posY = (e.clientY - mapBounds.top - ttBounds.height - 20) * transformY;
-                }
-            }
-            else if (shapeId && groupId in dataByGroup.data) {
-                tooltipVisibleOpacity = 0;
-                setTimeout(() => {
-                    onMouseMove(e);
-                }, 0);
-            }
-            if (!(groupId in dataByGroup.data)) {
-                hideTooltip();
-            }
-            else if (shapeId && tooltip.shapeId === shapeId) {
-                tooltip.element.setAttribute('x', posX);
-                tooltip.element.setAttribute('y', posY);
-                tooltip.element.style.display = 'block';
-                tooltip.element.style.opacity = tooltipVisibleOpacity;
-            }
-            else {
-                parent.append(e.target);
-                const data = dataByGroup.data[groupId][shapeId];
-                if (!data) {
-                    tooltip.element.style.display = 'none';
-                    return;
-                }
-                const tt = constructTooltip(data, dataByGroup.tooltips[groupId]);
-                tooltip.element.replaceWith(tt);
-                tooltip.element = tt;
-                tooltip.shapeId = shapeId;
-                tooltip.element.setAttribute('x', posX);
-                tooltip.element.setAttribute('y', posY);
-                tooltip.element.style.opacity = tooltipVisibleOpacity;
-            }
-        }
-    });]]>`;
+        // window.addEventListener('DOMContentLoaded', () => {
+            const mapElement = document.getElementById('static-svg-map');
+            duplicateContours(mapElement);
+            ${onResize}
+            ${tooltipCode}
+        // });  
+        `;
     const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
     const renderedCss = commonCss.replaceAll(/rgb\(.*?\)/g, rgb2hex);
     styleElem.innerHTML = pathIsBetter ? renderedCss : renderedCss + fontsToCss(usedProvidedFonts);
     optimizedSVG.firstChild.append(styleElem);
     if (!downloadExport) return optimizedSVG.firstChild.outerHTML;
+    if (minifyJs != false) {
+        const terser = await import('terser');
+        finalScript = await terser.minify(finalScript, { toplevel: true, mangle: {eval: true, reserved: ['data', 'shapeId']}});
+        finalScript = finalScript.code;
+    }
     const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
-    scriptElem.innerHTML = finalScript;
+    scriptElem.innerHTML = `<![CDATA[${finalScript}]]>`;
     optimizedSVG.firstChild.append(scriptElem);
     download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'svgscape-export.svg');
 }

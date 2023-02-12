@@ -286,7 +286,7 @@ onMount(() => {
                     if(tab.substring(0, tab.length - 5) == elemId) {
                         const filter = zonesFilter[tab];
                         const countryData = countries.features.find(country => country.properties.name === elemId);
-                        appendCountryImageNew.call(d3.select(`#${elemId}-img`).node(), countryData, filter, applyStyles, path);
+                        appendCountryImageNew.call(d3.select(`[id='${elemId}-img']`).node(), countryData, filter, applyStyles, path);
                     }
                 })
             }
@@ -298,7 +298,10 @@ onMount(() => {
                 const parentCountryIso3 = iso3Data.find(row => row.name === parentCountry)['name'];
                 const countryElem = document.getElementById(parentCountryIso3);
                 if (!countryElem) return [];
-                return [countryElem];
+                return [[countryElem, parentCountryIso3]];
+            }
+            if (el.tagName === 'tspan') {
+                return [[el.parentNode, 'text']];
             }
             return [];
         },
@@ -320,7 +323,12 @@ onMount(() => {
                     setTransformScale(el, scaleStr);
                 }
             },
-        }
+        },
+        cssRuleFilter: (el, cssSelector) => {
+            // if (cssSelector.includes('adm1')) return false;
+            return true;
+        },
+        inlineDeletable: () => (false)
     });
     document.body.append(contextualMenu);
     contextualMenu.style.display = 'none';
@@ -596,7 +604,7 @@ async function draw(simplified = false, _) {
     .selectAll('g').data(groupData).join('g').attr('id', d => d.name);
         // .attr('clip-path', 'url(#clipMapBorder)')
     function drawPaths(data) {
-        if (data.type === 'landImg') return appendLandImageNew.call(this, data.showSource, zonesFilter, width, height, borderRadius, contourParams, land, pathLarger);
+        if (data.type === 'landImg') return appendLandImageNew.call(this, data.showSource, zonesFilter, width, height, borderRadius, contourParams, land, pathLarger, p(zonesFilter['land']));
         if (data.type === 'filterImg') return appendCountryImageNew.call(this, data.countryData, data.filter, applyStyles, path);
         if (!data.data) return;
         const parentPathElem = d3.select(this).style('will-change', 'opacity'); 
@@ -1030,10 +1038,13 @@ function drawAndSetupShapes() {
     drawShapes(providedShapes, container, projection, save);
     d3.select(container).on('dblclick', e => {
         const target = e.target;
-        const targetId = target.getAttribute('id');
+        let targetId = target.getAttribute('id');
+        // if no id, it's a tspan, get parent
+        if (!targetId) targetId = target.parentNode.getAttribute('id');
         if (targetId.includes('label')) {
             editedLabelId = targetId;
-            typedText = target.childNodes[0].nodeValue.trim();
+            const labelDef = providedShapes.find(def => def.id === editedLabelId);
+            typedText = labelDef.text;
             addLabel();
             showMenu(e);
         }
@@ -1264,13 +1275,27 @@ function validateExport() {
     const formData = Object.fromEntries(new FormData(exportForm).entries());
     exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, true, totalCommonCss, formData);
     showExportConfirm = false;
+    if (!window.goatcounter) return;
+    window.goatcounter.count({
+        title: 'Export SVG',
+        event: true,
+    });
+
 }
 // === Export as PNG behaviour ===
 
 async function exportRaster() {
-    let optimized = await exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, false, totalCommonCss, {});
-    optimized = encodeSVGDataImage(optimized);
-    svgToPng(optimized, p('width'), p('height'));
+    const svgWithStyle = svg.node().cloneNode(true);
+    const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
+    styleElem.innerHTML = totalCommonCss;
+    svgWithStyle.firstChild.append(styleElem);
+    const svgMarkup = `data:image/svg+xml;utf8,${encodeURIComponent(svgWithStyle.outerHTML)}`;
+    svgToPng(svgMarkup, p('width'), p('height'));
+    if (!window.goatcounter) return;
+    window.goatcounter.count({
+        title: 'Export raster',
+        event: true,
+    });
 }
 
 let inlineFontUsed = false;
@@ -1397,7 +1422,7 @@ async function colorizeAndLegend(e) {
         if (!legendColors) return;
         if (tab === currentTab) sampleLegend = {color: legendColors[0][0], text: legendColors[0][1]};
         const sampleElem = htmlToElement(legendDefs[tab].sampleHtml);
-        displayedLegend[tab] = drawLegend(legendSelection, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', sampleElem, tab);
+        displayedLegend[tab] = drawLegend(legendSelection, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', sampleElem, tab, saveDebounced);
     });
     computeCss();
     applyStyles();
@@ -1593,6 +1618,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                 
                 <li class="nav-item icon-add">
                     <select role="button" id='country-select' on:change={addNewCountry}>
+                        <option disabled selected value> -- select a country -- </option>
                         {#each allAvailableAdm as country}
                             <option value={country}>{country}</option>
                         {/each}
@@ -1615,11 +1641,11 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                 </div>
                 {/if}
                 {#if currentTab === "land"}
-                    <RangeInput id="contourwidth" title="Contour width" onChange={() => draw()} bind:value={contourParams.strokeWidth} min="0" max="5" step="0.5"></RangeInput>
-                    <ColorPickerPreview id="contourpicker" popup="bottom" title="Contour color" value={contourParams.strokeColor} onChange={(col) => {contourParams.strokeColor = col; draw()}}> </ColorPickerPreview>
-                    <RangeInput id="contour dash" title="Contour dash" onChange={() => draw()} bind:value={contourParams.strokeDash} min="0" max="20" step="0.5"></RangeInput>
+                    <RangeInput id="contourwidth" title="Contour width" onChange={() => redraw()} bind:value={contourParams.strokeWidth} min="0" max="5" step="0.5"></RangeInput>
+                    <ColorPickerPreview id="contourpicker" popup="bottom" title="Contour color" value={contourParams.strokeColor} onChange={(col) => {contourParams.strokeColor = col; redraw()}}> </ColorPickerPreview>
+                    <RangeInput id="contour dash" title="Contour dash" onChange={() => redraw()} bind:value={contourParams.strokeDash} min="0" max="20" step="0.5"></RangeInput>
                     {#if computedOrderedTabs.findIndex(x => x === 'land') === 0}
-                        <ColorPickerPreview id="fillpicker" popup="bottom" title="Fill color" value={contourParams.fillColor} onChange={(col) => {contourParams.fillColor = col; draw()}}> </ColorPickerPreview>
+                        <ColorPickerPreview id="fillpicker" popup="bottom" title="Fill color" value={contourParams.fillColor} onChange={(col) => {contourParams.fillColor = col; redraw()}}> </ColorPickerPreview>
                     {/if}
                 {/if}
                 {#if zonesData?.[currentTab]?.['data']}
@@ -1802,9 +1828,17 @@ function getLegendColors(dataColorDef, tab, scale, data) {
         <h3 class="fs-4"> Resize </h3>
         <div class="form-check form-switch">
             <input class="form-check-input" name="hideOnResize" type="checkbox" role="switch" id="hideOnResize" checked>
-            <label class="form-check-label" for="flexSwitchCheckDefault">
+            <label class="form-check-label" for="hideOnResize">
                 Hide svg on resize 
                 <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="On some browsers, resizing the window triggers a re-render, which can cause a slowdown. If activated, the SVG will be hidden while the window is being resized, thus reducing the computing load.">?</span>
+            </label>
+        </div>
+        <h3 class="fs-4"> Javascript </h3>
+        <div class="form-check form-switch">
+            <input class="form-check-input" name="minifyJs" type="checkbox" role="switch" id="minifyJs" checked>
+            <label class="form-check-label" for="minifyJs">
+                Minify javascript
+                <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Some JS is included in the SVG (for the tooltip for instance). Minifying it will make the file smaller, but more difficult to edit.">?</span>
             </label>
         </div>
     </form>
@@ -1826,7 +1860,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
 <Modal open={showCustomPalette} onClosed={() => showCustomPalette = false} >
     <div slot="content">
         <PaletteEditor customCategoricalPalette={customCategoricalPalette} onChange={draw}></PaletteEditor>
-    </div>
+    </div> 
 </Modal>
 
 <style lang="scss" scoped>
@@ -1863,6 +1897,9 @@ input[type="file"] {
     border-left: 3px solid black;
 }
 .delete-tab {
+    position: absolute;
+    right: 2px;
+    top: 7px;
     &:hover {
         color: #67777a;
     }

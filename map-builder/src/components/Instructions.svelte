@@ -15,7 +15,7 @@
         </li>
         <li>
             Double clicking on a label or a legend title will enable its
-            edition.
+            edition. <code> ++ </code> will be printed as a new line.
         </li>
     </ul>
     <h4>Only on <strong> "Satellite" </strong> projection:</h4>

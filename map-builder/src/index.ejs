@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= htmlWebpackPlugin.options.title %></title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width; initial-scale=1">
+    <script data-goatcounter="https://qpincon.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  </head>
+  <body>
+    <!-- <p> <%= htmlWebpackPlugin.options.svgcontent %> </p>
+    <p> <%= htmlWebpackPlugin.options.title %> </p> -->
+    <div id="app-content">
+      
+    </div>
+    <% if (htmlWebpackPlugin.options.svgcontent) { %>
+      <div> <%= htmlWebpackPlugin.options.svgcontent %> </div>
+    <% } %>
+  </body>
+</html>

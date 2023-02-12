@@ -16,8 +16,7 @@ function drawShapes(shapeDefinitions, container, projection, dragCb) {
         }
         // shape is a label
         else {
-            const svgPart = `<text stroke-width="0"> ${shapeDef.text} </text>`;
-            svgShape = createSvgFromPart(svgPart);
+            svgShape = addSvgText(shapeDef.text).node();
         }
         const transform = `translate(${projectedPos[0]} ${projectedPos[1]})`;
         svgShape.setAttribute('transform', transform);
@@ -31,7 +30,10 @@ function drawShapes(shapeDefinitions, container, projection, dragCb) {
             const [x, y] = getTranslateFromTransform(currentlyDragging);
             setTransformTranslate(currentlyDragging, `translate(${x + event.dx} ${y + event.dy})`);
         })
-        .on('start', (e) => currentlyDragging = e.sourceEvent.target)
+        .on('start', (e) => {
+            if (e.sourceEvent.target.tagName === 'tspan') currentlyDragging = e.sourceEvent.target.parentNode;
+            else currentlyDragging = e.sourceEvent.target
+        })
         .on('end', (e) => {
             if (!dragging) return;
             dragging = false;
@@ -44,4 +46,18 @@ function drawShapes(shapeDefinitions, container, projection, dragCb) {
         })
     );
 }
-export { drawShapes };
+
+const separator = '++';
+function addSvgText(text) {
+    const parts = text.split(separator);
+    const textElem = d3.create('svg:text').attr('stroke-width', 0);
+    textElem.selectAll('tspan')
+        .data(parts)
+        .join('tspan')
+            .attr('x', 0)
+            .attr('dy', (_, i) => (i ? '1.1em' : 0))
+            .text(d => d);
+    return textElem;
+}
+
+export { drawShapes, addSvgText };

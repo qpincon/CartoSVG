@@ -93,14 +93,10 @@ function standardProj(projFunc, { width, height, translateX, translateY, altitud
     return proj;
 }
 function geoAlbersUsaProj({ width, height, translateX, translateY, altitude, latitude, longitude, rotation, borderWidth, larger = false } = {}) {
-    const offCanvasWithBorder = offCanvasPx - (borderWidth / 2);
     let proj = geoAlbersUsa()
     .scale(altitude)
     .translate([(width / 2) + translateX, (height / 2) + translateY])
     .precision(0.1);
-    if (larger) {
-        proj = proj.postclip(geoClipRectangle(-offCanvasWithBorder, -offCanvasWithBorder, width + offCanvasWithBorder, height + offCanvasWithBorder))
-    }
     return proj;
 }
 
