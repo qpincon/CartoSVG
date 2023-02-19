@@ -6,7 +6,7 @@
 
 <nav class="navbar navbar-expand-lg bg-light">
     <div class="container-fluid w-100">
-      <a class="mx-4 navbar-brand fs-2" href="#">
+      <a class="mx-4 navbar-brand fs-2" href="/">
         <img src={logo} alt="Logo" width="215" height="64" class="d-inline-block align-text-center">
       </a>
       <div class="navbar-collapse" >

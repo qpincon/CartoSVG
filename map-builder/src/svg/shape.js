@@ -16,7 +16,7 @@ function drawShapes(shapeDefinitions, container, projection, dragCb) {
         }
         // shape is a label
         else {
-            svgShape = addSvgText(shapeDef.text).node();
+            svgShape = addSvgText(shapeDef.text, shapeDef.id).node();
         }
         const transform = `translate(${projectedPos[0]} ${projectedPos[1]})`;
         svgShape.setAttribute('transform', transform);
@@ -48,14 +48,24 @@ function drawShapes(shapeDefinitions, container, projection, dragCb) {
 }
 
 const separator = '++';
-function addSvgText(text) {
+function addSvgText(text, id) {
     const parts = text.split(separator);
-    const textElem = d3.create('svg:text').attr('stroke-width', 0);
+    const textElem = d3.create('svg:text')
+        .attr('stroke-width', 0)
+        .attr('id', id);
+
+    const countPrefixSpace = str => {
+        let i = 0;
+        while (i < str.length && str[i] === ' ') ++i;
+        return i;
+    };
     textElem.selectAll('tspan')
         .data(parts)
         .join('tspan')
             .attr('x', 0)
+            .attr('dx', (d) => `${countPrefixSpace(d) / 3}em`)
             .attr('dy', (_, i) => (i ? '1.1em' : 0))
+            .attr('id', (_, i) => (`${id}-${i}`))
             .text(d => d);
     return textElem;
 }

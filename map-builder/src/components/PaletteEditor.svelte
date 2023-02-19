@@ -3,11 +3,15 @@
     import ColorPicker from "./ColorPicker.svelte";
     import addIcon from "../assets/img/add.svg?inline";
     import { debounce } from 'lodash-es';
-
     export let customCategoricalPalette = [];
     export let onChange = () => {};
+    export let mapping = {};
 
-    $:_onChange = debounce(onChange, 500);
+    function _onChange() {
+        onChange();
+    }
+
+    $:_onChangeDebounced = debounce(_onChange, 300);
     let colorPickers = [];
 
     let hoveringColor = false;
@@ -25,7 +29,8 @@
         }
         customCategoricalPalette = newList;
         hoveringColor = null;
-        onChange();
+        _onChange(true);
+        
     }
 
     function dragStartColor(event, i) {
@@ -34,11 +39,22 @@
         dragStartIndex = i;
     }
 
+    function findMatchedValues(color) {
+        // console.log(mapping);
+        if (!(color in mapping)) return null;
+        return [...mapping[color]].join(', ');
+    }
+
+    function getColors(x, y) {
+        console.log('get colors', x, y);
+        return customCategoricalPalette;
+    }
+
 </script>
 
 <span> Tip: it is possible to re-order dragging and dropping the colors.</span>
 <div class="custom-palette-menu d-flex flex-wrap">
-    {#each customCategoricalPalette as color, i}
+    {#each getColors(mapping, customCategoricalPalette) as color, i}
         <div
             class="position-relative d-flex flex-column justify-content-center p-4 m-2 color-container border rounded-3"
             role="button"
@@ -54,7 +70,7 @@
                 on:click={() => {
                     customCategoricalPalette.splice(i, 1);
                     customCategoricalPalette = customCategoricalPalette;
-                    _onChange();
+                    _onChangeDebounced(true);
                 }}>✕</span
             >
             <div
@@ -69,11 +85,12 @@
                     value={color}
                     onChange={(c) => {
                         customCategoricalPalette[i] = c;
-                        _onChange();
+                        _onChangeDebounced();
                     }}
                 />
             </div>
             <span> {color} </span>
+            <span> {findMatchedValues(color)}</span>
         </div>
     {/each}
     <div
@@ -82,7 +99,7 @@
         on:click={() => {
             customCategoricalPalette.push("#aaaaaa");
             customCategoricalPalette = customCategoricalPalette;
-            _onChange();
+            _onChangeDebounced(true);
         }}
     >
         <Icon width="3rem" height="3rem" fillColor="none" svg={addIcon} />

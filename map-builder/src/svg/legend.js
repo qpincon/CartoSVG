@@ -8,6 +8,8 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
     if (legendDef.noData.active) {
         colors.unshift([legendDef.noData.color, legendDef.noData.text]);
     }
+    const labelWidths = getEntryWidths(legendSelection.node(), colors.map(x => x[1]), sampleElem);
+    const maxLabelWidth = Math.max(...labelWidths);
     const horizontal = legendDef.direction === 'h';
     const gap = isCategorical ? 5 : 0;
     const textBaseline = !isCategorical && horizontal ? 'hanging' : 'middle';
@@ -47,16 +49,16 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
         .attr('id', groupId)
         .attr('transform', `translate(${legendDef.x + offsetX} ${offsetY + (legendDef.y ? legendDef.y : 100)})`)
 
-    const legendTitle = legendGroup.append(() => addSvgText(legendDef.title).node())
+    const legendTitle = legendGroup.append(() => addSvgText(legendDef.title, titleId).node())
         .attr('x', 0)
         .attr('y', 0)
         .attr('transform', `translate(${legendDef.changes[titleId].dx} ${legendDef.changes[titleId].dy -20})`)
-        .attr('id', `${tabName}-legend-title`)
+        .attr('id', titleId)
         .style('font-size', '20px')
         .on('dblclick', e => {
             const inputVal = legendDef.title;
             const closeInput = () => {
-                legendTitle.html(addSvgText(input.value).node().innerHTML);
+                legendTitle.html(addSvgText(input.value, titleId).node().innerHTML);
                 legendDef.title = input.value;
                 legendDef.titleChanged = true;
                 input.remove();
@@ -103,37 +105,57 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
             const y = computeY(i);
             return `translate(${x} ${y})`;
         });
-
+    const canBeOnLeft = isCategorical || legendDef.direction === 'v';
+    const getX = (index, isRect = false) => {
+        if (canBeOnLeft && legendDef.labelOnLeft) {
+            if (isRect) return maxLabelWidth + 5;
+            return maxLabelWidth - labelWidths[index];
+        }
+        if (isRect) return 0;
+        return (!isCategorical && horizontal) ? 0 : legendDef.rectWidth + 5
+    };
     legendEntries.append('rect')
-        .attr('x', 0)
+        .attr('x', (_, i) => getX(i, true))
         .attr('y', 0)
         .attr('width', legendDef.rectWidth)
         .attr('height', legendDef.rectHeight)
         .attr('fill', d => d[0])
         .attr('stroke', 'black');
-
+    
     legendEntries.append('text')
         .attr('text-anchor', !isCategorical && horizontal ? 'middle' : 'start')
         .attr('dominant-baseline', textBaseline)
-        .attr('x', () => !isCategorical && horizontal ? 0 : legendDef.rectWidth + 5)
+        .attr('x', (_, i) => getX(i, false))
         .attr('y', () => (!isCategorical ? (horizontal ? legendDef.rectHeight + 5 : legendDef.rectHeight) : legendDef.rectHeight / 2))
         .text(d => d[1]);
-
+        
+    
+    if (sampleElem) {
+        legendEntries.each(function () {
+            reportStyle(sampleElem, d3.select(this).node());
+        });
+    }
     if (willRerun) {
         let maxWidth = 0;
         legendEntries.each(function () {
             maxWidth = Math.max(maxWidth, d3.select(this).node().getBBox().width);
         });
         legendGroup.remove();
-        return drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, maxWidth);
-    }
-    else if (sampleElem) {
-        legendEntries.each(function () {
-            reportStyle(sampleElem, d3.select(this).node());
-        });
+        return drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, saveFunc, maxWidth);
     }
     return legendSelection;
 }
 
+function getEntryWidths(container, labels, sampleElem) {
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    if(sampleElem) reportStyle(sampleElem.querySelector('text'), text);
+    container.append(text);
+    const widths = labels.map(label => {
+        text.textContent = label;
+        return text.getBoundingClientRect().width;
+    });
+    text.remove();
+    return widths;
+}
 
 export { drawLegend };

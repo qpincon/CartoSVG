@@ -5,7 +5,8 @@ import svgoConfigText from '../svgoExportText.config';
 import TextToSVG from 'text-to-svg';
 import { htmlToElement } from '../util/common';
 import { indexBy, pick, download } from '../util/common';
-import { reportStyle, fontsToCss, getUsedInlineFonts } from '../util/dom';
+import { reportStyle, reportStyleElem, fontsToCss, getUsedInlineFonts } from '../util/dom';
+import { encodeSVGDataImage} from './svg';
 
 const domParser = new DOMParser();
 
@@ -29,21 +30,62 @@ const anchorToAnchor = {
     middle: 'center',
     right: 'right'
 };
+function getTextElems(svgElem) {
+    const texts = Array.from(svgElem.querySelectorAll('text')).concat(Array.from(svgElem.querySelectorAll('tspan')));
+    // ignore text elements containing tspans
+    return texts.filter(t => !(t.tagName == 'text' && t.firstChild.tagName == 'tspan'))
+}
+
+
+function getInlineStyle(el, defaultStyles, propName) {
+    const isTspan = el.tagName == 'tspan';
+    return el.style[propName] || (isTspan ? el.parentNode.style[propName] : null) || defaultStyles.getPropertyValue(propName);
+}
 
 function replaceTextsWithPaths(svgElem, transformedTexts) {
-    const texts = Array.from(svgElem.querySelectorAll('text'));
+    const defaultStyles = getComputedStyle(document.body);
+    const texts = getTextElems(svgElem);
     texts.forEach(textElem => {
-        const fontFamily = textElem.style['font-family'];
+        const fontFamily = getInlineStyle(textElem, defaultStyles, 'font-family');
         const text = textElem.textContent.trim();
         const transformed = transformedTexts[fontFamily]?.[text];
         if (!transformed) return;
         const pathElem = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         pathElem.setAttribute('d', transformed);
-        const transform = textElem.getAttribute('transform');
-        if (transform) pathElem.setAttribute('transform', transform);
-        reportStyle(textElem, pathElem);
-        textElem.replaceWith(pathElem);
+        reportStyleElem(textElem, pathElem);
+        if (textElem.tagName == 'tspan') {
+            textElem.parentNode.parentNode.append(pathElem);
+            reportStyleElem(textElem.parentNode, pathElem);
+            textElem.remove();
+        }
+        else textElem.replaceWith(pathElem);
     });
+}
+
+function getTextPosition(textElem, defaultStyles) {
+    const getShift = (elem, attr) => {
+        const fontSize = parseFloat(getInlineStyle(elem, defaultStyles, 'font-size'));
+        const delta = elem.getAttribute(attr);
+        if (delta && delta.includes('em')) return parseFloat(delta) * fontSize;
+        return 0;
+    };
+    const getPos = (elem, direction) => {
+        let attributes = {delta: 'dx', pos: 'x'};
+        let pos = parseFloat(elem.getAttribute(attributes.pos)) || 0;
+        if (direction == 'y') attributes = {delta: 'dy', pos: 'y'};
+        pos += getShift(elem, attributes.delta);
+        let prevSibling = elem.previousSibling;
+        // if "y" is ommited, "dy" is cumulative
+        while(prevSibling !== null && !prevSibling.hasAttribute(attributes.pos)) {
+            pos += getShift(prevSibling, attributes.delta);
+            prevSibling = prevSibling.previousSibling;
+        }
+        return pos;
+    };
+    
+    let x = getPos(textElem, 'x');
+    let y = getPos(textElem, 'y');
+    return {x, y};
 }
 
 async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
@@ -54,19 +96,23 @@ async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
     await Promise.all(providedFonts.map(({ name, content }) => {
         transformedTexts[name] = {};
         nbFontChars += content.length;
-        const texts = Array.from(svgElem.querySelectorAll('text'));
+        // const texts = Array.from(svgElem.querySelectorAll('text')).concat(Array.from(svgElem.querySelectorAll('tspan')));
+        const texts = getTextElems(svgElem);
         return new Promise(resolve => {
             TextToSVG.load(content, function (err, textToSVG) {
                 texts.forEach(textElem => {
-                    const fontFamily = textElem.style['font-family'] || defaultStyles.getPropertyValue('font-family');
+                    if (textElem.tagName == 'text' && textElem.firstChild.tagName == 'tspan') return;
+                    const fontFamily = getInlineStyle(textElem, defaultStyles, 'font-family');
                     if (fontFamily === name) {
                         const text = textElem.textContent.trim();
                         const anchor = anchorToAnchor[textElem.getAttribute('text-anchor')] || 'left';
                         const baseline = domBaselineToBaseline[textElem.getAttribute('dominant-baseline')] || 'baseline';
+                        const fontSize = parseFloat(getInlineStyle(textElem, defaultStyles, 'font-size'));
+                        const {x, y} = getTextPosition(textElem, defaultStyles);
                         const options = {
-                            x: textElem.getAttribute('x') || 0,
-                            y: textElem.getAttribute('y') || 0,
-                            fontSize: parseInt(textElem.style['font-size'] || defaultStyles.getPropertyValue('font-size')),
+                            x: x,
+                            y: y,
+                            fontSize: fontSize,
                             anchor: `${anchor} ${baseline}`
                         };
                         let path = textToSVG.getD(text, options);
@@ -106,6 +152,15 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     });
     const usedFonts = getUsedInlineFonts(svgNode);
     const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
+
+    // first, optimize data-uri images
+    const glowImages = svgNode.querySelectorAll('.glow-img'); 
+    glowImages.forEach(glowImg => {
+        let glowImgStr = decodeURIComponent(glowImg.getAttribute('href'));
+        glowImgStr = glowImgStr.substring(glowImgStr.indexOf('<svg'));
+        glowImgStr = encodeSVGDataImage(SVGO.optimize(glowImgStr, svgoConfig).data);
+        glowImg.setAttribute('href', glowImgStr);
+    });
     const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig).data;
     if (fo) svg.node().append(fo);
     contours.forEach(([el, parent]) => {
@@ -158,6 +213,26 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         contentSvg.style.display = "none"; clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => { contentSvg.style.display = 'block' }, 300);
     });`: '';
+
+    const onMouseEvents = `
+        mapElement.addEventListener('mousemove', (e) => {
+            ${tooltipEnabled ? 'onMouseMove(e);' : ''}
+            const parent = e.target.parentNode;
+            if (e.target.tagName === 'path' && parent.tagName === 'g') {
+                if (e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
+                if (e.target !== parent.lastElementChild) parent.append(e.target);
+            } 
+        });
+
+        mapElement.addEventListener('mouseout', (e) => {
+            const previousPos = e.target.previousPos;
+            if (previousPos) {
+                const parent = e.target.parentNode;
+                parent.insertBefore(e.target, parent.children[previousPos]);
+            }
+        });
+    `;
+
     const tooltipCode = tooltipEnabled ? `
     const parser = new DOMParser();
     const width = ${width}, height = ${height};
@@ -178,22 +253,6 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         return elem;
     }
     mapElement.addEventListener('mouseleave', hideTooltip);
-    mapElement.addEventListener('mousemove', (e) => {
-        onMouseMove(e);
-        const parent = e.target.parentNode;
-        if (e.target.tagName === 'path' && parent.tagName === 'g') {
-            if (e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
-            if (e.target !== parent.lastElementChild) parent.append(e.target);
-        } 
-    });
-
-    mapElement.addEventListener('mouseout', (e) => {
-        const previousPos = e.target.previousPos;
-        if (previousPos) {
-            const parent = e.target.parentNode;
-            parent.insertBefore(e.target, parent.children[previousPos]);
-        }
-    });
 
     function hideTooltip() {
         tooltip.element.style.display = 'none';
@@ -235,7 +294,6 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
             tooltip.element.style.opacity = tooltipVisibleOpacity;
         }
         else {
-            parent.append(e.target);
             const data = dataByGroup.data[groupId][shapeId];
             if (!data) {
                 tooltip.element.style.display = 'none';
@@ -260,13 +318,15 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
                 el.parentNode.insertBefore(clone, el);
             });
         }
-        // window.addEventListener('DOMContentLoaded', () => {
-            const mapElement = document.getElementById('static-svg-map');
-            duplicateContours(mapElement);
-            ${onResize}
-            ${tooltipCode}
-        // });  
+        const allScripts = document.getElementsByTagName('script');
+        const scriptTag = allScripts[allScripts.length - 1];
+        const mapElement = scriptTag.parentNode;
+        duplicateContours(mapElement);
+        ${onResize}
+        ${tooltipCode}
+        ${onMouseEvents}
         `;
+
     const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
     const renderedCss = commonCss.replaceAll(/rgb\(.*?\)/g, rgb2hex);
     styleElem.innerHTML = pathIsBetter ? renderedCss : renderedCss + fontsToCss(usedProvidedFonts);

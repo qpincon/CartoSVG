@@ -14,6 +14,10 @@ function reportStyleElem(ref, target) {
     if (refStyle && refStyle !== "null") {
         target.setAttribute('style', refStyle);
     }
+    const transform = ref.getAttribute('transform');
+    if (transform && transform !== "null") {
+        target.setAttribute('transform', transform);
+    }
 }
 
 function fontsToCss(fonts) {
@@ -55,4 +59,4 @@ function exportStyleSheet(selectorToFind) {
         }
     }
 }
-export { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts };
+export { reportStyle, reportStyleElem, fontsToCss, exportStyleSheet, getUsedInlineFonts };

@@ -51,12 +51,13 @@ function encodedSvgToBase64Png(encodedSvg, width, height, secondTry) {
 //needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
 function fixSvgDocumentFF(svgDocument) {
     try {
-        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
-        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        const widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        const heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
         svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
         svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
         return svgDocument;
     } catch (e) {
+        console.log(e);
         return svgDocument;
     }
 }

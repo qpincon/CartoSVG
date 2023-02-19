@@ -28,8 +28,7 @@ function appendLandImageNew(showSource, zonesFilter, width, height, borderWidth,
     if (showSource) {
         landElem.select('g').attr('fill', contourParams.fillColor);
     }
-    const optimized = encodeSVGDataImage(SVGO.optimize(landElem.node().outerHTML, svgoConfig).data);
-    
+    const optimized = encodeSVGDataImage(landElem.node().outerHTML);
     const img = d3.select(this).append('image')
             .attr('x', -offCanvasWithBorder/2).attr('y', -offCanvasWithBorder/2)
             .attr('width', width + (offCanvasWithBorder )).attr('height', height + (offCanvasWithBorder))
@@ -37,6 +36,7 @@ function appendLandImageNew(showSource, zonesFilter, width, height, borderWidth,
             .style('pointer-events', 'none')
             .style('will-change', 'opacity')
             .classed('contour-to-dup', true)
+            .classed('glow-img', true)
             
     
     let filterName = zonesFilter['land'];
@@ -49,9 +49,16 @@ function appendLandImageNew(showSource, zonesFilter, width, height, borderWidth,
     }
 }
 
-function appendCountryImageNew(countryData, filter, applyStyles, path) {
+function appendCountryImageNew(countryData, filter, applyStyles, path, inlineStyles) {
     d3.select(this).html('');
     const countryName = countryData.properties.name;
+    const ref = document.getElementById(countryName);
+    // if country not present or no stroke width and no filter, do nothing
+    if (filter === null) {
+        const strokeWidth = inlineStyles[countryName]?.['stroke-width'];
+        if (!strokeWidth || strokeWidth == '0px') return;
+        if (!ref) return;
+    }
     applyStyles(true);
     d3.select(this).style('pointer-events', 'none')
         .style('will-change', 'opacity');
@@ -63,7 +70,6 @@ function appendCountryImageNew(countryData, filter, applyStyles, path) {
         .attr('d', path(countryData))
         .attr('fill', 'none');
 
-    const ref = document.getElementById(countryName);
     if (ref) {
         const strokeParams = ['stroke', 'stroke-width', 'stroke-linejoin', 'stroke-dasharray'];
         const computedRef = window.getComputedStyle(ref);
@@ -72,12 +78,14 @@ function appendCountryImageNew(countryData, filter, applyStyles, path) {
         });
         ref.style['stroke-width'] = '0px';
     }
-    const optimized = encodeSVGDataImage(SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data);
+    // const optimized = encodeSVGDataImage(SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data);
+    const optimized = encodeSVGDataImage(countryElem.node().outerHTML);
     d3.select(this).append('image').attr('width', '100%').attr('height', '100%')
             .attr('href', optimized)
             .style('pointer-events', 'none')
             .style('will-change', 'opacity')
             .classed('contour-to-dup', true)
+            .classed('glow-img', true)
             .attr('filter-name', filter);
     // remove all cloned filter elements
     const svgElem = document.getElementById('static-svg-map');
@@ -174,6 +182,7 @@ function appendLandImage(showSource) {
 
     // const optimized = encodeSVGDataImage(SVGO.optimize(landElem.node().outerHTML, svgoConfig).data);
     const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
+        .classed('glow-img', true)
         .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(landElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
         // .attr('href', optimized);
         
@@ -207,6 +216,7 @@ function appendCountryImage(countryData, filter) {
     }
     // const optimized = encodeSVGDataImage(SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data);
     const countryImage = d3.create('image').attr('width', '100%').attr('height', '100%').attr('id', countryElem)
+        .classed('glow-img', true)
         .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
         // .attr('href', optimized);
     d3.select(this).html(countryImage.node().outerHTML)

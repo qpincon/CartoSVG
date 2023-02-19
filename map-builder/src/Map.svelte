@@ -17,7 +17,7 @@ import PaletteEditor from "./components/PaletteEditor.svelte";
 import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, getBestFormatter, getColumns } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import * as markers from './svg/markerDefs';
-import { setTransformScale, closestDistance, encodeSVGDataImage, duplicateContourCleanFirst } from './svg/svg';
+import { setTransformScale, closestDistance, duplicateContourCleanFirst, encodeSVGDataImage } from './svg/svg';
 import { appendLandImageNew,  appendCountryImageNew } from './svg/contourMethods';
 import { drawShapes } from './svg/shape';
 import iso3Data from './assets/data/iso3_filtered.json';
@@ -159,10 +159,12 @@ const defaultLegendDef =  {
     significantDigits: 3,
     maxWidth: 200,
     direction: 'v',
+    labelOnLeft: false,
     title: null,
     sampleHtml: null,
     noData: {
         active: false,
+        manual: false,
         text: 'N/A',
         color: '#AAAAAA'
     },
@@ -286,30 +288,30 @@ onMount(() => {
                     if(tab.substring(0, tab.length - 5) == elemId) {
                         const filter = zonesFilter[tab];
                         const countryData = countries.features.find(country => country.properties.name === elemId);
-                        appendCountryImageNew.call(d3.select(`[id='${elemId}-img']`).node(), countryData, filter, applyStyles, path);
+                        appendCountryImageNew.call(d3.select(`[id='${elemId}-img']`).node(), countryData, filter, applyStyles, path, inlineStyles);
                     }
                 })
             }
             save();
         },
-        getAdditionalElems: (el) => {
+        getElems: (el) => {
             if (el.classList.contains('adm')) {
                 const parentCountry = el.parentNode.getAttribute('id').replace(/ ADM(1|2)/, '')
                 const parentCountryIso3 = iso3Data.find(row => row.name === parentCountry)['name'];
                 const countryElem = document.getElementById(parentCountryIso3);
                 if (!countryElem) return [];
-                return [[countryElem, parentCountryIso3]];
+                return [[el, 'Clicked'], [countryElem, parentCountryIso3]];
             }
             if (el.tagName === 'tspan') {
-                return [[el.parentNode, 'text']];
+                return [[el.parentNode, 'text'], [el, 'text part']];
             }
-            return [];
+            return [[el, 'Clicked']];
         },
         customProps: {
             'scale': {
                 type: 'slider', min: 0.5, max: 5, step: 0.1,
                 getter: (el) => {
-                    if (el.parentNode.getAttribute('id') !== 'points-labels') return null;
+                    if (el.closest('#points-labels') == null) return null;
                     const transform = el.getAttribute('transform');
                     if (!transform) return 1;
                     else {
@@ -604,8 +606,8 @@ async function draw(simplified = false, _) {
     .selectAll('g').data(groupData).join('g').attr('id', d => d.name);
         // .attr('clip-path', 'url(#clipMapBorder)')
     function drawPaths(data) {
-        if (data.type === 'landImg') return appendLandImageNew.call(this, data.showSource, zonesFilter, width, height, borderRadius, contourParams, land, pathLarger, p(zonesFilter['land']));
-        if (data.type === 'filterImg') return appendCountryImageNew.call(this, data.countryData, data.filter, applyStyles, path);
+        if (data.type === 'landImg') return appendLandImageNew.call(this, data.showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, p(zonesFilter['land']));
+        if (data.type === 'filterImg') return appendCountryImageNew.call(this, data.countryData, data.filter, applyStyles, path, inlineStyles);
         if (!data.data) return;
         const parentPathElem = d3.select(this).style('will-change', 'opacity'); 
         const pathElem = parentPathElem.selectAll('path')
@@ -982,6 +984,11 @@ function handleChangeProp(event) {
         inlineProps.translateX = 0;
         inlineProps.translateY = 0;
     }
+    if (prop === 'height') {
+        Object.keys(legendDefs).forEach(tab => {
+            legendDefs[tab].y = value - 100;
+        });
+    }
     redrawThrottle(prop);
 }
 
@@ -1039,8 +1046,7 @@ function drawAndSetupShapes() {
     d3.select(container).on('dblclick', e => {
         const target = e.target;
         let targetId = target.getAttribute('id');
-        // if no id, it's a tspan, get parent
-        if (!targetId) targetId = target.parentNode.getAttribute('id');
+        if (target.tagName == 'tspan') targetId = target.parentNode.getAttribute('id');
         if (targetId.includes('label')) {
             editedLabelId = targetId;
             const labelDef = providedShapes.find(def => def.id === editedLabelId);
@@ -1069,11 +1075,12 @@ function showMenu(e, target = null) {
     contextualMenu.style.top = e.pageY + "px";
 }
 
-function addShape(shapeName) {
+async function addShape(shapeName) {
     const shapeId = `${shapeName}-${shapeCount++}`;
     providedShapes.push({name: shapeName, pos: openContextMenuInfo.position, scale: 1, id:shapeId});
     drawAndSetupShapes();
     closeMenu();
+    await tick();
     setTimeout(() => {
         const lastShape = document.getElementById(providedShapes[providedShapes.length -1].id);
         styleEditor.open(lastShape, openContextMenuInfo.event.pageX, openContextMenuInfo.event.pageY);
@@ -1081,7 +1088,10 @@ function addShape(shapeName) {
 }
 
 function copySelection() {
-    const objectId = openContextMenuInfo.target.getAttribute('id');
+    let objectId = openContextMenuInfo.target.getAttribute('id');
+    if (openContextMenuInfo.target.tagName === 'tspan') {
+        objectId = openContextMenuInfo.target.parentNode.getAttribute('id');
+    }
     const newDef = {...providedShapes.find(def => def.id === objectId)};
     const projected = projection(newDef.pos);
     newDef.pos = projection.invert([projected[0] - 10, projected[1]]);
@@ -1094,8 +1104,12 @@ function copySelection() {
 }
 
 function deleteSelection() {
-    const pointId = openContextMenuInfo.target.getAttribute('id');
+    let pointId = openContextMenuInfo.target.getAttribute('id');
     delete inlineStyles[pointId];
+    if (openContextMenuInfo.target.tagName === 'tspan') {
+        pointId = openContextMenuInfo.target.parentNode.getAttribute('id');
+        delete inlineStyles[pointId];
+    }
     providedShapes = providedShapes.filter(def => def.id !== pointId);
     drawAndSetupShapes();
     closeMenu();
@@ -1141,7 +1155,7 @@ function handleDataImport(e) {
             if (difference.size) {
                 return window.alert(`Missing names ${[...difference]}`);
             }
-            parsed = sortBy(parsed, 'name');
+            // parsed = sortBy(parsed, 'name');
             zonesData[currentTab] = {data: parsed, provided:true, numericCols: getNumericCols(parsed) };
             getZonesDataFormatters();
             autoSelectColors();
@@ -1277,22 +1291,24 @@ function validateExport() {
     showExportConfirm = false;
     if (!window.goatcounter) return;
     window.goatcounter.count({
+        path: 'export-svg',
         title: 'Export SVG',
         event: true,
     });
-
 }
-// === Export as PNG behaviour ===
 
+// === Export as PNG behaviour ===
+import * as saveSvgAsPng from 'save-svg-as-png';
 async function exportRaster() {
-    const svgWithStyle = svg.node().cloneNode(true);
-    const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
-    styleElem.innerHTML = totalCommonCss;
-    svgWithStyle.firstChild.append(styleElem);
-    const svgMarkup = `data:image/svg+xml;utf8,${encodeURIComponent(svgWithStyle.outerHTML)}`;
-    svgToPng(svgMarkup, p('width'), p('height'));
+    const optimized = await exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, false, totalCommonCss, {});
+    const elem = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    document.body.append(elem);
+    elem.outerHTML = optimized;
+    saveSvgAsPng.saveSvgAsPng(document.body.lastChild, 'test.png');
+    document.body.lastChild.remove();
     if (!window.goatcounter) return;
     window.goatcounter.count({
+        path: 'export-raster',
         title: 'Export raster',
         event: true,
     });
@@ -1356,7 +1372,8 @@ let sampleLegend = {
     color: 'black', text: 'test'
 };
 let showCustomPalette = false;
-
+// tab => {x => color} used for custom palette
+const ordinalMapping = {};
 async function colorizeAndLegend(e) {
     await tick();
     initTooltips();
@@ -1365,7 +1382,7 @@ async function colorizeAndLegend(e) {
     if (!legendEntries.empty()) legendEntries.remove();
     const legendSelection = svg.select('svg').append('g').attr('id', 'svg-map-legend');
     Object.entries(colorDataDefs).forEach(([tab, dataColorDef], tabIndex) => {
-        legendDefs[tab].noData.active = false;
+        if(!legendDefs[tab].noData.manual) legendDefs[tab].noData.active = false;
         if (!dataColorDef.enabled) {
             dataColorDef.legendEnabled = false;
             colorsCss[tab] = '';
@@ -1378,7 +1395,7 @@ async function colorizeAndLegend(e) {
         const data = zonesData[tab].data.reduce((acc, row) => {
             const d = row[dataColorDef.colorColumn];
             if (d === null || d === undefined) {
-                legendDefs[tab].noData.active = true;
+                if(!legendDefs[tab].noData.manual) legendDefs[tab].noData.active = true;
                 return acc;
             }
             acc.push(d);
@@ -1387,6 +1404,7 @@ async function colorizeAndLegend(e) {
         let scale;
         if (dataColorDef.colorScale === "category" ) {
             if (dataColorDef.colorPalette === 'Custom') {
+                ordinalMapping[tab] = {};
                 scale = d3.scaleOrdinal(customCategoricalPalette);
             }
             else scale = d3.scaleOrdinal(d3[paletteName]);
@@ -1399,14 +1417,18 @@ async function colorizeAndLegend(e) {
         zonesData[tab].data.forEach(row => {
             const d = row[dataColorDef.colorColumn];
             const key = row.name;
-            const elem = document.getElementById(key);
+            const elem = document.querySelector(`g[id="${tab}"] [id="${key}"]`);
             if (!elem) return;
             let color;
             if (d === null || d === undefined) {
                 color = legendDefs[tab].noData.color;
             }
             else {
-                color = scale(row[dataColorDef.colorColumn]);
+                color = scale(d);
+                if (ordinalMapping[tab]) {
+                    if (!ordinalMapping[tab][color]) ordinalMapping[tab][color] = new Set([d])
+                    else ordinalMapping[tab][color].add(d);
+                }
             }
             if (!usedColors.includes(color)) usedColors.push(color);
             const cssClass = `ssc-${tabIndex}-${usedColors.indexOf(color)}`;
@@ -1852,6 +1874,9 @@ function getLegendColors(dataColorDef, tab, scale, data) {
 </Modal>
 
 <Modal open={showInstructions} onClosed={() => showInstructions = false}>
+    <div slot="header">
+        <h1> Instruction </h1>
+    </div>
     <div slot="content">
         <Instructions></Instructions>
     </div>
@@ -1859,7 +1884,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
 
 <Modal open={showCustomPalette} onClosed={() => showCustomPalette = false} >
     <div slot="content">
-        <PaletteEditor customCategoricalPalette={customCategoricalPalette} onChange={draw}></PaletteEditor>
+        <PaletteEditor {customCategoricalPalette} mapping={ordinalMapping[currentTab]} onChange={draw}></PaletteEditor>
     </div> 
 </Modal>
 
