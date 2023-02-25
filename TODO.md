@@ -72,7 +72,7 @@
 - [x] Legend: color width/height not reported immediatly
 - [x] Tooltip check/uncheck: style not applied to template
 - [x] Altitude bounds not correct when satellite directly used
-- [ ] Allow for undefined values in quantil/ze, with a checkbox appearing if there are undefined values
+- [x] Allow for undefined values in quantil/ze, with a checkbox appearing if there are undefined values
 - [-] Legend can go off-canvas when resizing -> Not a big deal
 - [x] On small canvas, there seems to be off-canvas drawings
 - [x] Export as raster no working when legend is present

@@ -1294,6 +1294,7 @@ function validateExport() {
     const formData = Object.fromEntries(new FormData(exportForm).entries());
     exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, true, totalCommonCss, formData);
     showExportConfirm = false;
+    fetch('/exportSvg');
     if (!window.goatcounter) return;
     window.goatcounter.count({
         path: 'export-svg',
@@ -1311,6 +1312,7 @@ async function exportRaster() {
     elem.outerHTML = optimized;
     saveSvgAsPng.saveSvgAsPng(document.body.lastChild, 'test.png');
     document.body.lastChild.remove();
+    fetch('/exportRaster');
     if (!window.goatcounter) return;
     window.goatcounter.count({
         path: 'export-raster',
