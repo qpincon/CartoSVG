@@ -1,0 +1,10 @@
+{
+    "italia": {
+        "title": "La Bella Italia",
+        "description": "Italia map built with SVGscape"
+    },
+    "usa": {
+        "title": "USA Elections",
+        "description": "USA elections map built with SVGscape"
+    }
+}

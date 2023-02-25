@@ -83,3 +83,4 @@
 - [x] Allow for multi-line labels
 - [x] Inline style editor: give name to other elements. Add parent <text> element for <tspan>
 - [x] Only include code for tooltip when one tooltip included
+- [ ] Delay optimizing content of <image> at export time (for performance)
