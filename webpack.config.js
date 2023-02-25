@@ -17,8 +17,7 @@ const config = {
             svelte: path.resolve('node_modules', 'svelte')
         },
         extensions: ['.js', '.svelte'],
-        mainFields: ['svelte', 'browser', 'module', 'main'],
-        conditionNames: ['svelte']
+        mainFields: ['svelte', 'browser', 'module', 'main']
     },
     output: {
         path: path.resolve(__dirname, 'dist'),
