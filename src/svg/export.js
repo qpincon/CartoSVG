@@ -349,7 +349,8 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         finalScript = finalScript.code;
     }
     const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
-    scriptElem.innerHTML = `<![CDATA[${finalScript}]]>`;
+    const scriptContent = document.createTextNode(finalScript);
+    scriptElem.appendChild(scriptContent);
     optimizedSVG.firstChild.append(scriptElem);
     download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'svgscape-export.svg');
 }
