@@ -3,7 +3,7 @@ import { reportStyle } from '../util/dom';
 import { setTransformTranslate, getTranslateFromTransform } from '../svg/svg';
 import { addSvgText } from './shape';
 
-function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, saveFunc, entryWidth = legendDef.lineWidth) {
+function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, saveFunc, applyStyles, entryWidth = legendDef.lineWidth) {
     const colors = [...legendColors];
     if (legendDef.noData.active) {
         colors.unshift([legendDef.noData.color, legendDef.noData.text]);
@@ -62,6 +62,7 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
                 legendDef.title = input.value;
                 legendDef.titleChanged = true;
                 input.remove();
+                applyStyles();
                 saveFunc();
             };
             const input = d3.select(document.body).append('input')
@@ -141,7 +142,7 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
             maxWidth = Math.max(maxWidth, d3.select(this).node().getBBox().width);
         });
         legendGroup.remove();
-        return drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, saveFunc, maxWidth);
+        return drawLegend(legendSelection, legendDef, legendColors, isCategorical, sampleElem, tabName, saveFunc, applyStyles, maxWidth);
     }
     return legendSelection;
 }

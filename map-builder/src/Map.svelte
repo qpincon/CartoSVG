@@ -802,6 +802,11 @@ function applyStyles(styleAll = false) {
             else if (cssProp === 'bringtofront') {
                 elem.parentNode.append(elem);
             }
+            // if no width, remove width and color. Width will be inherited
+            else if (cssProp === 'stroke-width' && cssValue === null) {
+                elem.style.removeProperty('stroke-width');
+                elem.style.removeProperty('stroke');
+            }
             else elem.style[cssProp] = cssValue;
         });
     }));
@@ -1444,7 +1449,7 @@ async function colorizeAndLegend(e) {
         if (!legendColors) return;
         if (tab === currentTab) sampleLegend = {color: legendColors[0][0], text: legendColors[0][1]};
         const sampleElem = htmlToElement(legendDefs[tab].sampleHtml);
-        displayedLegend[tab] = drawLegend(legendSelection, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', sampleElem, tab, saveDebounced);
+        displayedLegend[tab] = drawLegend(legendSelection, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', sampleElem, tab, saveDebounced, applyStyles);
     });
     computeCss();
     applyStyles();
@@ -1654,8 +1659,8 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                     <div class="form-floating flex-grow-1">
                         <select id="choseFilter" class="form-select form-select-sm" bind:value={zonesFilter[currentTab]} on:change={() => draw()}>
                             <option value={null}> None </option>
-                            <option value="firstGlow"> First filter </option>
-                            <option value="secondGlow"> Second filter </option>
+                            <option value="firstGlow"> First glow </option>
+                            <option value="secondGlow"> Second glow </option>
                         </select>
                         <label for="choseFilter">Glow filter</label>
                     </div>
@@ -1664,10 +1669,10 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                 {/if}
                 {#if currentTab === "land"}
                     <RangeInput id="contourwidth" title="Contour width" onChange={() => redraw()} bind:value={contourParams.strokeWidth} min="0" max="5" step="0.5"></RangeInput>
-                    <ColorPickerPreview id="contourpicker" popup="bottom" title="Contour color" value={contourParams.strokeColor} onChange={(col) => {contourParams.strokeColor = col; redraw()}}> </ColorPickerPreview>
+                    <ColorPickerPreview id="contourpicker" popup="left" title="Contour color" value={contourParams.strokeColor} onChange={(col) => {contourParams.strokeColor = col; redraw()}}> </ColorPickerPreview>
                     <RangeInput id="contour dash" title="Contour dash" onChange={() => redraw()} bind:value={contourParams.strokeDash} min="0" max="20" step="0.5"></RangeInput>
                     {#if computedOrderedTabs.findIndex(x => x === 'land') === 0}
-                        <ColorPickerPreview id="fillpicker" popup="bottom" title="Fill color" value={contourParams.fillColor} onChange={(col) => {contourParams.fillColor = col; redraw()}}> </ColorPickerPreview>
+                        <ColorPickerPreview id="fillpicker" popup="left" title="Fill color" value={contourParams.fillColor} onChange={(col) => {contourParams.fillColor = col; redraw()}}> </ColorPickerPreview>
                     {/if}
                 {/if}
                 {#if zonesData?.[currentTab]?.['data']}

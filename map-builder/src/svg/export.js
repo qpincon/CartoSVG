@@ -1,8 +1,6 @@
-import SVGO from 'svgo/dist/svgo.browser';
 import svgoConfig from '../svgoExport.config';
 import svgoConfigText from '../svgoExportText.config';
 
-import TextToSVG from 'text-to-svg';
 import { htmlToElement } from '../util/common';
 import { indexBy, pick, download } from '../util/common';
 import { reportStyle, reportStyleElem, fontsToCss, getUsedInlineFonts } from '../util/dom';
@@ -30,6 +28,9 @@ const anchorToAnchor = {
     middle: 'center',
     right: 'right'
 };
+
+const additionnalCssExport = '#points-labels {pointer-events:none}';
+const cssFontProps = ['font-family', 'font-size', 'font-weight', 'color'];
 function getTextElems(svgElem) {
     const texts = Array.from(svgElem.querySelectorAll('text')).concat(Array.from(svgElem.querySelectorAll('tspan')));
     // ignore text elements containing tspans
@@ -59,7 +60,11 @@ function replaceTextsWithPaths(svgElem, transformedTexts) {
             textElem.remove();
         }
         else textElem.replaceWith(pathElem);
+        // no need to keep font-xxx properties on a path
+        cssFontProps.forEach(prop => pathElem.style.removeProperty(prop));
     });
+    // Remove now empty <text>s
+    svgElem.querySelectorAll('text:empty').forEach(el => el.remove());
 }
 
 function getTextPosition(textElem, defaultStyles) {
@@ -71,8 +76,8 @@ function getTextPosition(textElem, defaultStyles) {
     };
     const getPos = (elem, direction) => {
         let attributes = {delta: 'dx', pos: 'x'};
-        let pos = parseFloat(elem.getAttribute(attributes.pos)) || 0;
         if (direction == 'y') attributes = {delta: 'dy', pos: 'y'};
+        let pos = parseFloat(elem.getAttribute(attributes.pos)) || 0;
         pos += getShift(elem, attributes.delta);
         let prevSibling = elem.previousSibling;
         // if "y" is ommited, "dy" is cumulative
@@ -92,11 +97,12 @@ async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
     let nbFontChars = 0;
     let nbPathChars = 0;
     const transformedTexts = {};
+    const SVGO = await import('svgo/dist/svgo.browser');
+    const TextToSVG  = (await import('text-to-svg')).default;
     const defaultStyles = getComputedStyle(document.body);
     await Promise.all(providedFonts.map(({ name, content }) => {
         transformedTexts[name] = {};
         nbFontChars += content.length;
-        // const texts = Array.from(svgElem.querySelectorAll('text')).concat(Array.from(svgElem.querySelectorAll('tspan')));
         const texts = getTextElems(svgElem);
         return new Promise(resolve => {
             TextToSVG.load(content, function (err, textToSVG) {
@@ -152,7 +158,8 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     });
     const usedFonts = getUsedInlineFonts(svgNode);
     const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
-
+    
+    const SVGO = await import('svgo/dist/svgo.browser');
     // first, optimize data-uri images
     const glowImages = svgNode.querySelectorAll('.glow-img'); 
     glowImages.forEach(glowImg => {
@@ -236,19 +243,20 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     const tooltipCode = tooltipEnabled ? `
     const parser = new DOMParser();
     const width = ${width}, height = ${height};
-    const frameElement = document.getElementById('frame');
+    const inverseScreenCTM = mapElement.getScreenCTM().inverse();
     const tooltip = {shapeId: null, element: null};
-    tooltip.element = constructTooltip({}, '');
+    tooltip.element = constructTooltip({}, '', 1, 1);
     mapElement.append(tooltip.element);
     tooltip.element.style.display = 'none';
     const dataByGroup = ${JSON.stringify(finalDataByGroup)};
-    function constructTooltip(data, templateStr, shapeId) {
+    function constructTooltip(data, templateStr, shapeId, scaleX, scaleY) {
         if(!data) return;
         const elem = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
         elem.setAttribute('width', 1);
         elem.setAttribute('height', 1);
         elem.style.overflow = 'visible';
         const parsed = parser.parseFromString(eval('\`' + templateStr + '\`' ), 'text/html').querySelector('body');
+        parsed.style['position'] = 'fixed';
         elem.appendChild(parsed);
         return elem;
     }
@@ -262,20 +270,20 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     function onMouseMove(e) {
         const parent = e.target.parentNode;
         if (!parent?.hasAttribute?.("id")) return hideTooltip();
-        const mapBounds = frameElement.getBoundingClientRect();
-        const transformX = width / mapBounds.width;
-        const transformY = height / mapBounds.height;
+        const mapBounds = mapElement.querySelector('#frame').getBoundingClientRect();
+        const scaleX = width / mapBounds.width;
+        const scaleY = height / mapBounds.height;
         const ttBounds = tooltip.element.firstChild?.firstChild?.getBoundingClientRect();
-        let posX = (e.clientX - mapBounds.left + 10) * transformX, posY = (e.clientY - mapBounds.top + 10) * transformY;
+        let posX = (e.clientX - mapBounds.left + 10) * scaleX, posY = (e.clientY - mapBounds.top + 10) * scaleY;
         let tooltipVisibleOpacity = 1;
         const groupId = parent.getAttribute('id');
         const shapeId = e.target.getAttribute('id');
         if (ttBounds?.width > 0) {
             if (mapBounds.right - ttBounds.width < e.clientX + 10) {
-                posX = (e.clientX - mapBounds.left - ttBounds.width - 20) * transformX;
+                posX = (e.clientX - mapBounds.left - ttBounds.width - 20) * scaleX;
             }
             if (mapBounds.bottom - ttBounds.height < e.clientY + 10) {
-                posY = (e.clientY - mapBounds.top - ttBounds.height - 20) * transformY;
+                posY = (e.clientY - mapBounds.top - ttBounds.height - 20) * scaleY;
             }
         }
         else if (shapeId && groupId in dataByGroup.data) {
@@ -290,6 +298,9 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         else if (shapeId && tooltip.shapeId === shapeId) {
             tooltip.element.setAttribute('x', posX);
             tooltip.element.setAttribute('y', posY);
+            // webkit positioning fix
+            tooltip.element.firstChild.style['position'] = 'absolute';
+            setTimeout(() => {tooltip.element.firstChild.style['position'] = 'fixed'}, 0)
             tooltip.element.style.display = 'block';
             tooltip.element.style.opacity = tooltipVisibleOpacity;
         }
@@ -299,7 +310,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
                 tooltip.element.style.display = 'none';
                 return;
             }
-            const tt = constructTooltip(data, dataByGroup.tooltips[groupId], shapeId);
+            const tt = constructTooltip(data, dataByGroup.tooltips[groupId], shapeId, scaleX, scaleY);
             tooltip.element.replaceWith(tt);
             tooltip.element = tt;
             tooltip.shapeId = shapeId;
@@ -328,7 +339,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         `;
 
     const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
-    const renderedCss = commonCss.replaceAll(/rgb\(.*?\)/g, rgb2hex);
+    const renderedCss = commonCss.replaceAll(/rgb\(.*?\)/g, rgb2hex) + additionnalCssExport;
     styleElem.innerHTML = pathIsBetter ? renderedCss : renderedCss + fontsToCss(usedProvidedFonts);
     optimizedSVG.firstChild.append(styleElem);
     if (!downloadExport) return optimizedSVG.firstChild.outerHTML;

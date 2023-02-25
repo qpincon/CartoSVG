@@ -51,7 +51,7 @@ const separator = '++';
 function addSvgText(text, id) {
     const parts = text.split(separator);
     const textElem = d3.create('svg:text')
-        .attr('stroke-width', 0)
+        .style('stroke-width', 0)
         .attr('id', id);
 
     const countPrefixSpace = str => {
@@ -67,6 +67,7 @@ function addSvgText(text, id) {
             .attr('dy', (_, i) => (i ? '1.1em' : 0))
             .attr('id', (_, i) => (`${id}-${i}`))
             .text(d => d);
+
     return textElem;
 }
 

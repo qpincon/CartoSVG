@@ -1,4 +1,4 @@
-import SVGO from 'svgo/dist/svgo.browser';
+// import SVGO from 'svgo/dist/svgo.browser';
 import svgoConfig from '../svgoExport.config';
 import * as d3 from 'd3';
 import { duplicateContourCleanFirst, encodeSVGDataImage} from './svg';
@@ -183,7 +183,8 @@ function appendLandImage(showSource) {
     // const optimized = encodeSVGDataImage(SVGO.optimize(landElem.node().outerHTML, svgoConfig).data);
     const landImage = d3.create('image').attr('width', '100%').attr('height', '100%')
         .classed('glow-img', true)
-        .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(landElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
+        .attr('href', `data:image/svg+xml;utf8,${landElem.node().outerHTML.replaceAll(/#/g, '%23')}`);
+        // .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(landElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
         // .attr('href', optimized);
         
     d3.select(this).html(landImage.node().outerHTML)
@@ -217,7 +218,8 @@ function appendCountryImage(countryData, filter) {
     // const optimized = encodeSVGDataImage(SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data);
     const countryImage = d3.create('image').attr('width', '100%').attr('height', '100%').attr('id', countryElem)
         .classed('glow-img', true)
-        .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
+        .attr('href', `data:image/svg+xml;utf8,${countryElem.node().replaceAll(/#/g, '%23')}`);
+        // .attr('href', `data:image/svg+xml;utf8,${SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data.replaceAll(/#/g, '%23')}`);
         // .attr('href', optimized);
     d3.select(this).html(countryImage.node().outerHTML)
         .style('pointer-events', 'none')
