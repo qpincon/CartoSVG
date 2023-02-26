@@ -7,7 +7,7 @@
       margin-top: 0;
   }
   :global(svg) {
-      max-width: 700px;
+      max-width: 800px;
       margin: auto;
   }
 </style>
