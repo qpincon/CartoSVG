@@ -5,13 +5,14 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const fs = require('fs');
 
 const examplesMeta = JSON.parse(fs.readFileSync('./examples.json'));
-
+const mode = process.argv.find(x => x.includes('--mode'));
+const isProduction = mode.includes('production');
 const config = {
     entry: {
         main: './src/entrypoints/index.js',
         about: './src/entrypoints/about.js',
     },
-    devtool: 'source-map',
+    mode: isProduction ? 'production' : 'development',
     resolve: {
         alias: {
             svelte: path.resolve('node_modules', 'svelte')
@@ -133,4 +134,9 @@ Object.entries(examplesMeta).forEach(([exampleName, description]) => {
     });
     config.plugins.push(plugin);
 });
+
+if (!isProduction) {
+    config.devtool = 'source-map';
+}
+
 module.exports = config;
