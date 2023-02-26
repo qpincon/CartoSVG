@@ -66,6 +66,13 @@
                 manipulation
             </li>
             <li>
+                <a href="https://github.com/shrhdk/text-to-svg">text-to-svg</a>
+                and
+                <a href="https://github.com/opentypejs/opentype.js">
+                    opentypes.js
+                </a> for conversion of fonts to paths
+            </li>
+            <li>
                 <a href="https://kartograph.org/showcase/italia/">
                     Kartograph Italia showcase
                 </a> for inspiration

@@ -6,5 +6,9 @@
     "usa": {
         "title": "USA Elections",
         "description": "USA elections map built with SVGscape"
+    },
+    "ukraine": {
+        "title": "Ukraine population",
+        "description": "Ukraine population map, built with SVGscape"
     }
 }

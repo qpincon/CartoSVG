@@ -40,13 +40,11 @@
     }
 
     function findMatchedValues(color) {
-        // console.log(mapping);
         if (!(color in mapping)) return null;
         return [...mapping[color]].join(', ');
     }
 
     function getColors(x, y) {
-        console.log('get colors', x, y);
         return customCategoricalPalette;
     }
 

@@ -327,7 +327,7 @@ onMount(() => {
             },
         },
         cssRuleFilter: (el, cssSelector) => {
-            // if (cssSelector.includes('adm1')) return false;
+            if (cssSelector.includes('ssc-')) return false;
             return true;
         },
         inlineDeletable: () => (false)
@@ -521,7 +521,6 @@ async function draw(simplified = false, _) {
             (context.strokeStyle = "#ddf"),
             (context.globalAlpha = 0.8),
             context.stroke();
-        // console.log(context.canvas);
         return;
     }
     svg = container.select('svg');
@@ -1150,7 +1149,7 @@ function handleDataImport(e) {
             let parsed = JSON.parse(reader.result);
             const currentNames = new Set(zonesData[currentTab].data.map(line => line.name));
             if (!Array.isArray(parsed)) {
-                return window.alert("JSON sould be a list of objects, each object reprensenting a line.");
+                return window.alert("JSON should be a list of objects, each object reprensenting a line.");
             }
             if (parsed.some(line => line.name === undefined )) {
                 return window.alert("All lines should have a 'name' property.");
@@ -1167,6 +1166,7 @@ function handleDataImport(e) {
             save();
         } catch (e) {
             console.log('Parse error:', e);
+            window.alert("Provided file should be valid JSON.");
         }
     });
     reader.readAsText(file);
@@ -1295,12 +1295,6 @@ function validateExport() {
     exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, true, totalCommonCss, formData);
     showExportConfirm = false;
     fetch('/exportSvg');
-    if (!window.goatcounter) return;
-    window.goatcounter.count({
-        path: 'export-svg',
-        title: 'Export SVG',
-        event: true,
-    });
 }
 
 // === Export as PNG behaviour ===
@@ -1313,12 +1307,6 @@ async function exportRaster() {
     saveSvgAsPng.saveSvgAsPng(document.body.lastChild, 'test.png');
     document.body.lastChild.remove();
     fetch('/exportRaster');
-    if (!window.goatcounter) return;
-    window.goatcounter.count({
-        path: 'export-raster',
-        title: 'Export raster',
-        event: true,
-    });
 }
 
 let inlineFontUsed = false;
@@ -1390,11 +1378,25 @@ async function colorizeAndLegend(e) {
     const legendSelection = svg.select('svg').append('g').attr('id', 'svg-map-legend');
     Object.entries(colorDataDefs).forEach(([tab, dataColorDef], tabIndex) => {
         if(!legendDefs[tab].noData.manual) legendDefs[tab].noData.active = false;
+        // reset present classes
+        document.querySelectorAll(`g[id="${tab}"] [class*="ssc"]`).forEach(el => {
+            [...el.classList].forEach(cls => {
+                if (cls.includes('ssc')) el.classList.remove(cls);
+            });
+        });
         if (!dataColorDef.enabled) {
             dataColorDef.legendEnabled = false;
             colorsCss[tab] = '';
-            computeCss();
             if (displayedLegend[tab]) displayedLegend[tab].remove();
+            zonesData[tab].data.forEach(row => {
+                const d = row[dataColorDef.colorColumn];
+                const key = row.name;
+                const elem = document.querySelector(`g[id="${tab}"] [id="${key}"]`);
+                if (!elem) return;
+                [...elem.classList].forEach(cls => {
+                    if (cls.includes('ssc')) elem.classList.remove(cls);
+                });
+            })
             return;
         }
         const paletteName = `scheme${dataColorDef.colorPalette}`;
@@ -1439,6 +1441,7 @@ async function colorizeAndLegend(e) {
             }
             if (!usedColors.includes(color)) usedColors.push(color);
             const cssClass = `ssc-${tabIndex}-${usedColors.indexOf(color)}`;
+            
             elem.classList.add(cssClass);
         });
         let newCss = '';
@@ -1621,10 +1624,10 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                 </div>
             </div>
             
-            <ul class="nav nav-tabs align-items-center flex-nowrap">
+            <ul class="nav nav-pills align-items-center m-1">
                 {#each computedOrderedTabs as tabTitle, index (tabTitle) }
                 {@const isLand = tabTitle === "land"}
-                <li class="nav-item d-flex align-items-center"
+                <li class="nav-item d-flex align-items-center mx-1"
                     draggable={isLand}
                     on:dragstart={event => dragstart(event, index, tabTitle !== "land")}
                     on:drop|preventDefault={event => drop(event, index)}
@@ -1635,7 +1638,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                     class:grabbable={isLand}>
                     <a href="javascript:;"
                     class:active={currentTab === tabTitle}
-                    class="nav-link d-flex align-items-center"
+                    class="nav-link d-flex align-items-center position-relative"
                     on:click={() => onTabChanged(tabTitle)}>
                         {#if isLand} <Icon svg={icons['draggable']}/> {/if}
                         {tabTitle}
