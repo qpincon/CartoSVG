@@ -139,3 +139,6 @@ html {
 aside .nav-link.active {
     border-top: 3px solid #95b0ff !important
 }
+.picker_wrapper.popup {
+    z-index: 9999;
+}

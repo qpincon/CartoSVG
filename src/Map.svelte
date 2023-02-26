@@ -1586,12 +1586,12 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                         <Icon fillColor="white" svg={icons['map']}/> Project
                     </button>
                     <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" on:click={resetState}>
+                            <Icon svg={icons['reset']}/>Reset
+                        </a></li>
                         <li><a class="dropdown-item" href="#" on:click={saveProject}>
                             <Icon fillColor="none" svg={icons['save']}/>
                             Save project
-                        </a></li>
-                        <li><a class="dropdown-item" href="#" on:click={resetState}>
-                            <Icon svg={icons['reset']}/>Reset
                         </a></li>
                         <li><a class="dropdown-item" href="#">
                             <label role="button" for="project-import"> <Icon svg={icons['restore']}/> Load project</label>
