@@ -1,5 +1,5 @@
 
-[![SVG Scape logo](map-builder/src/assets/img/logo_transparent_text.webp 'SVG Scape logo')](https://svgscape.xyz)
+[![SVG Scape logo](src/assets/img/logo_transparent_text.webp 'SVG Scape logo')](https://svgscape.xyz)
 
 This is the source code of the [SVGScape](https://svgscape.xyz) website. 
 
