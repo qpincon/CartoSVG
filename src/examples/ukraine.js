@@ -1,5 +1,5 @@
 import Ukraine from './Ukraine.svelte';
-import '../assets/navbar_only.scss';
+import '../assets/minimal.scss';
 
 new Ukraine({
   target: document.getElementById('app-content')

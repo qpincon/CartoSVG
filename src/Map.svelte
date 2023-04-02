@@ -17,7 +17,7 @@ import PaletteEditor from "./components/PaletteEditor.svelte";
 import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, getBestFormatter, getColumns } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import * as markers from './svg/markerDefs';
-import { setTransformScale, closestDistance, duplicateContourCleanFirst, encodeSVGDataImage } from './svg/svg';
+import { setTransformScale, closestDistance, duplicateContourCleanFirst } from './svg/svg';
 import { appendLandImageNew,  appendCountryImageNew } from './svg/contourMethods';
 import { drawShapes } from './svg/shape';
 import iso3Data from './assets/data/iso3_filtered.json';
@@ -29,7 +29,7 @@ import defaultBaseCss from './assets/pagestyle.css?inline';
 import { drawLegend } from './svg/legend';
 import { freeHandDrawPath } from './svg/freeHandPath'
 import Modal from './components/Modal.svelte';
-import NestedAccordions from './components/NestedAccordions.svelte';
+import Accordions from './components/Accordions.svelte';
 import Navbar from './components/Navbar.svelte';
 import ColorPickerPreview from './components/ColorPickerPreview.svelte';
 
@@ -38,7 +38,6 @@ import Icon from './components/Icon.svelte';
 import RangeInput from './components/RangeInput.svelte';
 import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts } from './util/dom';
 import { saveState, getState } from './util/save';
-import { svgToPng } from './svg/toPng';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
 
@@ -247,6 +246,8 @@ let exportForm;
 let htmlTooltipElem;
 let currentTab = 'countries';
 
+let mainMenuSelection = 0;
+$: if (true || mainMenuSelection) { tick().then(() => initTooltips()); }
 let editingPath = false;
 let commonStyleSheetElem;
 let zoomFunc;
@@ -1220,11 +1221,11 @@ async function onTabChanged(newTabTitle) {
 }
 
 function applyStylesToTemplate() {
-    if (tooltipDefs[currentTab]?.enabled) {
+    if (htmlTooltipElem && tooltipDefs[currentTab]?.enabled) {
         const tmpElem = htmlToElement(tooltipDefs[currentTab].content);
         reportStyle(tmpElem, htmlTooltipElem);
     }
-    if (colorDataDefs[currentTab]?.legendEnabled) {
+    if (legendSample && colorDataDefs[currentTab]?.legendEnabled) {
         const tmpElem = htmlToElement(legendDefs[currentTab].sampleHtml);
         reportStyle(tmpElem, legendSample);
     }
@@ -1559,22 +1560,258 @@ function getLegendColors(dataColorDef, tab, scale, data) {
     {/if}
 </div>
 
-<Navbar></Navbar>
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-start p-3">
-        <aside class="panel d-flex flex-column align-items-center me-4">
+<div class="d-flex align-items-start h-100">
+    <aside id="params" class="h-100">
+        <div id="main-panel" class="d-flex flex-column align-items-center pt-4 h-100">
+            <div class="btn-group" role="group">
+                <input
+                    type="radio"
+                    class="btn-check"
+                    name="paramsSwitch"
+                    id="switchGeneral"
+                    bind:group={mainMenuSelection}
+                    value={0}
+                    autocomplete="off"
+                />
+                <label class="btn btn-outline-primary" for="switchGeneral">General</label
+                >
+                <input
+                    type="radio"
+                    class="btn-check"
+                    name="paramsSwitch"
+                    id="switchLayers"
+                    autocomplete="off"
+                    bind:group={mainMenuSelection}
+                    value={1}
+                />
+                <label class="btn btn-outline-primary" for="switchLayers">Layers</label>
+            </div>
+    
+            <div id="main-menu" class="mt-4">
+                {#if mainMenuSelection === 0}
+                    <Accordions sections={params} {paramDefs} {helpParams} otherParams={accordionVisiblityParams}  on:change={handleChangeProp} ></Accordions>
+                {:else}
+                <div class="border border-primary rounded m-4">
+                    <div class="p-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="showLand" bind:checked={inlineProps.showLand} on:change={() => draw()}>
+                            <label class="form-check-label" for="showLand"> Show land</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="showCountries" bind:checked={inlineProps.showCountries} on:change={() => draw()}>
+                            <label class="form-check-label" for="showCountries"> Show countries</label>
+                        </div>
+                    </div>
+                    
+                    <ul class="nav nav-pills align-items-center m-1">
+                        {#each computedOrderedTabs as tabTitle, index (tabTitle) }
+                        {@const isLand = tabTitle === "land"}
+                        <li class="nav-item d-flex align-items-center mx-1"
+                            draggable={isLand}
+                            on:dragstart={event => dragstart(event, index, tabTitle !== "land")}
+                            on:drop|preventDefault={event => drop(event, index)}
+                            ondragover="return false"
+                            on:dragenter={() => hoveringTab = index}
+                            class:is-dnd-hovering-right={hoveringTab === index && index > dragStartIndex}
+                            class:is-dnd-hovering-left={hoveringTab === index && index < dragStartIndex}
+                            class:grabbable={isLand}>
+                            <a href="javascript:;"
+                            class:active={currentTab === tabTitle}
+                            class="nav-link d-flex align-items-center position-relative"
+                            on:click={() => onTabChanged(tabTitle)}>
+                                {#if isLand} <Icon svg={icons['draggable']}/> {/if}
+                                {tabTitle}
+                                {#if tabTitle !== 'countries' && !isLand}
+                                    <span role="button" class="delete-tab" on:click={() => deleteCountry(tabTitle)}> ✕ </span>
+                                {/if}
+                            </a>
+                        {/each}
+                        
+                        <li class="nav-item icon-add">
+                            <select role="button" id='country-select' on:change={addNewCountry}>
+                                <option disabled selected value> -- select a country -- </option>
+                                {#each allAvailableAdm as country}
+                                    <option value={country}>{country}</option>
+                                {/each}
+                            </select>
+                            <span class="nav-link d-flex "> <Icon fillColor="none" svg={icons['add']}/> </span>
+                        </li>
+                    </ul>
+                    <div class="p-2">
+                        {#if currentTab !== 'countries'}
+                        <div class="d-flex m-1 align-items-center">
+                            <div class="form-floating flex-grow-1">
+                                <select id="choseFilter" class="form-select form-select-sm" bind:value={zonesFilter[currentTab]} on:change={() => draw()}>
+                                    <option value={null}> None </option>
+                                    <option value="firstGlow"> First glow </option>
+                                    <option value="secondGlow"> Second glow </option>
+                                </select>
+                                <label for="choseFilter">Glow filter</label>
+                            </div>
+                            <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Two filters are available, that are customizable in the 'General' panel (first / second glow sections).">?</span>
+                        </div>
+                        {/if}
+                        {#if currentTab === "land"}
+                        <div>
+                            <div class="field"> <RangeInput id="contourwidth" title="Contour width" onChange={() => redraw()} bind:value={contourParams.strokeWidth} min="0" max="5" step="0.5"></RangeInput></div>
+                            <div class="field"> <ColorPickerPreview id="contourpicker" popup="right" title="Contour color" value={contourParams.strokeColor} onChange={(col) => {contourParams.strokeColor = col; redraw()}}> </ColorPickerPreview></div>
+                            <div class="field"> <RangeInput id="contour dash" title="Contour dash" onChange={() => redraw()} bind:value={contourParams.strokeDash} min="0" max="20" step="0.5"></RangeInput></div>
+                            {#if computedOrderedTabs.findIndex(x => x === 'land') === 0}
+                                <ColorPickerPreview id="fillpicker" popup="right" title="Fill color" value={contourParams.fillColor} onChange={(col) => {contourParams.fillColor = col; redraw()}}> </ColorPickerPreview>
+                            {/if}
+                        </div>
+                        {/if}
+                        {#if zonesData?.[currentTab]?.['data']}
+                            <div class="d-flex align-items-center">
+                                <div>
+                                    <label for="data-input-json" class="m-2 btn btn-light"> Import data for {currentTab} </label>
+                                    <input id="data-input-json" type="file" accept=".json" on:change={(e) => handleDataImport(e)}>
+                                </div>
+                                <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Import data for current layer. The 'name' property must be defined for each line. You can export the default data to have a template to start from.">?</span>
+                                <div class="mx-2 ms-auto btn btn-outline-primary" on:click={() => exportJson(zonesData?.[currentTab]?.['data'])}> Export JSON </div>
+                            </div>
+                            <div class="data-table border rounded-2 mb-2" on:click={() => (showModal = true)}>
+                                <DataTable data={zonesData?.[currentTab]?.['data']}> </DataTable>
+                            </div>
+                            <div class="mx-2 form-check form-switch">
+                                <input
+                                    type="checkbox" role="switch" class="form-check-input" id='showTooltip' bind:checked={tooltipDefs[currentTab].enabled} 
+                                    on:click={() => setTimeout(() => {initTooltips(); save(); applyStylesToTemplate();}, 0)}
+                                />
+                                <label for='showTooltip' class="form-check-label"> Show tooltip on hover </label>
+                            </div>
+                            {#if tooltipDefs[currentTab].enabled}
+                                <div class="m-2 has-validation">
+                                    <label for="templatetooltip" class="form-label"> Tooltip template
+                                        <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="The template must be valid HTML (<br/> can be used to break lines). Brackets  &#123; &#125; can be used to reference variables.  ">?</span>
+                                    </label>
+                                    <textarea class="form-control"
+                                    class:is-invalid="{templateErrorMessages[currentTab]}"
+                                    id="templatetooltip" rows="7" bind:value={tooltipDefs[currentTab].template} on:change={onTemplateChange}/>
+                                    {#if templateErrorMessages[currentTab]}
+                                        <div class="invalid-feedback"> 
+                                            <span> Malformed HTML. Please fix the template </span> <br/>
+                                            <!-- {templateErrorMessages[currentTab]} -->
+                                        </div> {/if}
+                                </div>
+                                <div class="mx-2 d-flex align-items-center">
+                                    <label for="tooltip-preview-{currentTab}"> Example tooltip:
+                                        <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click on the example to update style. Pro tip: changes made in the developer panel are also reported.">?</span>
+                                    </label>
+                                    <div class="tooltip-preview">
+                                        <div id="tooltip-preview-{currentTab}" bind:this={htmlTooltipElem} on:click={editTooltip} style="${defaultTooltipStyle}">
+                                            {@html tooltipDefs[currentTab].template.formatUnicorn(getFirstDataRow(zonesData?.[currentTab]))}
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
+                            <!-- COLORING -->
+                            <div class="mx-2 form-check form-switch">
+                                <input
+                                    type="checkbox" role="switch" class="form-check-input" id='colorData'
+                                    bind:checked={curDataDefs.enabled}
+                                    on:change={colorizeAndLegend}
+                                />
+                                <label for='colorData' class="form-check-label"> Color using data </label>
+                            </div>
+                            {#if curDataDefs.enabled}
+                                <div class="d-flex m-1 align-items-center">
+                                    <div class="form-floating flex-grow-1">
+                                        <select class="form-select form-select-sm" id="choseColorType" bind:value={curDataDefs.colorScale}>
+                                            {#each availableColorTypes as colorType}
+                                                <option value={colorType}> {colorType} </option>
+                                            {/each}
+                                        </select>
+                                        <label for="choseColorType">Color type</label>
+                                    </div>
+                                    <span class="help-tooltip" data-bs-toggle="tooltip" allow-html="true" data-bs-title="{scalesHelp}">?</span>
+                                </div>
+        
+                                <div class="d-flex align-items-center justify-content-between ">
+                                    <div class="flex-grow-1 m-1 form-floating">
+                                        <select class="form-select form-select-sm" id="choseColorColumn" bind:value={curDataDefs.colorColumn}
+                                            on:change={e => legendDefs[currentTab].title = e.target.value}>
+                                            {#each availableColumns as colorColumn}
+                                                <option value={colorColumn}> {colorColumn} </option>
+                                            {/each}
+                                        </select>
+                                        <label for="choseColorColumn"> Value color</label>
+                                    </div> 
+                                    <div class="flex-grow-1 m-1 form-floating">
+                                        <select class="form-select form-select-sm" id="choseColorPalette" bind:value={curDataDefs.colorPalette}>
+                                            {#each availablePalettes as palette}
+                                                <option value={palette}> {palette} </option>
+                                            {/each}
+                                        </select>
+                                        <label for="choseColorPalette"> Palette </label>
+                                    </div>
+                                    {#if curDataDefs.colorPalette === 'Custom'}
+                                        <span class="btn btn-outline-primary" on:click={() => showCustomPalette = true}> Edit palette</span>
+                                    {/if}
+                                </div>
+                                {#if curDataDefs.colorScale !== 'category'}
+                                    <div>
+                                        <RangeInput title="Number of breaks" bind:value={curDataDefs.nbBreaks} min="3" max="9"></RangeInput>
+                                    </div>
+                                {/if}
+                                    <!-- LEGEND -->
+                                    <div class="mx-2 form-check form-switch">
+                                        <input
+                                            type="checkbox" class="form-check-input" id='showLegend' role="switch"
+                                            bind:checked={colorDataDefs[currentTab].legendEnabled}
+                                            on:change={colorizeAndLegend}
+                                        />
+                                        <label for='showLegend' class="form-check-label"> 
+                                            Show legend 
+                                            <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Drag the title of the legend to move it, as well as the entries.">?</span>
+                                        </label>
+                                    </div>
+                                {/if}
+                            {#if curDataDefs.legendEnabled}
+                                <Legend definition={legendDefs[currentTab]} on:change={colorizeAndLegend} categorical={colorDataDefs[currentTab].colorScale === 'category'}/>
+                                <svg width="75%" height={legendDefs[currentTab].rectHeight + 20}>
+                                    <g bind:this={legendSample}>
+                                        <rect x="10" y="10" width={legendDefs[currentTab].rectWidth} 
+                                            height={legendDefs[currentTab].rectHeight} 
+                                            fill={sampleLegend.color} stroke="black"
+                                            on:click={openEditor}></rect>
+                                        <text x={legendDefs[currentTab].rectWidth + 15}
+                                            y={(legendDefs[currentTab].rectHeight / 2) + 10}
+                                            text-anchor="start" dominant-baseline="middle"
+                                            on:click={openEditor} style="font-size: 12px;"> {sampleLegend.text} </text>
+                                    </g>
+                                </svg>
+                                <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click to update style (the legend is SVG).">?</span>
+                            {/if}
+                        {/if}
+                        {#if currentIsColorByNumeric || currentTemplateHasNumeric }
+                            <div class="mt-1 form-floating">
+                                <select class="form-select form-select-sm" id="choseFormatLocale" bind:value={tooltipDefs[currentTab].locale} on:change={changeNumericFormatter}>
+                                    {#each availableFormatLocales as locale}
+                                        <option value={locale}> {locale} </option>
+                                    {/each}
+                                </select>
+                                <label for="choseFormatLocale">Number formatting language</label>
+                            </div>
+                        {/if}
+                    </div> 
+                </div>
+                {/if}
+            </div>
+        </div>
+        
+    </aside>
+    <div class="w-auto d-flex flex-grow-1 flex-column align-items-center h-100">
+        <Navbar>
             <div class="d-flex justify-content-center align-items-center">
-                <span class="m-2 px-2 py-1 btn btn-outline-primary" role="button" on:click={() => showInstructions = true} > 
+                <span class="px-2 py-1 btn btn-outline-primary" role="button" on:click={() => showInstructions = true} > 
                     <Icon marginRight="0px" width="1.8rem" svg={icons['help']}/>
                     Instructions
                 </span>
                 <Examples on:example={loadExample}/>
             </div>
-            <div class="accordions rounded p-0 border mx-2">
-                <NestedAccordions sections={params} {paramDefs} {helpParams} otherParams={accordionVisiblityParams}  on:change={handleChangeProp} ></NestedAccordions>
-            </div>
-        </aside>
-        <div class="w-auto d-flex flex-column justify-content-center">
+        </Navbar>
+        <div class="d-flex flex-column justify-content-center align-items-center h-100">
             <div id="map-container" class="col"></div>
             <div class="mt-4 d-flex align-items-center justify-content-center">
                 <div class="mx-2">
@@ -1600,221 +1837,12 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                     </ul>
                 </div>
                 <div class="dropdown mx-2">
-                    <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <button class="btn btn-outline-success" type="button" on:click={onExportSvgClicked}>
                         <Icon fillColor="none" svg={icons['download']}/> Export
                     </button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#" on:click={onExportSvgClicked}> Export SVG </a></li>
-                        <li><a class="dropdown-item" href="#" on:click={exportRaster}> Export raster </a></li>
-                    </ul>
                 </div>
             </div>
         </div>
-
-        
-        <aside class="panel p-0 border rounded ms-4">
-            <div class="p-2">
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" role="switch" id="showLand" bind:checked={inlineProps.showLand} on:change={() => draw()}>
-                    <label class="form-check-label" for="showLand"> Show land</label>
-                </div>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" role="switch" id="showCountries" bind:checked={inlineProps.showCountries} on:change={() => draw()}>
-                    <label class="form-check-label" for="showCountries"> Show countries</label>
-                </div>
-            </div>
-            
-            <ul class="nav nav-pills align-items-center m-1">
-                {#each computedOrderedTabs as tabTitle, index (tabTitle) }
-                {@const isLand = tabTitle === "land"}
-                <li class="nav-item d-flex align-items-center mx-1"
-                    draggable={isLand}
-                    on:dragstart={event => dragstart(event, index, tabTitle !== "land")}
-                    on:drop|preventDefault={event => drop(event, index)}
-                    ondragover="return false"
-                    on:dragenter={() => hoveringTab = index}
-                    class:is-dnd-hovering-right={hoveringTab === index && index > dragStartIndex}
-                    class:is-dnd-hovering-left={hoveringTab === index && index < dragStartIndex}
-                    class:grabbable={isLand}>
-                    <a href="javascript:;"
-                    class:active={currentTab === tabTitle}
-                    class="nav-link d-flex align-items-center position-relative"
-                    on:click={() => onTabChanged(tabTitle)}>
-                        {#if isLand} <Icon svg={icons['draggable']}/> {/if}
-                        {tabTitle}
-                        {#if tabTitle !== 'countries' && !isLand}
-                            <span role="button" class="delete-tab" on:click={() => deleteCountry(tabTitle)}> ✕ </span>
-                        {/if}
-                    </a>
-                {/each}
-                
-                <li class="nav-item icon-add">
-                    <select role="button" id='country-select' on:change={addNewCountry}>
-                        <option disabled selected value> -- select a country -- </option>
-                        {#each allAvailableAdm as country}
-                            <option value={country}>{country}</option>
-                        {/each}
-                    </select>
-                    <span class="nav-link d-flex "> <Icon fillColor="none" svg={icons['add']}/> </span>
-                </li>
-            </ul>
-            <div class="p-2">
-                {#if currentTab !== 'countries'}
-                <div class="d-flex m-1 align-items-center">
-                    <div class="form-floating flex-grow-1">
-                        <select id="choseFilter" class="form-select form-select-sm" bind:value={zonesFilter[currentTab]} on:change={() => draw()}>
-                            <option value={null}> None </option>
-                            <option value="firstGlow"> First glow </option>
-                            <option value="secondGlow"> Second glow </option>
-                        </select>
-                        <label for="choseFilter">Glow filter</label>
-                    </div>
-                    <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Two filters are available, that are customizable in the panel on the other side (first / second glow sections).">?</span>
-                </div>
-                {/if}
-                {#if currentTab === "land"}
-                    <RangeInput id="contourwidth" title="Contour width" onChange={() => redraw()} bind:value={contourParams.strokeWidth} min="0" max="5" step="0.5"></RangeInput>
-                    <ColorPickerPreview id="contourpicker" popup="left" title="Contour color" value={contourParams.strokeColor} onChange={(col) => {contourParams.strokeColor = col; redraw()}}> </ColorPickerPreview>
-                    <RangeInput id="contour dash" title="Contour dash" onChange={() => redraw()} bind:value={contourParams.strokeDash} min="0" max="20" step="0.5"></RangeInput>
-                    {#if computedOrderedTabs.findIndex(x => x === 'land') === 0}
-                        <ColorPickerPreview id="fillpicker" popup="left" title="Fill color" value={contourParams.fillColor} onChange={(col) => {contourParams.fillColor = col; redraw()}}> </ColorPickerPreview>
-                    {/if}
-                {/if}
-                {#if zonesData?.[currentTab]?.['data']}
-                    <div class="d-flex align-items-center">
-                        <div>
-                            <label for="data-input-json" class="m-2 btn btn-light"> Import data for {currentTab} </label>
-                            <input id="data-input-json" type="file" accept=".json" on:change={(e) => handleDataImport(e)}>
-                        </div>
-                        <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Import data for current layer. The 'name' property must be defined for each line. You can export the default data to have a template to start from.">?</span>
-                        <div class="mx-2 ms-auto btn btn-outline-primary" on:click={() => exportJson(zonesData?.[currentTab]?.['data'])}> Export JSON </div>
-                    </div>
-                    <div class="data-table mb-2" on:click={() => (showModal = true)}>
-                        <DataTable data={zonesData?.[currentTab]?.['data']}> </DataTable>
-                    </div>
-                    <div class="mx-2 form-check form-switch">
-                        <input
-                            type="checkbox" role="switch" class="form-check-input" id='showTooltip' bind:checked={tooltipDefs[currentTab].enabled} 
-                            on:click={() => setTimeout(() => {initTooltips(); save(); applyStylesToTemplate();}, 0)}
-                        />
-                        <label for='showTooltip' class="form-check-label"> Show tooltip on hover </label>
-                    </div>
-                    {#if tooltipDefs[currentTab].enabled}
-                        <div class="m-2 has-validation">
-                            <label for="templatetooltip" class="form-label"> Tooltip template
-                                <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="The template must be valid HTML (<br/> can be used to break lines). Brackets  &#123; &#125; can be used to reference variables.  ">?</span>
-                            </label>
-                            <textarea class="form-control"
-                            class:is-invalid="{templateErrorMessages[currentTab]}"
-                            id="templatetooltip" rows="7" bind:value={tooltipDefs[currentTab].template} on:change={onTemplateChange}/>
-                            {#if templateErrorMessages[currentTab]}
-                                <div class="invalid-feedback"> 
-                                    <span> Malformed HTML. Please fix the template </span> <br/>
-                                    <!-- {templateErrorMessages[currentTab]} -->
-                                </div> {/if}
-                        </div>
-                        <div class="mx-2 d-flex align-items-center">
-                            <label for="tooltip-preview-{currentTab}"> Example tooltip:
-                                <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click on the example to update style. Pro tip: changes made in the developer panel are also reported.">?</span>
-                            </label>
-                            <div class="tooltip-preview">
-                                <div id="tooltip-preview-{currentTab}" bind:this={htmlTooltipElem} on:click={editTooltip} style="${defaultTooltipStyle}">
-                                    {@html tooltipDefs[currentTab].template.formatUnicorn(getFirstDataRow(zonesData?.[currentTab]))}
-                                </div>
-                            </div>
-                        </div>
-                    {/if}
-                    <!-- COLORING -->
-                    <div class="mx-2 form-check form-switch">
-                        <input
-                            type="checkbox" role="switch" class="form-check-input" id='colorData'
-                            bind:checked={curDataDefs.enabled}
-                            on:change={colorizeAndLegend}
-                        />
-                        <label for='colorData' class="form-check-label"> Color using data </label>
-                    </div>
-                    {#if curDataDefs.enabled}
-                        <div class="d-flex m-1 align-items-center">
-                            <div class="form-floating flex-grow-1">
-                                <select class="form-select form-select-sm" id="choseColorType" bind:value={curDataDefs.colorScale}>
-                                    {#each availableColorTypes as colorType}
-                                        <option value={colorType}> {colorType} </option>
-                                    {/each}
-                                </select>
-                                <label for="choseColorType">Color type</label>
-                            </div>
-                            <span class="help-tooltip" data-bs-toggle="tooltip" allow-html="true" data-bs-title="{scalesHelp}">?</span>
-                        </div>
-
-                        <div class="d-flex align-items-center justify-content-between ">
-                            <div class="flex-grow-1 m-1 form-floating">
-                                <select class="form-select form-select-sm" id="choseColorColumn" bind:value={curDataDefs.colorColumn}
-                                    on:change={e => legendDefs[currentTab].title = e.target.value}>
-                                    {#each availableColumns as colorColumn}
-                                        <option value={colorColumn}> {colorColumn} </option>
-                                    {/each}
-                                </select>
-                                <label for="choseColorColumn"> Value color</label>
-                            </div> 
-                            <div class="flex-grow-1 m-1 form-floating">
-                                <select class="form-select form-select-sm" id="choseColorPalette" bind:value={curDataDefs.colorPalette}>
-                                    {#each availablePalettes as palette}
-                                        <option value={palette}> {palette} </option>
-                                    {/each}
-                                </select>
-                                <label for="choseColorPalette"> Palette </label>
-                            </div>
-                            {#if curDataDefs.colorPalette === 'Custom'}
-                                <span class="btn btn-outline-primary" on:click={() => showCustomPalette = true}> Edit palette</span>
-                            {/if}
-                        </div>
-                        {#if curDataDefs.colorScale !== 'category'}
-                            <div>
-                                <RangeInput title="Number of breaks" bind:value={curDataDefs.nbBreaks} min="3" max="9"></RangeInput>
-                            </div>
-                        {/if}
-                            <!-- LEGEND -->
-                            <div class="mx-2 form-check form-switch">
-                                <input
-                                    type="checkbox" class="form-check-input" id='showLegend' role="switch"
-                                    bind:checked={colorDataDefs[currentTab].legendEnabled}
-                                    on:change={colorizeAndLegend}
-                                />
-                                <label for='showLegend' class="form-check-label"> 
-                                    Show legend 
-                                    <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Drag the title of the legend to move it, as well as the entries.">?</span>
-                                </label>
-                            </div>
-                        {/if}
-                    {#if curDataDefs.legendEnabled}
-                        <Legend definition={legendDefs[currentTab]} on:change={colorizeAndLegend} categorical={colorDataDefs[currentTab].colorScale === 'category'}/>
-                        <svg width="75%" height={legendDefs[currentTab].rectHeight + 20}>
-                            <g bind:this={legendSample}>
-                                <rect x="10" y="10" width={legendDefs[currentTab].rectWidth} 
-                                    height={legendDefs[currentTab].rectHeight} 
-                                    fill={sampleLegend.color} stroke="black"
-                                    on:click={openEditor}></rect>
-                                <text x={legendDefs[currentTab].rectWidth + 15}
-                                    y={(legendDefs[currentTab].rectHeight / 2) + 10}
-                                    text-anchor="start" dominant-baseline="middle"
-                                    on:click={openEditor} style="font-size: 12px;"> {sampleLegend.text} </text>
-                            </g>
-                        </svg>
-                        <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Click to update style (the legend is SVG).">?</span>
-                    {/if}
-                {/if}
-                {#if currentIsColorByNumeric || currentTemplateHasNumeric }
-                    <div class="mt-1 form-floating">
-                        <select class="form-select form-select-sm" id="choseFormatLocale" bind:value={tooltipDefs[currentTab].locale} on:change={changeNumericFormatter}>
-                            {#each availableFormatLocales as locale}
-                                <option value={locale}> {locale} </option>
-                            {/each}
-                        </select>
-                        <label for="choseFormatLocale">Number formatting language</label>
-                    </div>
-                {/if}
-            </div> 
-        </aside>
     </div>
 </div>
 <Modal open={showModal} onClosed={() => onModalClose()}>
@@ -1885,7 +1913,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
 
 <Modal open={showInstructions} onClosed={() => showInstructions = false}>
     <div slot="header">
-        <h1> Instruction </h1>
+        <h1> Instructions </h1>
     </div>
     <div slot="content">
         <Instructions></Instructions>
@@ -1899,6 +1927,25 @@ function getLegendColors(dataColorDef, tab, scale, data) {
 </Modal>
 
 <style lang="scss" scoped>
+.text-nowrap {
+    white-space: nowrap;
+}
+#main-panel > .btn-group {
+    .btn-check:checked + .btn {
+        background-color: #465da3;
+    }
+    .btn {
+        width: 100px;
+    }
+}
+
+#params {
+    flex: 1 0 500px;
+    background-color: #ebf0f8;
+    border-right: 1px solid #c8d4e3;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
 #country-select:hover ~ span {
     color: #aeafaf;
 }
@@ -1949,4 +1996,5 @@ input[type="file"] {
 textarea {
     font-size: 0.82rem;
 }
+
 </style>

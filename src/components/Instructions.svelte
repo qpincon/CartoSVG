@@ -32,7 +32,7 @@
         When selecting a country, some data <strong> already exist </strong> for
         the different regions (typically the name). <br />
         You can <strong> import your own data </strong> using the button on the
-        right panel. Your data <strong> MUST </strong> define a
+        layers panel. Your data <strong> MUST </strong> define a
         <code> name </code>
         field for the application to know where to show the data. <br />
         To get you started with the data, you can

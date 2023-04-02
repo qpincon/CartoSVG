@@ -50,16 +50,36 @@
     export function init() {
         _init(options);
     }
+    function _onOpen() {
+        // const container = document.getElementById('main-panel');
+        // const containerBounds = container.getBoundingClientRect();
+        // const bounds = self.getBoundingClientRect();
+        setTimeout(() => {
+            console.log(self.scrollWidth, self.clientWidth);
+            const overflow = self.scrollWidth - self.clientWidth;
+            const isOverflowing = self.clientWidth < self.scrollWidth;
+            console.log(overflow, isOverflowing);
+            const isOverflowingX = self.scrollWidth != Math.max(self.offsetWidth, self.clientWidth);
+            console.log('isOverflowingX', isOverflowingX);
+
+        }, 100);
+    }
 
     function _init(opts) {
         if (!self) return;
         if (pickerElem) pickerElem.destroy();
         opts.onChange = _onChange;
+        opts.onOpen = (x) => {console.log(x, 'coucou')},
         pickerElem = new Picker({
             parent: self,
             color: value,
             ...opts
         });
+        pickerElem.__originalOpenHandler = pickerElem.openHandler;
+        pickerElem.openHandler = function(e) {
+            _onOpen();
+            this.__originalOpenHandler();
+        };
     }
 </script>
     

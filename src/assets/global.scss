@@ -1,19 +1,24 @@
-$primary: #37383d;
-$accordion-padding-y: 0.5rem;
-$accordion-padding-x: 0.6rem;
-$accordion-body-padding-y: 0;
-$accordion-body-padding-x: 0;
-$accordion-border-width: 0;
+$primary: #506784;
+
+$accordion-padding-y: 0.3rem;
+$accordion-padding-x: 0.4rem;
+$accordion-body-padding-y: 0px;
+$accordion-body-padding-x: 0px;
+$accordion-border-width: 1px;
+$accordion-border-radius: 5px;
+$accordion-inner-border-radius: 5px;
+$accordion-button-color: white;
+$accordion-button-bg: $primary;
+$accordion-button-active-color: white;
+$accordion-button-active-bg: $primary;
+
 $form-range-thumb-width: 0.8rem;
 $form-range-thumb-height: 1rem;
 $form-range-thumb-border-radius: 2px;
-$accordion-inner-border-radius: 0;
-$accordion-border-radius: 0;
 $form-label-margin-bottom: 0;
 $input-padding-y: 2px;
 $navbar-padding-y: 0px;
 
-$nav-pills-link-active-bg: #777;
 // 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
 @import "bootstrap/scss/functions";
 
@@ -26,7 +31,7 @@ $nav-pills-link-active-bg: #777;
 @import "bootstrap/scss/maps";
 @import "bootstrap/scss/mixins";
 @import "bootstrap/scss/root";
-$accordion-button-bg: tint-color($component-active-bg, 90%);
+
 $tooltip-bg: $primary;
 
 // // 6. Optionally include any other parts as needed
@@ -43,7 +48,7 @@ $tooltip-bg: $primary;
 @import "bootstrap/scss/button-group";
 @import "bootstrap/scss/modal";
 @import "bootstrap/scss/tooltip";
-@import "bootstrap/scss/navbar";
+// @import "bootstrap/scss/navbar";
 @import "bootstrap/scss/close";
 @import "bootstrap/scss/dropdown";
 
@@ -55,7 +60,15 @@ $tooltip-bg: $primary;
 @import '../../node_modules/inline-style-editor/dist/inline-style-editor.css';
 
 html {
+    font-family: Open Sans, --apple-default, sans-serif;
     font-size: 14px;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0px;
+    padding: 0px;
 }
 
 #contextmenu {
@@ -100,44 +113,78 @@ html {
     margin-left: 5px;
     flex-shrink: 0;
     cursor: pointer;
+    padding: 0;
 }
 
 .big-tooltip {
     --bs-tooltip-max-width: 500px;
 }
 
-.github {
-    width: 40px;
-    height: auto;
-}
-
-.github>svg {
-    fill: #5f5f5f;
-    transition: fill 0.3s;
-    max-width: 3rem;
-}
-
-.github:hover>svg {
-    fill: black;
-}
 .color-preview {
     width: 23px;
     height: 23px;
     flex: 0 0 auto;
 }
-.accordion-item > .input-type {
+
+.accordion-item>.input-type {
     padding-right: 6px;
 }
-.accordion-item:last-of-type > .input-type {
+
+.accordion-item:last-of-type>.input-type {
     padding-bottom: 6px;
 }
 
-#static-svg-map text{
+#main-menu>.accordion>.accordion-item {
+    margin-bottom: 1rem;
+}
+
+#main-menu>div {
+    background-color: white;
+}
+
+.icon-add svg {
+    color: #253446;
+}
+
+.icon-add:hover svg {
+    color: #506784;
+}
+
+#static-svg-map text {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
+
 aside .nav-link.active {
     border-top: 3px solid #95b0ff !important
 }
+
 .picker_wrapper.popup {
     z-index: 9999;
+}
+
+.col-form-label {
+    font-weight: initial;
+}
+
+.field {
+    border-top: 1px solid #dfe8f3;
+    display: flex;
+    font-size: 13px;
+    justify-content: flex-start;
+    align-items: flex-start;
+    min-height: 32px;
+    padding: 3px 8px;
+    width: 100%;
+    position: relative;
+    color: $primary;
+    &:first-child {
+        border-top: 0;
+    }
+}
+#main-menu {
+    color: $primary;
+    font-size: 14px;
+}
+.popup.popup_right {
+    left: -30px !important;
 }

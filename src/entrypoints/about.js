@@ -1,5 +1,5 @@
 import About from '../components/About.svelte';
-import '../assets/navbar_only.scss';
+import '../assets/minimal.scss';
 
 new About({
   target: document.getElementById('app-content')

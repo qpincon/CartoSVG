@@ -1,5 +1,5 @@
 import Mercator from './Mercator.svelte';
-import '../assets/navbar_only.scss';
+import '../assets/minimal.scss';
 
 new Mercator({
   target: document.getElementById('app-content')

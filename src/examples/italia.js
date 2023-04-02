@@ -1,5 +1,5 @@
 import Italia from './Italia.svelte';
-import '../assets/navbar_only.scss';
+import '../assets/minimal.scss';
 
 new Italia({
   target: document.getElementById('app-content')

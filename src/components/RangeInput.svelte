@@ -25,18 +25,18 @@
     };
 </script>
 
-<div class="row w-100">
+<div class="row align-items-center w-100">
     <label for={id} class="d-flex col-4 col-form-label align-items-center">
         {title}
+        {#if helpText}
+            <span
+                class="help-tooltip fs-6"
+                data-bs-toggle="tooltip"
+                data-bs-title={helpText}>?</span
+            >
+        {/if}
     </label>
 
-    {#if helpText}
-        <span
-            class="help-tooltip fs-6"
-            data-bs-toggle="tooltip"
-            data-bs-title={helpText}>?</span
-        >
-    {/if}
     <div class="p-0 d-flex align-items-center col">
         <input
             type="range"
@@ -48,50 +48,67 @@
             {step}
             on:change={(e) => onChange(parseFloat(e.target.value))}
         />
-        <div class="d-flex">
+        <div class="d-flex align-items-center">
             <span
-                class="range-label text-center d-flex text-primary mx-1 text-opacity-75 fs-6"
+                class="text-center d-flex text-primary mx-1 text-opacity-75 fs-6"
             >
                 {value}
             </span>
-            <div
-                class="ms-2 d-inline-flex flex-column align-items-center justify-content-center arrows"
-            >
-                <svg
-                    use:tapHold
-                    on:hold={increment}
-                    role="button"
-                    on:click={increment}
-                    height="10"
-                    viewBox="0 0 20 15"
-                    width="10"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <path
-                        d="m1 15h18c.4 0 .7-.2.9-.5s.1-.7-.1-1l-9-13c-.4-.5-1.3-.5-1.6 0l-9 13c-.2.3-.2.7-.1 1 .2.3.5.5.9.5z"
-                    />
-                </svg>
-                <svg
-                    use:tapHold
-                    on:hold={decrement}
-                    role="button"
-                    on:click={decrement}
-                    height="10"
-                    viewBox="0 0 20 15"
-                    width="10"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <path
-                        d="m9.2 14.6c.2.3.5.4.8.4s.6-.2.8-.4l9-13c.2-.3.2-.7.1-1-.2-.3-.5-.5-.9-.5h-18c-.4 0-.7.2-.9.5s-.1.7.1 1z"
-                    />
-                </svg>
+            <div class="arrows">
+                <div class="numeric-input">
+                    <svg
+                        width="10"
+                        height="10"
+                        fill="currentColor"
+                        viewBox="3 3 18 18"
+                        use:tapHold
+                        on:hold={increment}
+                        on:click={increment}
+                        ><path d="M7,15L12,10L17,15H7Z" /></svg
+                    >
+                </div>
+                <div class="numeric-input">
+                    <svg
+                        width="10"
+                        height="10"
+                        fill="currentColor"
+                        viewBox="3 3 18 18"
+                        use:tapHold
+                        on:hold={decrement}
+                        on:click={decrement}
+                        ><path d="M7,10L12,15L17,10H7Z" /></svg
+                    >
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<style>
+<style lang="scss" scoped>
+    * {
+        box-sizing: content-box !important;
+    }
     .arrows {
-        fill: #5c5f62;
+        display: inline-block;
+        max-height: 25px;
+        margin-left: 6px;
+        margin-right: 12px;
+        vertical-align: middle;
+        box-sizing: border-box;
+    }
+    .numeric-input {
+        cursor: pointer;
+        background-color: #f3f6fa;
+        border: 1px solid #c8d4e3;
+        border-radius: 1px;
+        line-height: 6px;
+        text-align: center;
+        max-height: 10px;
+        & > svg {
+            fill: #506784 !important;
+        }
+        &:first-child {
+            margin-bottom: 2px;
+        }
     }
 </style>

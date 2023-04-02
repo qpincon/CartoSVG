@@ -22,9 +22,9 @@
 	}
 </script>
 
-<div class="ms-4 dropdown">
+<div class="mx-4 dropdown">
     <button
-        class="btn btn-secondary dropdown-toggle"
+        class="btn btn-outline-secondary dropdown-toggle"
         type="button"
         data-bs-toggle="dropdown"
         aria-expanded="false"

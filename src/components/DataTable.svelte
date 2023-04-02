@@ -9,7 +9,7 @@ $: headers = getColumns(data);
 
 </script>
 
-<table class="table">
+<table class="table table-light border table-striped">
     <thead>
         <tr> 
             {#each headers as header }
@@ -29,9 +29,17 @@ $: headers = getColumns(data);
     </tbody>
 </table>
 
-<style scoped>
+<style lang="scss" scoped>
 th {
     white-space: nowrap;
 }
+.table {
+    table-layout: fixed;
+    td {
+        text-overflow: ellipsis;
+        overflow: hidden;
+    }
+}
+
 
 </style>

@@ -1,0 +1,19 @@
+html {
+    font-family: Open Sans,--apple-default,sans-serif;
+    font-size: 14px;
+}
+
+html, body {
+    height: 100%;
+    margin: 0px; padding: 0px;
+}
+
+.content {
+    max-width: 80%;
+    padding: 1em;
+    margin: auto;
+    line-height: 1.75;
+}
+#static-svg-map {
+    margin-bottom: 2rem;
+}

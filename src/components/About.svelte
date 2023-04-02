@@ -94,3 +94,24 @@
     <h3 class="mt-2">Licence ?</h3>
     <span>MIT</span>
 </div>
+
+<style lang="scss">
+
+:global(html) {
+    font-family: Open Sans,--apple-default,sans-serif;
+    font-size: 14px;
+}
+
+:global(html, body) {
+    height: 100%;
+    margin: 0px; padding: 0px;
+}
+
+.content {
+    max-width: 80%;
+    padding: 1em;
+    margin: auto;
+    line-height: 1.75;
+}
+
+</style>

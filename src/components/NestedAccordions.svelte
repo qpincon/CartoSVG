@@ -31,9 +31,9 @@
         {@const isObject = typeof value === "object"}
         <div class="accordion-item" class:noborder={!isObject}>
             {#if isObject}
-                <h2 class="accordion-header">
+                <h3 class="accordion-header">
                     <button
-                        class="accordion-button fs-4"
+                        class="accordion-button fs-5"
                         type="button"
                         data-bs-toggle="collapse"
                         data-bs-target={`#panel-${key}-collapse`}
@@ -43,11 +43,10 @@
                             <span
                                 class="help-tooltip fs-6 float-end"
                                 data-bs-toggle="tooltip"
-                                data-bs-title={helpParams[key]}>?</span
-                            >
+                                data-bs-title={helpParams[key]}>?</span>
                         {/if}
                     </button>
-                </h2>
+                </h3>
                 <div
                     id={`panel-${key}-collapse`}
                     class="accordion-collapse collapse"

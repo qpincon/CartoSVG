@@ -1,26 +1,66 @@
 <script>
-    import logo from '../assets/img/logo_transparent_text.webp';
-    import githubLogo from '../assets/img/github.svg?inline';
-    export let activeTitle = 'index.html'
+  import logo from "../assets/img/logo_transparent_text.webp";
+  import githubLogo from "../assets/img/github.svg?inline";
+  export let activeTitle = "index.html";
 </script>
 
-<nav class="navbar navbar-expand-lg bg-light">
-    <div class="container-fluid w-100">
-      <a class="mx-4 navbar-brand fs-2" href="/">
-        <img src={logo} alt="Logo" width="215" height="64" class="d-inline-block align-text-center">
-      </a>
-      <div class="navbar-collapse" >
-        <ul class="navbar-nav me-auto">
-          <li class="nav-item" >
-            <a class="nav-link" class:active={activeTitle === 'index.html'} role="button" href="index.html"> <strong> Design </strong> </a>
-          </li>
-          
-          <li class="nav-item" >
-            <a class="nav-link" class:active={activeTitle === 'about.html'}  role="button" href="about.html">About </a>
-          </li>
-        </ul>
-        <a class="p-2 github" target="_blank" style="width:50px; height:auto; fill:#aaa;" href="https://github.com/qpincon/SVGscape">{@html githubLogo}</a>
-      </div>
-      <slot></slot>
-    </div>
-  </nav>
+<div id="navbar">
+  <a href="/" class="logo">
+    <img src={logo} alt="Logo" />
+  </a>
+  {#if activeTitle === "index.html"}
+    <a
+      class:active={activeTitle === "about.html"}
+      role="button"
+      href="about.html"
+      >About
+    </a>
+  {/if}
+  <slot></slot>
+</div>
+<a
+  class="p-2 github"
+  target="_blank"
+  style="width:60px; height:auto; fill:#aaa;"
+  href="https://github.com/qpincon/SVGscape">{@html githubLogo}</a
+>
+
+<style lang="scss">
+  .logo {
+    padding: 5px;
+    > img {
+      height: 50px;
+      width: auto;
+    }
+  }
+  #navbar {
+    display: flex;
+    width: 100%;
+    background-color: #ebf0f8;
+    border-bottom: 1px solid #c8d4e3;
+    flex-basis: 50px;
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    > a {
+      text-decoration: none;
+      font-size: 14px;
+      color: black;
+      margin-right: 10px;
+      font-weight: bold;
+    }
+  }
+  .github {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+  }
+  :global(.github > svg) {
+    fill: #5f5f5f;
+    transition: fill 0.3s;
+    max-width: 3rem;
+  }
+  :global(.github:hover > svg) {
+    fill: black;
+  }
+</style>
