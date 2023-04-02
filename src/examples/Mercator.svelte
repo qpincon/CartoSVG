@@ -8,9 +8,9 @@
   <p>
     This is an example built with <a
       target="_blank"
-      href="https://svgscape.xyz"
+      href="https://cartosvg.com"
     >
-      SVGscape</a
+      CartoSVG</a
     >. It features a simple map using the Mercator projection, and a customized tooltip (of questionnable taste). <br />
     The exported SVG file weights 225Ko. It's a bit heavy because of the resolution
     of geometry, and we display here the whole world.

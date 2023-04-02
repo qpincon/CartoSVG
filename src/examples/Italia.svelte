@@ -8,9 +8,9 @@
     <p>
         This is an example built with <a
             target="_blank"
-            href="https://svgscape.xyz"
+            href="https://cartosvg.com"
         >
-            SVGscape</a
+            CartoSVG</a
         >. It is a copy of
         <a target="_blank" href="https://kartograph.org/showcase/italia/">
             Kartograph's La Bella Italia.</a

@@ -90,7 +90,7 @@ const config = {
                 ]
             },
             {
-                test: /\.(topojson|geojson|svgscape)$/,
+                test: /\.(topojson|geojson|cartosvg)$/,
                 type: 'json',
             }
         ],
@@ -99,9 +99,9 @@ const config = {
         new NodePolyfillPlugin(),
         new HtmlWebpackPlugin({
             template: './src/index.ejs',
-            title: 'SVGscape - Design gorgeous interactive maps',
+            title: 'CartoSVG - Design gorgeous interactive maps',
             meta: {
-                description: 'SVGscape is a SVG map editor to create, tweak and export rich and splendid visualizations. It allows customization by binding data, displaying tooltips, drawing choropleth, and provides optimizations for exporting the SVG file as light as possible.'
+                description: 'CartoSVG is a SVG map editor to create, tweak and export rich and splendid visualizations. It allows customization by binding data, displaying tooltips, drawing choropleth, and provides optimizations for exporting the SVG file as light as possible.'
             },
             chunks: ['main'],
             favicon: './src/assets/img/logo_transparent.webp'
@@ -110,7 +110,7 @@ const config = {
             template: './src/index.ejs',
             title: 'About',
             meta: {
-                description: 'SVGscape aims to be a easy, beautiful and lightweight datamaps replacement.'
+                description: 'CartoSVG aims to be a easy, beautiful and lightweight datamaps replacement.'
             },
             filename: 'about.html',
             chunks: ['about'],

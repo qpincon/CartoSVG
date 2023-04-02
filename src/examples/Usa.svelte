@@ -8,9 +8,9 @@
     <p>
         This is an example built with <a
             target="_blank"
-            href="https://svgscape.xyz"
+            href="https://cartosvg.com"
         >
-            SVGscape</a
+            CartoSVG</a
         >. It is a copy of a
         <a target="_blank" href="https://datamaps.github.io/">
             datamaps example.</a

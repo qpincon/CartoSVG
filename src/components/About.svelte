@@ -28,7 +28,7 @@
         much more customization available). The main drawback is at it is fully static
         at the moment (an option would be to create an API later on).<br />
         Please refer to the
-        <a href="https://github.com/qpincon/SVGscape"> GitHub repository </a>
+        <a href="https://github.com/qpincon/CartoSVG"> GitHub repository </a>
         for contributions / requests, or shoot me an email at
         <a href="mailto:pinconquentin@gmail.com">pinconquentin@gmail.com</a>.
     </section>

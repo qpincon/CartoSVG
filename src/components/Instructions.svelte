@@ -84,7 +84,7 @@
         be optimized as much as possible (shape and data-wise), and will follow the
         preferences set in the export modal. <br />
         You can also export it as a png image if you prefer. <br/>Feel free to
-        <a href="https://github.com/qpincon/SVGscape" target="_blank">
+        <a href="https://github.com/qpincon/CartoSVG" target="_blank">
             share your creations
         </a> , if you want it to feature in the examples!
     </p>

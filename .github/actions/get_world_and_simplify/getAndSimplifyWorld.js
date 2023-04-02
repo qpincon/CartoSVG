@@ -2,8 +2,8 @@ import fetch from 'node-fetch';
 import fs from'fs';
 import mapshaper from 'mapshaper';
 
-// const assetsPath = 'map-builder/src/assets/layers';
-const assetsPath = '/home/quentin/Tests/SVGscape/map-builder/src/assets/layers';
+const assetsPath = 'src/assets/layers';
+// const assetsPath = '/home/quentin/Tests/CartoSVG/map-builder/src/assets/layers';
 // const assetsPath = '/home/quentin/Documents/static-map-builder/map-builder/src/assets/layers';
 async function getWorldTopojson(){
     if(fs.existsSync(assetsPath)) {

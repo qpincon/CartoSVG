@@ -1,5 +1,5 @@
 {
-  "name": "svgscape",
+  "name": "cartosvg",
   "version": "1.0.0",
   "description": "Design gorgeous SVG map easily ",
   "main": "index.js",

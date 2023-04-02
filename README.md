@@ -1,7 +1,7 @@
 
-[![SVG Scape logo](src/assets/img/logo_transparent_text.webp 'SVG Scape logo')](https://svgscape.xyz)
+[![SVG Scape logo](src/assets/img/logo_brand.webp 'SVG Scape logo')](https://cartosvg.com)
 
-This is the source code of the [SVGScape](https://svgscape.xyz) website. 
+This is the source code of the [CartoSVG](https://cartosvg.com) website. 
 
 ## Contribute
 

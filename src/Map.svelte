@@ -763,7 +763,7 @@ function saveProject() {
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, contourParams, colorDataDefs, legendDefs, customCategoricalPalette
     };
-    download(JSON.stringify(state), 'text/json', 'project.svgscape');
+    download(JSON.stringify(state), 'text/json', 'project.cartosvg');
 }
 
 function loadProject(e) {
@@ -1832,7 +1832,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                         </a></li>
                         <li><a class="dropdown-item" href="#">
                             <label role="button" for="project-import"> <Icon svg={icons['restore']}/> Load project</label>
-                            <input id="project-import" type="file" accept=".svgscape" on:change={loadProject}>
+                            <input id="project-import" type="file" accept=".cartosvg" on:change={loadProject}>
                         </a></li>
                     </ul>
                 </div>

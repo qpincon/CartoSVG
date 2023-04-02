@@ -3,7 +3,7 @@
     import htmlIcon from "../assets/img/html.svg?inline";
     import examplesDesc from '../../examples.json';
 
-    const exampleProjects = require.context('../examples/', false, /\..*svgscape$/, 'lazy');
+    const exampleProjects = require.context('../examples/', false, /\..*cartosvg$/, 'lazy');
     const exampleMap = exampleProjects.keys().reduce((acc, file) => {
         const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
         acc[name] = file;

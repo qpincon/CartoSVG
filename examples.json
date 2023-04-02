@@ -1,7 +1,7 @@
 {
     "italia": {
         "title": "La Bella Italia",
-        "description": "Italia map built with SVGscape"
+        "description": "Italia map built with CartoSVG"
     },
     "mercator": {
         "title": "Mercator projection",
@@ -9,10 +9,10 @@
     },
     "usa": {
         "title": "USA Elections",
-        "description": "USA elections map built with SVGscape"
+        "description": "USA elections map built with CartoSVG"
     },
     "ukraine": {
         "title": "Ukraine population",
-        "description": "Ukraine population map, built with SVGscape"
+        "description": "Ukraine population map, built with CartoSVG"
     }
 }

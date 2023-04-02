@@ -352,7 +352,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     const scriptContent = document.createTextNode(finalScript);
     scriptElem.appendChild(scriptContent);
     optimizedSVG.firstChild.append(scriptElem);
-    download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'svgscape-export.svg');
+    download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'cartosvg-export.svg');
 }
 
 function getFinalTooltipTemplate(groupId, tooltipDefs) {

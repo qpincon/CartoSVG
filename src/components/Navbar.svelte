@@ -1,5 +1,5 @@
 <script>
-  import logo from "../assets/img/logo_transparent_text.webp";
+  import logo from "../assets/img/logo_brand.webp";
   import githubLogo from "../assets/img/github.svg?inline";
   export let activeTitle = "index.html";
 </script>
@@ -22,7 +22,7 @@
   class="p-2 github"
   target="_blank"
   style="width:60px; height:auto; fill:#aaa;"
-  href="https://github.com/qpincon/SVGscape">{@html githubLogo}</a
+  href="https://github.com/qpincon/CartoSVG">{@html githubLogo}</a
 >
 
 <style lang="scss">

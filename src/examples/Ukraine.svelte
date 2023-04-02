@@ -8,10 +8,10 @@
   <p>
     This is an example built with <a
       target="_blank"
-      href="https://svgscape.xyz"
+      href="https://cartosvg.com"
     >
-      SVGscape</a
-    >. It features a demonstration of the choropleth capabilities of SVGScape based on numerical data. <br/>
+      CartoSVG</a
+    >. It features a demonstration of the choropleth capabilities of CartoSVG based on numerical data. <br/>
     The file export SVG weights ~100Ko.
   </p>
 </div>
