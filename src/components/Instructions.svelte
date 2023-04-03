@@ -80,12 +80,11 @@
             export it</strong
         >
         with the "Export" button at the bottom of the map. <br />
-        Exporting as SVG is recommended (it is the main usage of this tool). It will
-        be optimized as much as possible (shape and data-wise), and will follow the
+        The resulting SVG file will be optimized as much as possible (shape and data-wise), and will follow the
         preferences set in the export modal. <br />
-        You can also export it as a png image if you prefer. <br/>Feel free to
+        Feel free to share your creations
         <a href="https://github.com/qpincon/CartoSVG" target="_blank">
-            share your creations
-        </a> , if you want it to feature in the examples!
+            by creating a PR
+        </a>, <a href="mailto:pincon.quentin@gmail.com"> or sending me an email at pincon.quentin@gmail.com</a> if you want it to feature in the examples!
     </p>
 </section>

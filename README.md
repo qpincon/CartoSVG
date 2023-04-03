@@ -7,7 +7,7 @@ This is the source code of the [CartoSVG](https://cartosvg.com) website.
 
 You can contribute by submitting an example project, either by:
 - creating a pull request
-- send me an email at pinconquentin@gmail.com
+- send me an email at pincon.quentin@gmail.com
 
 
 ## Running locally

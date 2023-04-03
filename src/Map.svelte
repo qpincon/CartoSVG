@@ -151,7 +151,7 @@ let projectionLarger = null;
 let svg = null;
 const defaultLegendDef =  {
     x: 20,
-    y: p('height') - 100,
+    y: Math.max(0, p('height') - 200),
     lineWidth: 100,
     rectWidth: 30,
     rectHeight: 30,
@@ -1591,7 +1591,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                 {#if mainMenuSelection === 0}
                     <Accordions sections={params} {paramDefs} {helpParams} otherParams={accordionVisiblityParams}  on:change={handleChangeProp} ></Accordions>
                 {:else}
-                <div class="border border-primary rounded m-4">
+                <div class="border border-primary rounded">
                     <div class="p-2">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" role="switch" id="showLand" bind:checked={inlineProps.showLand} on:change={() => draw()}>

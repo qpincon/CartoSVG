@@ -6,7 +6,7 @@
 
 <div id="navbar">
   <a href="/" class="logo">
-    <img src={logo} alt="Logo" />
+    <img src={logo} alt="Logo" height="50" width="140" />
   </a>
   {#if activeTitle === "index.html"}
     <a
@@ -28,10 +28,6 @@
 <style lang="scss">
   .logo {
     padding: 5px;
-    > img {
-      height: 50px;
-      width: auto;
-    }
   }
   #navbar {
     display: flex;

@@ -100,7 +100,7 @@
         min="10"
         max="100"
     />
-    <div class="mx-2 form-check form-switch">
+    <div class="form-check form-switch">
         <input
             type="checkbox" role="switch" class="form-check-input" id='noDataActive'
             bind:checked={definition.noData.active}

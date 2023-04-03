@@ -30,7 +30,7 @@
         Please refer to the
         <a href="https://github.com/qpincon/CartoSVG"> GitHub repository </a>
         for contributions / requests, or shoot me an email at
-        <a href="mailto:pinconquentin@gmail.com">pinconquentin@gmail.com</a>.
+        <a href="mailto:pincon.quentin@gmail.com">pincon.quentin@gmail.com</a>.
     </section>
 
     <h2 class="mt-2">Credits</h2>
