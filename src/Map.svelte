@@ -178,22 +178,24 @@ const defaultColorDef = {
     legendEnabled: false,
 };
 
-// ====== State =======
-let baseCss = defaultBaseCss;
-let providedPaths = [];
-let providedShapes = []; // {name, coords, scale, id}
-let chosenCountriesAdm = [];
-let inlineProps = {
+const defaultInlineProps = {
     longitude: 15,
     latitude: 42.5,
     translateX: 0,
     translateY: 0,
     altitude: null,
     rotation: 0,
-    tilt: 8.7,
+    tilt: 0,
     showLand: true,
     showCountries: true
 };
+
+// ====== State =======
+let baseCss = defaultBaseCss;
+let providedPaths = [];
+let providedShapes = []; // {name, coords, scale, id}
+let chosenCountriesAdm = [];
+let inlineProps = JSON.parse(JSON.stringify(defaultInlineProps));
 
 let providedFonts = [];
 let shapeCount = 0;
@@ -300,7 +302,7 @@ onMount(() => {
                 const parentCountry = el.parentNode.getAttribute('id').replace(/ ADM(1|2)/, '')
                 const parentCountryIso3 = iso3Data.find(row => row.name === parentCountry)['name'];
                 const countryElem = document.getElementById(parentCountryIso3);
-                if (!countryElem) return [];
+                if (!countryElem) return [[el, 'Clicked']];
                 return [[el, 'Clicked'], [countryElem, parentCountryIso3]];
             }
             if (el.tagName === 'tspan') {
@@ -636,7 +638,8 @@ async function draw(simplified = false, _) {
         .attr('id', 'frame')
         .attr('width', width - borderWidth) 
         .attr('height', height - borderWidth)
-        .attr('rx', rx)
+        .attr('rx', rx);
+
     drawAndSetupShapes();
     const map = document.getElementById('static-svg-map');
     if(!map) return;
@@ -658,8 +661,8 @@ function computeCss() {
     const height = p('height');
     const borderRadius = p('borderRadius');
     const wantedRadiusInPx = Math.max(width, height) * (borderRadius / 100);
-    const radiusX = Math.min((wantedRadiusInPx * 100) / width, 50);
-    const radiusY = Math.min((wantedRadiusInPx * 100) / height, 50);
+    const radiusX = Math.round(Math.min((wantedRadiusInPx * 100) / width, 50)) + 1;
+    const radiusY = Math.round(Math.min((wantedRadiusInPx * 100) / height, 50)) + 1;
     const borderCss = `
     #static-svg-map {
         ${p('frameShadow') ? 'filter: drop-shadow(2px 2px 8px rgba(0,0,0,.2));': ''}
@@ -696,17 +699,7 @@ function resetState() {
     chosenCountriesAdm = [];
     orderedTabs = ['countries', 'land'];
     currentTab = 'countries';
-    inlineProps = {
-        longitude: 15,
-        latitude: 42.5,
-        translateX: 0,
-        translateY: 0,
-        altitude: null,
-        rotation: 0,
-        tilt: 8.7,
-        showLand: true,
-        showCountries: true
-    };
+    inlineProps = JSON.parse(JSON.stringify(defaultInlineProps));
     providedFonts = [];
     shapeCount = 0;
     inlineStyles = {};
@@ -1299,16 +1292,16 @@ function validateExport() {
 }
 
 // === Export as PNG behaviour ===
-import * as saveSvgAsPng from 'save-svg-as-png';
-async function exportRaster() {
-    const optimized = await exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, false, totalCommonCss, {});
-    const elem = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    document.body.append(elem);
-    elem.outerHTML = optimized;
-    saveSvgAsPng.saveSvgAsPng(document.body.lastChild, 'test.png');
-    document.body.lastChild.remove();
-    fetch('/exportRaster');
-}
+// import * as saveSvgAsPng from 'save-svg-as-png';
+// async function exportRaster() {
+//     const optimized = await exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, false, totalCommonCss, {});
+//     const elem = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+//     document.body.append(elem);
+//     elem.outerHTML = optimized;
+//     saveSvgAsPng.saveSvgAsPng(document.body.lastChild, 'test.png');
+//     document.body.lastChild.remove();
+//     fetch('/exportRaster');
+// }
 
 let inlineFontUsed = false;
 function onExportSvgClicked() {
@@ -1683,7 +1676,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                             {#if tooltipDefs[currentTab].enabled}
                                 <div class="m-2 has-validation">
                                     <label for="templatetooltip" class="form-label"> Tooltip template
-                                        <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="The template must be valid HTML (<br/> can be used to break lines). Brackets  &#123; &#125; can be used to reference variables.  ">?</span>
+                                        <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="The template must be valid HTML (<br/> can be used to break lines). Brackets  &#123; &#125; can be used to reference columns from the data above.  ">?</span>
                                     </label>
                                     <textarea class="form-control"
                                     class:is-invalid="{templateErrorMessages[currentTab]}"
@@ -1812,7 +1805,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
             </div>
         </Navbar>
         <div class="d-flex flex-column justify-content-center align-items-center h-100">
-            <div id="map-container" class="col"></div>
+            <div id="map-container" class="col mx-4"></div>
             <div class="mt-4 d-flex align-items-center justify-content-center">
                 <div class="mx-2">
                     <label for="fontinput" class="m-2 d-flex align-items-center btn btn-outline-primary"> <Icon svg={icons['font']}/> Add font</label>
@@ -1930,6 +1923,16 @@ function getLegendColors(dataColorDef, tab, scale, data) {
 .text-nowrap {
     white-space: nowrap;
 }
+#params {
+    flex: 1 1 400px;
+    min-width: 300px;
+    max-width: 550px;
+    background-color: #ebf0f8;
+    border-right: 1px solid #c8d4e3;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
 #main-panel > .btn-group {
     .btn-check:checked + .btn {
         background-color: #465da3;
@@ -1939,13 +1942,6 @@ function getLegendColors(dataColorDef, tab, scale, data) {
     }
 }
 
-#params {
-    flex: 1 0 500px;
-    background-color: #ebf0f8;
-    border-right: 1px solid #c8d4e3;
-    overflow-x: hidden;
-    overflow-y: auto;
-}
 #country-select:hover ~ span {
     color: #aeafaf;
 }
@@ -1989,10 +1985,7 @@ input[type="file"] {
 .grabbable {
     cursor: grab !important;
 }
-.accordions, aside {
-    min-width: 20rem;
-    max-width: 30rem;
-}
+
 textarea {
     font-size: 0.82rem;
 }

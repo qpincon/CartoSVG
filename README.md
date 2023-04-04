@@ -19,10 +19,10 @@ Run `npm install` to install dependencies
 
 ### Develop
 Run `npm run dev` to launch webpack with file watching.
-Go into `docs/index.html` to test locally.
+Go into `dist/index.html` to test locally.
 
 ### Build the project
-Run `npm run build` to build the project. All built assets will be in the `docs` directory.  
+Run `npm run build` to build the project. All built assets will be in the `dist` directory.  
 
 ### Webkit caveats
 - Webkit does not support SVG Filters definition in data-URI, so a slightly less performant version of the code is used while waiting for improvments.

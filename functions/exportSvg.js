@@ -1,3 +1,3 @@
 export function onRequest(context) {
-  return new Response("Yes")
+  return new Response("Done")
 }

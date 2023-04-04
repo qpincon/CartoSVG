@@ -10,6 +10,12 @@
     export let id = "rangeinputid";
     export let helpText;
 
+    function countDecimals(val) {
+        if(Math.floor(val.valueOf()) === val.valueOf()) return 0;
+        return val.toString().split(".")[1].length || 0; 
+    }
+
+    $:nbDecimals = countDecimals(step);
     const increment = () => {
         if (value === null) value = step;
         else if (value === max) return;
@@ -52,7 +58,7 @@
             <span
                 class="text-center d-flex text-primary mx-1 text-opacity-75 fs-6"
             >
-                {value}
+                {value.toFixed(nbDecimals)}
             </span>
             <div class="arrows">
                 <div class="numeric-input">
