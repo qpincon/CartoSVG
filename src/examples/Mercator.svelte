@@ -12,8 +12,7 @@
     >
       CartoSVG</a
     >. It features a simple map using the Mercator projection, and a customized tooltip (of questionnable taste). <br />
-    The exported SVG file weights 225Ko. It's a bit heavy because of the resolution
-    of geometry, and we display here the whole world.
+    The exported SVG file weights 167Ko. It's a bit heavy because we display the whole world here.
   </p>
 </div>
 

@@ -44,10 +44,10 @@
           {/if}
         </button>
       </h3>
+      {@html '<!-- Buggy - collaspe on any click inside... class:show={level === 0 && i < 4}-->'}
       <div
         id={`panel-${title}-collapse`}
-        class="accordion-collapse collapse"
-        class:show={level === 0 && i < 3}
+        class="accordion-collapse collapse show"
       >
         <div
           class="accordion-body"

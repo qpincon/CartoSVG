@@ -1,6 +1,8 @@
 <script>
 import { onMount, tick } from 'svelte';
 import * as topojson from 'topojson-client';
+import { presimplify, simplify } from 'topojson-simplify';
+
 import * as d3 from "d3";
 import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
 import 'bootstrap/js/dist/dropdown';
@@ -64,6 +66,7 @@ const icons = iconsReq.keys().reduce((acc, iconFile) => {
 let params = JSON.parse(JSON.stringify(defaultParams));
 const iso3DataById = indexBy(iso3Data, 'alpha-3');
 const resolvedAdm = {};
+const resolvedAdmTopo = {};
 const countriesAdm1Resolve = require.context('./assets/layers/adm1/', false, /\..*json$/, 'lazy');
 const availableCountriesAdm1 = countriesAdm1Resolve.keys().reduce((acc, file) => {
     const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
@@ -123,26 +126,60 @@ const p = (propName, obj = params) => findProp(propName, obj);
 
 const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView', 'projection', 'width', 'height'];
 let timeoutId;
+let visibleArea;
 let countries = null;
 let land = null;
+let adm0Topo = null;
 let simpleLand = null;
 let openContextMenuInfo;
-const adm0Land = import('./assets/layers/world_adm0_simplified.topojson')
+
+const typeSizes = {
+  "undefined": () => 0,
+  "boolean": () => 4,
+  "number": () => 8,
+  "string": item => 2 * item.length,
+  "object": item => !item ? 0 : Object
+    .keys(item)
+    .reduce((total, key) => sizeOf(key) + sizeOf(item[key]) + total, 0)
+};
+
+const sizeOf = value => typeSizes[typeof value](value);
+const adm0LandTopoPromise = import('./assets/layers/world_adm0_simplified.topojson')
     .then(({default:topoAdm0}) => {
-        const firstKey = Object.keys(topoAdm0.objects)[0];
-        countries = topojson.feature(topoAdm0, topoAdm0.objects[firstKey]);
-        countries.features.forEach(feat => {
-            feat.properties = iso3DataById[feat.properties['shapeGroup']] || {};
-        });
-        land = topojson.merge(topoAdm0, topoAdm0.objects[firstKey].geometries);
-        land = splitMultiPolygons({type: 'FeatureCollection', features: [{type:'Feature', geometry: {...land} }]}, 'land');
+        adm0Topo = presimplify(topoAdm0);
     });
+
+function updateLayerSimplification() {
+    updateAdm0LandAndCountries();
+    Object.keys(resolvedAdmTopo).forEach(countryAdm => {
+        const simplified = simplify(resolvedAdmTopo[countryAdm], visibleArea);
+        const sizeSimp = sizeOf(simplified);
+        const sizeTopo = sizeOf(resolvedAdmTopo[countryAdm]);
+        console.log(countryAdm, 'before', sizeTopo, 'simplified=', sizeSimp, `(${((sizeTopo - sizeSimp) / sizeTopo) * 100}% of reduction)`);
+        const firstKey = Object.keys(simplified.objects)[0];
+        resolvedAdm[countryAdm] = topojson.feature(simplified, simplified.objects[firstKey]);
+    });
+}
+function updateAdm0LandAndCountries() {
+    const simplified = simplify(adm0Topo, visibleArea);
+    const sizeSimp = sizeOf(simplified);
+    const sizeTopo = sizeOf(adm0Topo);
+    console.log('before', sizeTopo, 'simplified=', sizeSimp, `(${((sizeTopo - sizeSimp) / sizeTopo) * 100}% of reduction)`);
+    const firstKey = Object.keys(simplified.objects)[0];
+    countries = topojson.feature(simplified, simplified.objects[firstKey]);
+    countries.features.forEach(feat => {
+        feat.properties = iso3DataById[feat.properties['shapeGroup']] || {};
+    });
+    land = topojson.merge(simplified, simplified.objects[firstKey].geometries);
+    land = splitMultiPolygons({type: 'FeatureCollection', features: [{type:'Feature', geometry: {...land} }]}, 'land');
+}
 const verySimpleLand = import('./assets/layers/world_land_very_simplified.topojson')
     .then(({default:land}) => {
         const firstKey = Object.keys(land.objects)[0];
         simpleLand = topojson.feature(land, land.objects[firstKey]);
     });
-Promise.all([adm0Land, verySimpleLand]).then(() => projectAndDraw());
+
+const layerPromises = Promise.all([adm0LandTopoPromise, verySimpleLand]);
 
 let path = null;
 let pathLarger = null;
@@ -254,11 +291,13 @@ let editingPath = false;
 let commonStyleSheetElem;
 let zoomFunc;
 let dragFunc;
-onMount(() => {
+onMount(async() => {
     commonStyleSheetElem = document.createElement('style');
     document.head.appendChild(commonStyleSheetElem);
     commonStyleSheetElem.innerHTML = baseCss;
+    await layerPromises;
     restoreState();
+    projectAndDraw();
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
             const elemId = target.getAttribute('id');
@@ -374,17 +413,21 @@ function redraw(propName) {
     }
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
+        updateLayerSimplification();
         draw(false);
     }, 300);
 }
 
 let altScale = d3.scaleLinear().domain([1, 0]).range([100, 10000]);
+// scale for simplification according to zoom
+let threshScale = d3.scalePow().domain([0, 1]).range([0.1, 0]).exponent(0.08);
 function zoomed(event) {
     if (!event.sourceEvent) return;
     if (event.sourceEvent.type === 'dblclick') return;
     if (!projection) return;
     event.transform.k = Math.max(Math.min(event.transform.k, 1), 0.00001)
     const newAltitude = Math.round(altScale(event.transform.k));
+    visibleArea = threshScale(event.transform.k);
     params["General"].altitude = newAltitude;
     inlineProps.altitude = newAltitude;
     redrawThrottle('altitude');
@@ -429,8 +472,10 @@ function changeAltitudeScale(autoAdjustAltitude = true) {
     else {
         altScale = d3.scaleLinear().domain([0, 1]).range([90, 2000]);
     }
-    if (!autoAdjustAltitude) return;
     const altitude = inlineProps.altitude || params["General"].altitude;
+    const originalScale = altScale.invert(altitude);
+    visibleArea = threshScale(originalScale);
+    if (!autoAdjustAltitude) return;
     let altChanged = false;
     const firstScaleVal = altScale(invertAlt ? 1 : 0);
     const secondScaleVal = altScale(invertAlt ? 0 : 1);
@@ -448,11 +493,12 @@ function changeProjection() {
         accordionVisiblityParams = noSatelliteParams;
     }
     else accordionVisiblityParams = {};
+    const alt = inlineProps.altitude || params['General'].altitude
     const projectionParams = {
         projectionName: projName, fov: p('fieldOfView'), width: p('width'), height: p('height'),
         translateX: inlineProps.translateX, translateY: inlineProps.translateY,
         longitude: inlineProps.longitude, latitude: inlineProps.latitude, rotation: inlineProps.rotation,
-        altitude: inlineProps.altitude || params['General'].altitude, tilt: inlineProps.tilt, borderWidth: p('borderWidth')
+        altitude: alt, tilt: inlineProps.tilt, borderWidth: p('borderWidth')
     };
     projection = getProjection(projectionParams);
     projectionLarger = getProjection({...projectionParams, larger:true});
@@ -478,8 +524,10 @@ async function draw(simplified = false, _) {
     for (const countryAdm of chosenCountriesAdm) {
         if (!(countryAdm in resolvedAdm)) {
             const resolved = await resolveAdm(countryAdm);
-            const firstKey = Object.keys(resolved.objects)[0];
-            resolvedAdm[countryAdm] = topojson.feature(resolved, resolved.objects[firstKey]);
+            // const firstKey = Object.keys(resolved.objects)[0];
+            // resolvedAdmTopo[countryAdm] = topojson.feature(resolved, resolved.objects[firstKey]);
+            resolvedAdmTopo[countryAdm] = presimplify(resolved);
+            updateLayerSimplification();
             draw(simplified);
             return;
         }
@@ -661,8 +709,8 @@ function computeCss() {
     const height = p('height');
     const borderRadius = p('borderRadius');
     const wantedRadiusInPx = Math.max(width, height) * (borderRadius / 100);
-    const radiusX = Math.round(Math.min((wantedRadiusInPx * 100) / width, 50)) + 1;
-    const radiusY = Math.round(Math.min((wantedRadiusInPx * 100) / height, 50)) + 1;
+    const radiusX = Math.round(Math.min((wantedRadiusInPx * 100) / width, 50));
+    const radiusY = Math.round(Math.min((wantedRadiusInPx * 100) / height, 50));
     const borderCss = `
     #static-svg-map {
         ${p('frameShadow') ? 'filter: drop-shadow(2px 2px 8px rgba(0,0,0,.2));': ''}
@@ -724,9 +772,10 @@ function resetState() {
     };
     legendDefs = {countries: JSON.parse(JSON.stringify(defaultLegendDef))};
     customCategoricalPalette = ['#ff0000ff', '#00ff00ff', '#0000ffff'];
-    projectAndDraw();
     // auto adjust altitude when reseting
     changeAltitudeScale();
+    updateLayerSimplification();
+    projectAndDraw();
 }
 
 function restoreState(givenState) {
@@ -735,18 +784,19 @@ function restoreState(givenState) {
         state = givenState;
     }
     else state = getState();
-    if (!state) return;
+    if (!state) return resetState();
     ({  params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, contourParams, colorDataDefs, legendDefs, customCategoricalPalette
-    } = state);
+    } = JSON.parse(JSON.stringify(state)));
     if (!baseCss) baseCss = defaultBaseCss;
     commonStyleSheetElem.innerHTML = baseCss;
     const tabsWoLand = orderedTabs.filter(x => x !== 'land');
     if (tabsWoLand.length) onTabChanged(tabsWoLand[0]);
     getZonesDataFormatters();
     changeAltitudeScale(false);
+    updateLayerSimplification();
 }
 
 function saveProject() {
