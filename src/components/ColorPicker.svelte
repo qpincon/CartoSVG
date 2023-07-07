@@ -57,7 +57,6 @@
         if (!self) return;
         if (pickerElem) pickerElem.destroy();
         opts.onChange = _onChange;
-        opts.onOpen = (x) => {console.log(x, 'coucou')},
         pickerElem = new Picker({
             parent: self,
             color: value,

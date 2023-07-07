@@ -1,10 +1,10 @@
 import svgoConfig from '../svgoExport.config';
 import svgoConfigText from '../svgoExportText.config';
 
+import { imageFromSpecialGElemStr, encodeSVGDataImageStr } from '../svg/contourMethods';
 import { htmlToElement } from '../util/common';
 import { indexBy, pick, download } from '../util/common';
 import { reportStyle, reportStyleElem, fontsToCss, getUsedInlineFonts } from '../util/dom';
-import { encodeSVGDataImage} from './svg';
 
 const domParser = new DOMParser();
 
@@ -144,35 +144,74 @@ async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
     return false;
 }
 
+// to insert at the end to have mapElement object defined
+const intersectionObservingPart = `
+const observerOptions = {
+    root: null,
+    rootMargin: "0px",
+    threshold: 0.3,
+  };
+mapElement.style['visibility'] = 'hidden';
+let rendered = false;
+function intersectionCallback(entries) {
+    if (rendered || !entries[0].isIntersecting) return;
+    rendered = true;
+    // add some delay to ensure the map is in the viewport
+    setTimeout(() => {
+        mapElement.style['visibility'] = 'visible';
+        mapElement.classList.add('animate');
+        mapElement.querySelectorAll('path').forEach(pathElem => {
+            pathElem.setAttribute('pathLength', 1);
+        });
+        setTimeout(() => {
+            mapElement.classList.add('animate-transition');
+        }, 1000);
+        mapElement.querySelector('#frame').addEventListener('animationend', () => {
+            mapElement.classList.remove('animate');
+            gElemsToImages(true);
+            mapElement.querySelectorAll('path[pathLength]').forEach(el => {el.removeAttribute('pathLength')});
+            setTimeout(() => {
+                mapElement.classList.remove('animate-transition');
+            }, 1000);
+        });
+    }, 500);
+}
+const observer = new IntersectionObserver(intersectionCallback, observerOptions);
+observer.observe(mapElement);
+`;
 async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, providedFonts, downloadExport = true, commonCss,
-    { exportFonts = exportFontChoices.convertToPath, hideOnResize = false, minifyJs = false }) {
+    animated, { exportFonts = exportFontChoices.convertToPath, hideOnResize = false, minifyJs = false })
+{
     const fo = svg.select('foreignObject').node();
     // remove foreign object from dom when exporting
     if (fo) document.body.append(fo);
     const svgNode = svg.node();
-    let contours = Array.from(svg.node().querySelectorAll('.contour-to-dup[filter]'));
+
+    // === Remove contours ==
+    // let contours = Array.from(svg.node().querySelectorAll('.contour-to-dup[filter]'));
+    let contours = Array.from(svg.node().querySelectorAll('image.contour-to-dup'));
     contours = contours.map(el => {
         const parent = el.parentNode;
         document.body.append(el);
         return [el, parent];
     });
+    // === End remove contours ==
+
     const usedFonts = getUsedInlineFonts(svgNode);
     const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
     
     const SVGO = await import('svgo/dist/svgo.browser');
-    // first, optimize data-uri images
-    const glowImages = svgNode.querySelectorAll('.glow-img'); 
-    glowImages.forEach(glowImg => {
-        let glowImgStr = decodeURIComponent(glowImg.getAttribute('href'));
-        glowImgStr = glowImgStr.substring(glowImgStr.indexOf('<svg'));
-        glowImgStr = encodeSVGDataImage(SVGO.optimize(glowImgStr, svgoConfig).data);
-        glowImg.setAttribute('href', glowImgStr);
-    });
+
+    // Optimize whole SVG
     const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig).data;
+
+    // === re-insert tooltip and contours ===
     if (fo) svg.node().append(fo);
     contours.forEach(([el, parent]) => {
         parent.insertBefore(el, parent.firstChild);
     });
+    // === End re-insertion === 
+
     const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
     let pathIsBetter = false;
     if (exportFonts == exportFontChoices.smallest || exportFonts == exportFontChoices.convertToPath) {
@@ -320,22 +359,45 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         }
     }` : '';
     let finalScript = `
-        function duplicateContours(svgElem) {
+        ${encodeSVGDataImageStr}
+        ${imageFromSpecialGElemStr}
+        function duplicateContours(svgElem, transition=false) {
             Array.from(svgElem.querySelectorAll('.contour-to-dup')).forEach(el => {
                 if (!el.hasAttribute('filter-name')) return;
                 const clone = el.cloneNode();
                 clone.setAttribute('href', el.getAttribute('href').replace(\`fill='none'\`, ''))
                 clone.setAttribute('filter', \`url(#\${el.getAttribute('filter-name')})\`);
+                if (transition) {
+                    clone.style['opacity'] = 0;
+                    setTimeout(() => {
+                        clone.style['opacity'] = 1;
+                    }, 0);
+                }
                 el.parentNode.insertBefore(clone, el);
             });
         }
         const allScripts = document.getElementsByTagName('script');
         const scriptTag = allScripts[allScripts.length - 1];
         const mapElement = scriptTag.parentNode;
-        duplicateContours(mapElement);
+
+        function gElemsToImages(transition=false) {
+            const toTransformToImg = mapElement.querySelectorAll('g[image-class]');
+            toTransformToImg.forEach(gElem => {
+                const image = imageFromSpecialGElem(gElem);
+                gElem.parentNode.append(image);
+                if (transition) {
+                    setTimeout(() => {
+                        gElem.remove();
+                    }, 500);
+                }
+                else gElem.remove();
+            });
+            duplicateContours(mapElement, transition);
+        }
         ${onResize}
         ${tooltipCode}
         ${onMouseEvents}
+        ${animated ? intersectionObservingPart : 'gElemsToImages()'}
         `;
 
     const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');

@@ -9,6 +9,7 @@ import 'bootstrap/js/dist/dropdown';
 import { debounce, throttle} from 'lodash-es';
 import dataExplanation from './assets/dataColor.svg';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
+import { transitionCss } from './svg/transition';
 import PathEditor from './svg/pathEditor';
 import { paramDefs, defaultParams, helpParams, noSatelliteParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
@@ -330,7 +331,7 @@ onMount(async() => {
                     if(tab.substring(0, tab.length - 5) == elemId) {
                         const filter = zonesFilter[tab];
                         const countryData = countries.features.find(country => country.properties.name === elemId);
-                        appendCountryImageNew.call(d3.select(`[id='${elemId}-img']`).node(), countryData, filter, applyStyles, path, inlineStyles);
+                        appendCountryImageNew.call(d3.select(`[id='${elemId}-img']`).node(), countryData, filter, applyStyles, path, inlineStyles, false, true);
                     }
                 })
             }
@@ -555,6 +556,7 @@ async function draw(simplified = false, _) {
     const borderWidth = p('borderWidth');
     const borderRadius = p('borderRadius');
     const container = d3.select('#map-container');
+    const animated = p('animate');
     container.html('');
     const outline = {type: "Sphere"};
     const graticule = d3.geoGraticule().step([p('graticuleStep'), p('graticuleStep')])();
@@ -579,6 +581,9 @@ async function draw(simplified = false, _) {
         .attr('xmlns', "http://www.w3.org/2000/svg")
         .attr('xmlns:xlink', "http://www.w3.org/1999/xlink")
         .attr('id', 'static-svg-map');
+
+    svg.classed('animate-transition', true)
+        .classed('animate', params['General'].animate);
 
     if (p('useViewBox')) {
         svg.attr('viewBox', `0 0 ${width} ${height}`);
@@ -656,13 +661,14 @@ async function draw(simplified = false, _) {
     .selectAll('g').data(groupData).join('g').attr('id', d => d.name);
         // .attr('clip-path', 'url(#clipMapBorder)')
     function drawPaths(data) {
-        if (data.type === 'landImg') return appendLandImageNew.call(this, data.showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, p(zonesFilter['land']));
-        if (data.type === 'filterImg') return appendCountryImageNew.call(this, data.countryData, data.filter, applyStyles, path, inlineStyles);
+        if (data.type === 'landImg') return appendLandImageNew.call(this, data.showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, p(zonesFilter['land']), animated);
+        if (data.type === 'filterImg') return appendCountryImageNew.call(this, data.countryData, data.filter, applyStyles, path, inlineStyles, animated);
         if (!data.data) return;
         const parentPathElem = d3.select(this).style('will-change', 'opacity'); 
         const pathElem = parentPathElem.selectAll('path')
             .data(data.data.features ? data.data.features : data.data)
             .join('path')
+                .attr('pathLength', 1)
                 .attr('d', (d) => {return path(d)});
         if (data.id) pathElem.attr('id', (d) => d.properties[data.id]);
         if (data.class) pathElem.attr('class', data.class);
@@ -680,13 +686,37 @@ async function draw(simplified = false, _) {
     d3.select('#outline').style('fill', "url(#noise)");
     colorizeAndLegend();
     computeCss();
-    svg.append('rect')
+    const frame = svg.append('rect')
         .attr('x', borderWidth / 2)
         .attr('y', borderWidth / 2)
         .attr('id', 'frame')
+        .attr('pathLength', 1)
         .attr('width', width - borderWidth) 
         .attr('height', height - borderWidth)
         .attr('rx', rx);
+
+    if(animated) {
+        frame.on("animationend", (e) => {
+            setTimeout(() => {
+                svg.classed('animate', false);
+                svg.selectAll('path[pathLength]').attr('pathLength', null);
+                const landElem = svg.select('#land');
+                const landGroupDef = groupData.find(x => x.type === 'landImg');
+                const countryGroupDefs = groupData.filter(x => x.type === 'filterImg');
+                if (!landElem.empty() && landGroupDef) {
+                    appendLandImageNew.call(landElem.node(), landGroupDef.showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, p(zonesFilter['land']), false);
+                }
+                countryGroupDefs.forEach(def => {
+                    appendCountryImageNew.call(svg.select(`[id='${def.name}']`).node(), def.countryData, def.filter, applyStyles, path, inlineStyles, false);
+                });
+                duplicateContourCleanFirst(svg.node());
+                setTimeout(() => {
+                    svg.selectAll('g[image-class]').classed('hidden-after', true);
+                    svg.classed('animate-transition', false);
+                }, 1500)
+            }, 200);
+        });
+    }
 
     drawAndSetupShapes();
     const map = document.getElementById('static-svg-map');
@@ -695,6 +725,9 @@ async function draw(simplified = false, _) {
     addTooltipListener(map, tooltipDefs, zonesData);
     duplicateContourCleanFirst(svg.node());
     firstDraw = false;
+    if (!animated) {
+        svg.selectAll('path[pathLength]').attr('pathLength', null);
+    }
 }
 
 function projectAndDraw(simplified = false) {
@@ -724,6 +757,7 @@ function computeCss() {
         stroke-width:${p('borderWidth')}px;
     }`;
     commonCss = finalColorsCss + borderCss;
+    if (p('animate')) commonCss += transitionCss;
     totalCommonCss = exportStyleSheet('#paths > path') + commonCss;
 }
 
@@ -1336,7 +1370,7 @@ function dragstart(event, i, prevent = false) {
 
 function validateExport() {
     const formData = Object.fromEntries(new FormData(exportForm).entries());
-    exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, true, totalCommonCss, formData);
+    exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, true, totalCommonCss, p('animate'), formData);
     showExportConfirm = false;
     fetch('/exportSvg');
 }
@@ -1534,6 +1568,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
     return legendColors;
 }
 
+// TODO: check menu opened to avoid it being display on page land
 </script>
 
 <svelte:head>
@@ -1903,7 +1938,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                 <input class="form-check-input" type="radio" name="exportFonts" value={exportFontChoices.noExport} id="exportFonts1">
                 <label class="form-check-label" for="exportFonts1">
                     Do not export fonts
-                    <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="If the final document will contain imported fonts, no need to export it as part of the SVG">?</span>
+                    <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="If the final HTML document containing the map contains imported fonts, no need to export it as part of the SVG">?</span>
                 </label>
             </div>
             <div class="form-check">

@@ -120,6 +120,7 @@ function drawLegend(legendSelection, legendDef, legendColors, isCategorical, sam
         .attr('y', 0)
         .attr('width', legendDef.rectWidth)
         .attr('height', legendDef.rectHeight)
+        .attr('pathLength', 1)
         .attr('fill', d => d[0])
         .attr('stroke', 'black');
     

@@ -88,24 +88,20 @@ function createSvgFromPart(partStr) {
     return domParser.parseFromString(svgStr, 'text/html').body.childNodes[0].firstChild;
 }
 
-function addNameSpace (data) {
-    if (data.indexOf(`http://www.w3.org/2000/svg`) < 0) {
-      data = data.replace(/<svg/g, `<svg xmlns='http://www.w3.org/2000/svg'`);
-    }
-    return data;
-  }
-
-const symbols = /[\r\n%#()<>?[\\\]^`{|}]/g;
-function encodeSVGDataImage(data) {
-    data = addNameSpace(data);
-    data = data.replace(/"/g, `'`);
-    data = data.replace(/>\s{1,}</g, `><`);
-    data = data.replace(/\s{2,}/g, ` `);
-    // Using encodeURIComponent() as replacement function
-    // allows to keep result code readable
-    data = data.replace(symbols, encodeURIComponent);
-    return `data:image/svg+xml,${data}`
-}
+// // Using encodeURIComponent() as replacement function
+// // allows to keep result code readable
+// function encodeSVGDataImage(data) {
+//     const symbols = /[\r\n%#()<>?[\\\]^`{|}]/g;
+//     if (data.indexOf(`http://www.w3.org/2000/svg`) < 0) {
+//       data = data.replace(/<svg/g, `<svg xmlns='http://www.w3.org/2000/svg'`);
+//     }
+//     data = data.replace(/"/g, `'`);
+//     data = data.replace(/>\s{1,}</g, `><`);
+//     data = data.replace(/\s{2,}/g, ` `);
+//     data = data.replace(symbols, encodeURIComponent);
+//     return `data:image/svg+xml,${data}`
+// }
+// const encodeSVGDataImageStr = encodeSVGDataImage.toString();
 
 function duplicateContourCleanFirst(svgElem) {
     Array.from(svgElem.querySelectorAll('.contour-to-dup[filter]')).forEach(el => el.remove());
@@ -117,11 +113,17 @@ function duplicateContours(svgElem) {
         const clone = el.cloneNode();
         clone.setAttribute('href', el.getAttribute('href').replace(`fill='none'`, ''))
         clone.setAttribute('filter', `url(#${el.getAttribute('filter-name')})`);
+        // set opacity to 0 once to initiate transition
+        clone.style['opacity'] = 0;
+        setTimeout(() => {
+            clone.style['opacity'] = 1;
+        }, 0);
         el.parentNode.insertBefore(clone, el);
     });
 }
 
 export {
     createSvgFromPart, setTransformScale, setTransformTranslate, getTranslateFromTransform, 
-    closestDistance, encodeSVGDataImage, duplicateContours, duplicateContourCleanFirst,
+    closestDistance, duplicateContours, duplicateContourCleanFirst, 
+    //encodeSVGDataImageStr, encodeSVGDataImage
 };

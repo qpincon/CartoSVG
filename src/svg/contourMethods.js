@@ -1,58 +1,98 @@
 // import SVGO from 'svgo/dist/svgo.browser';
 import svgoConfig from '../svgoExport.config';
 import * as d3 from 'd3';
-import { duplicateContourCleanFirst, encodeSVGDataImage} from './svg';
+import { duplicateContourCleanFirst} from './svg';
 import { appendGlow } from './svgDefs';
 
-function appendLandImageNew(showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, glowParams) {
+
+// Using encodeURIComponent() as replacement function
+// allows to keep result code readable
+// should be in svg.js, but wif we import, the toString method on function will not work properly
+function encodeSVGDataImage(data) {
+    const symbols = /[\r\n%#()<>?[\\\]^`{|}]/g;
+    if (data.indexOf(`http://www.w3.org/2000/svg`) < 0) {
+      data = data.replace(/<svg/g, `<svg xmlns='http://www.w3.org/2000/svg'`);
+    }
+    data = data.replace(/"/g, `'`);
+    data = data.replace(/>\s{1,}</g, `><`);
+    data = data.replace(/\s{2,}/g, ` `);
+    data = data.replace(symbols, encodeURIComponent);
+    return `data:image/svg+xml,${data}`
+}
+const encodeSVGDataImageStr = encodeSVGDataImage.toString();
+
+function imageFromSpecialGElem(gElem) {
+    const embeddedSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    embeddedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    embeddedSvg.setAttribute('preserveAspectRatio', 'none');
+    embeddedSvg.innerHTML = gElem.innerHTML;
+    const imageElem = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+    [...gElem.attributes].forEach( attr => {
+        if (attr.nodeName.includes('image-')) {
+            const attrName = attr.nodeName.slice(6);
+            imageElem.setAttribute(attrName ,attr.nodeValue);
+        }
+        else {
+            embeddedSvg.setAttribute(attr.nodeName ,attr.nodeValue) }
+        }
+    );
+    const optimized = encodeSVGDataImage(embeddedSvg.outerHTML);
+    imageElem.setAttribute('href', optimized);
+    return imageElem;
+}
+const imageFromSpecialGElemStr = imageFromSpecialGElem.toString();
+
+function appendLandImageNew(showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, glowParams, animate) {
     // for not having glow effect on sides of view where there is land
     const offCanvasWithBorder = 20 - (borderWidth / 2);
-    d3.select(this).style('pointer-events', 'none')
-        .style('will-change', 'opacity');
-    const landElem = d3.create('svg')
-        .attr('xmlns', "http://www.w3.org/2000/svg")
-        .attr('viewBox', `${-offCanvasWithBorder/2} ${-offCanvasWithBorder/2} ${width + offCanvasWithBorder} ${height + offCanvasWithBorder}`)
-        .attr('preserveAspectRatio', 'none');
+    d3.select(this).attr('id', 'land')
+        .style('pointer-events', 'none')
+        .style('will-change', 'opacity')
 
-        
-    landElem.append('g')
-        .attr('stroke', contourParams.strokeColor)
-        .attr('stroke-width', contourParams.strokeWidth)
-        .attr('stroke-dasharray', contourParams.strokeDash)
-        .attr('fill', 'none')
-        .selectAll('path')
-        .data(land.features ? land.features : land)
-        .join('path')
-        .attr('d', (d) => {return pathLarger(d)});
-        
-    if (showSource) {
-        landElem.select('g').attr('fill', contourParams.fillColor);
-    }
-    const optimized = encodeSVGDataImage(landElem.node().outerHTML);
-    const img = d3.select(this).append('image')
-            .attr('x', -offCanvasWithBorder/2).attr('y', -offCanvasWithBorder/2)
-            .attr('width', width + (offCanvasWithBorder )).attr('height', height + (offCanvasWithBorder))
-            .attr('href', optimized)
-            .style('pointer-events', 'none')
-            .style('will-change', 'opacity')
-            .classed('contour-to-dup', true)
-            .classed('glow-img', true)
+    const parent = d3.select(this);
+    let gElem = parent.select('g');
+    let transitionOut = !animate && !gElem.empty();
+    if (gElem.empty()) {
+        gElem = parent.append('g')
+            .attr('stroke', contourParams.strokeColor)
+            .attr('stroke-width', contourParams.strokeWidth)
+            .attr('stroke-dasharray', contourParams.strokeDash)
+            .attr('fill', 'none')
+            .attr('viewBox', `${-offCanvasWithBorder/2} ${-offCanvasWithBorder/2} ${width + offCanvasWithBorder} ${height + offCanvasWithBorder}`)
             
-    
-    let filterName = zonesFilter['land'];
-    if(filterName) {
-        if (showSource) {
-            filterName = `${zonesFilter['land']}-with-source`;
-            appendGlow(d3.select('#static-svg-map'), filterName, showSource, glowParams);
+            .attr('image-x', -offCanvasWithBorder/2)
+            .attr('image-y', -offCanvasWithBorder/2)
+            .attr('image-width', width + (offCanvasWithBorder ))
+            .attr('image-height', height + (offCanvasWithBorder))
+            .attr('image-class', 'contour-to-dup glow-img');
+            
+        gElem.selectAll('path')
+            .data(land.features ? land.features : land)
+            .join('path')
+            .attr('pathLength', 1)
+            .attr('d', (d) => {return pathLarger(d)});
+        let filterName = zonesFilter['land'];
+        if(filterName) {
+            if (showSource) {
+                filterName = `${zonesFilter['land']}-with-source`;
+                appendGlow(d3.select('#static-svg-map'), filterName, showSource, glowParams);
+            }
+            gElem.attr('image-filter-name', filterName);
         }
-        img.attr('filter-name', filterName);
     }
+    if (showSource) {
+        parent.select('g').attr('fill', contourParams.fillColor);
+    }
+    if (animate) return;
+    const imageElem = imageFromSpecialGElem(gElem.node());
+    this.append(imageElem);
 }
 
-function appendCountryImageNew(countryData, filter, applyStyles, path, inlineStyles) {
-    d3.select(this).html('');
+function appendCountryImageNew(countryData, filter, applyStyles, path, inlineStyles, animate, clear = false) {
+    if (clear) d3.select(this).html('');
     const countryName = countryData.properties.name;
     const ref = document.getElementById(countryName);
+
     // if country not present or no stroke width and no filter, do nothing
     if (filter === null) {
         const strokeWidth = inlineStyles[countryName]?.['stroke-width'];
@@ -61,35 +101,39 @@ function appendCountryImageNew(countryData, filter, applyStyles, path, inlineSty
     }
     applyStyles(true);
     d3.select(this).style('pointer-events', 'none')
-        .style('will-change', 'opacity');
+        .style('will-change', 'opacity')
+        .classed('country-img', true);
 
-    const countryElem = d3.create('svg')
-        .attr('xmlns', "http://www.w3.org/2000/svg");
-    
-    countryElem.append('path')
-        .attr('d', path(countryData))
-        .attr('fill', 'none');
-
+    const parent = d3.select(this);
+    let gElem = parent.select('g');
+    if (gElem.empty()) {
+        gElem = parent.append('g')
+            .attr('image-width', '100%')
+            .attr('image-height', '100%')
+            .attr('image-class', 'contour-to-dup glow-img')
+            .attr('image-filter-name', filter);
+        gElem.append('path')
+            .attr('d', path(countryData))
+            .attr('pathLength', 1)
+            .attr('fill', 'none');
+    }
+    const pathElem = gElem.select('path');
     if (ref) {
         const strokeParams = ['stroke', 'stroke-width', 'stroke-linejoin', 'stroke-dasharray'];
         const computedRef = window.getComputedStyle(ref);
         strokeParams.forEach(p => {
-            countryElem.attr(p, computedRef[p])
+            pathElem.attr(p, computedRef[p])
         });
         ref.style['stroke-width'] = '0px';
     }
-    // const optimized = encodeSVGDataImage(SVGO.optimize(countryElem.node().outerHTML, svgoConfig).data);
-    const optimized = encodeSVGDataImage(countryElem.node().outerHTML);
-    d3.select(this).append('image').attr('width', '100%').attr('height', '100%')
-            .attr('href', optimized)
-            .style('pointer-events', 'none')
-            .style('will-change', 'opacity')
-            .classed('contour-to-dup', true)
-            .classed('glow-img', true)
-            .attr('filter-name', filter);
+    if (animate) return;
+    const imageElem = imageFromSpecialGElem(gElem.node());
+    this.append(imageElem);
     // remove all cloned filter elements
-    const svgElem = document.getElementById('static-svg-map');
-    duplicateContourCleanFirst(svgElem);
+    if (clear) {
+        const svgElem = document.getElementById('static-svg-map');
+        duplicateContourCleanFirst(svgElem);
+    }
 }
 
 
@@ -226,4 +270,5 @@ function appendCountryImage(countryData, filter) {
         .style('will-change', 'opacity');
 }
 
-export {appendLandImageNew, appendLandImage, appendLandDefAndUse, appendCountryDefAndUse, appendCountryImageNew, appendCountryImage};
+export {appendLandImageNew, appendLandImage, appendLandDefAndUse, appendCountryDefAndUse, 
+    appendCountryImageNew, appendCountryImage, imageFromSpecialGElem, imageFromSpecialGElemStr, encodeSVGDataImage, encodeSVGDataImageStr };

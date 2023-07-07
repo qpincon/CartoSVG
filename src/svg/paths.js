@@ -7,10 +7,14 @@ export function drawCustomPaths(pathDefs, svg, projection, inlineStyles = {}) {
     let elem = svg.select('#paths');
     if (elem.empty()) elem = svg.append('g').attr('id', 'paths');
     else elem.html('');
+    let exists = false;
     const images = {}; // imageName => content
     let imagesElem = svg.select('#path-images');
     if (imagesElem.empty()) imagesElem = svg.append('g').attr('id', 'path-images');
-    else imagesElem.html('');
+    else {
+        imagesElem.html('');
+        exists = true;
+    }
     pathDefs.forEach((pathDef, index) => {
         if (pathDef.image) {
             if (!(pathDef.image.name in images)) {
@@ -18,7 +22,7 @@ export function drawCustomPaths(pathDefs, svg, projection, inlineStyles = {}) {
             }
         }
         const id = `path-${index}`;
-        const pathElem = elem.append('path').attr('id', id);
+        const pathElem = elem.append('path').attr('id', id).attr('pathLength', exists ? null : 1);
         if (pathDef.marker) {
             let color = inlineStyles[id]?.stroke;
             if (!color) {

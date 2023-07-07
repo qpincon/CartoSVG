@@ -111,7 +111,6 @@
                       id={`form-${key}`}
                       bind:checked={sections[title][key]}
                       on:change={(e) => {
-                        console.log(e);
                         propChanged(key, e.target.checked);
                       }}
                     />

@@ -53,7 +53,7 @@ function addSvgText(text, id) {
     const textElem = d3.create('svg:text')
         .style('stroke-width', 0)
         .attr('id', id);
-
+        
     const countPrefixSpace = str => {
         let i = 0;
         while (i < str.length && str[i] === ' ') ++i;

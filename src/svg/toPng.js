@@ -1,6 +1,6 @@
 
 
-import { encodeSVGDataImage } from "./svg";
+import { encodeSVGDataImage } from "./contourMethods";
 
 function svgToPng(encodedSvg, width, height) {
     encodedSvgToBase64Png(encodedSvg, width, height).then(pngSrc => {

@@ -6,6 +6,7 @@ let defaultParams = {
         projection: 'satellite',
         fieldOfView: 50,
         altitude: 3200,
+        animate: true,
     },
     Border: {
         borderRadius: 1.5,
@@ -69,6 +70,7 @@ const helpParams = {
     innerBlur: blurHelp, 
     innerStrength: strengthHelp,
     useViewBox: `If checked, the exported SVG will fit to its container and will not define its own width/height.`,
+    animate: `The map will animate when entering the viewport on your page. You can turn it off during edition of the map, as it will trigger on every change.`,
 };
 
 export {defaultParams, paramDefs, helpParams, noSatelliteParams };
