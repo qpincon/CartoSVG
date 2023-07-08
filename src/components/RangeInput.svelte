@@ -10,23 +10,28 @@
     export let id = "rangeinputid";
     export let helpText;
 
+    // props are passed as strings most of the time
+    $: _step = parseFloat(step);
+    $: _min = parseFloat(min);
+    $: _max = parseFloat(max);
+
     function countDecimals(val) {
         if(Math.floor(val.valueOf()) === val.valueOf()) return 0;
         return val.toString().split(".")[1].length || 0; 
     }
 
-    $:nbDecimals = countDecimals(step);
+    $:nbDecimals = countDecimals(_step);
     const increment = () => {
-        if (value === null) value = step;
-        else if (value === max) return;
-        else value += step;
+        if (value === null) value = _step;
+        else if (value === _max) return;
+        else value += _step;
         onChange(value);
     };
 
     const decrement = () => {
-        if (value === null) value = min;
-        else if (value === min) return;
-        else value -= step;
+        if (value === null) value = _min;
+        else if (value === _min) return;
+        else value -= _step;
         onChange(value);
     };
 </script>
@@ -49,9 +54,9 @@
             class="form-range"
             {id}
             bind:value
-            {min}
-            {max}
-            {step}
+            {_min}
+            {_max}
+            {_step}
             on:change={(e) => onChange(parseFloat(e.target.value))}
         />
         <div class="d-flex align-items-center">

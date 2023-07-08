@@ -27,6 +27,7 @@ function imageFromSpecialGElem(gElem) {
     embeddedSvg.setAttribute('preserveAspectRatio', 'none');
     embeddedSvg.innerHTML = gElem.innerHTML;
     const imageElem = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+    embeddedSvg.querySelectorAll('path[pathLength]').forEach(el => {el.removeAttribute('pathLength')});
     [...gElem.attributes].forEach( attr => {
         if (attr.nodeName.includes('image-')) {
             const attrName = attr.nodeName.slice(6);
@@ -51,7 +52,6 @@ function appendLandImageNew(showSource, zonesFilter, width, height, borderWidth,
 
     const parent = d3.select(this);
     let gElem = parent.select('g');
-    let transitionOut = !animate && !gElem.empty();
     if (gElem.empty()) {
         gElem = parent.append('g')
             .attr('stroke', contourParams.strokeColor)

@@ -48,6 +48,9 @@ const config = {
                 use: {
                     loader: 'svelte-loader',
                     options: {
+                        compilerOptions: {
+                            dev: !isProduction
+                        },
                         preprocess: sveltePreprocess({
                             scss: {
                                 renderSync: true,

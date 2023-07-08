@@ -38,7 +38,7 @@
     }
 </script>
 
-<form on:change={sendChange} class="m-2">
+<form on:change={sendChange} class="m-2 mt-3">
     <div class="d-flex align-items-center">
         <div class="btn-group" role="group">
             <input

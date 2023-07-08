@@ -289,6 +289,9 @@ let currentTab = 'countries';
 let mainMenuSelection = 0;
 $: if (true || mainMenuSelection) { tick().then(() => initTooltips()); }
 let editingPath = false;
+
+// This contains the common CSS that can ben editor with inline-css-editor
+// we also have a special svelte:head element containing all CSS that is not in baseCss (border style, legend colors, etc.)
 let commonStyleSheetElem;
 let zoomFunc;
 let dragFunc;
@@ -378,6 +381,7 @@ onMount(async() => {
     document.body.append(contextualMenu);
     contextualMenu.style.display = 'none';
     contextualMenu.style.position = 'absolute';
+    contextualMenu.opened = false;
     attachListeners();
 });
 
@@ -1077,6 +1081,7 @@ function handleChangeProp(event) {
 
 function closeMenu() {
     contextualMenu.style.display = 'none';
+    contextualMenu.opened = false;
     menuStates.chosingPoint = false;
     menuStates.pointSelected = false;
     menuStates.addingLabel = false;
@@ -1152,6 +1157,7 @@ function drawAndSetupShapes() {
 function showMenu(e, target = null) {
     openContextMenuInfo = {event: e, position: projection.invert(d3.pointer(e))};
     openContextMenuInfo.target = target ? target : e.target;
+    contextualMenu.opened = true;
     contextualMenu.style.display = 'block';
     contextualMenu.style.left = e.pageX + "px";
     contextualMenu.style.top = e.pageY + "px";
@@ -1226,18 +1232,24 @@ function handleDataImport(e) {
         try {
             let parsed = JSON.parse(reader.result);
             const currentNames = new Set(zonesData[currentTab].data.map(line => line.name));
+            currentNames.delete(undefined);
             if (!Array.isArray(parsed)) {
                 return window.alert("JSON should be a list of objects, each object reprensenting a line.");
             }
+            const noNameLinesMsg = parsed.reduce((errorMsg, entry, index) => {
+                if (entry.name === undefined) {
+                    errorMsg += `Entry ${index} is ${JSON.stringify(entry)} \n`;
+                }
+                return errorMsg;
+            }, '');
             if (parsed.some(line => line.name === undefined )) {
-                return window.alert("All lines should have a 'name' property.");
+                return window.alert(`All lines should have a 'name' property \n${noNameLinesMsg}`);
             }
             const newNames = new Set(parsed.map(line => line.name));
             const difference = new Set([...currentNames].filter((x) => !newNames.has(x)));
             if (difference.size) {
                 return window.alert(`Missing names ${[...difference]}`);
             }
-            // parsed = sortBy(parsed, 'name');
             zonesData[currentTab] = {data: parsed, provided:true, numericCols: getNumericCols(parsed) };
             getZonesDataFormatters();
             autoSelectColors();
@@ -1576,7 +1588,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
 	{@html `<${''}style> ${cssFonts} </${''}style>`}
 </svelte:head>
 
-<div id="contextmenu" class="border rounded" bind:this={contextualMenu}>
+<div id="contextmenu" class="border rounded" bind:this={contextualMenu} class:hidden={!contextualMenu?.opened}>
     {#if menuStates.chosingPoint}
         {#each Object.keys(shapes) as shapeName (shapeName)}
             <div role="button" class="px-2 py-1" on:click={() => addShape(shapeName)}> { shapeName } </div>
@@ -1833,7 +1845,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                                     </div>
                                 {/if}
                                     <!-- LEGEND -->
-                                    <div class="mx-2 form-check form-switch">
+                                    <div class="mx-2 form-check form-switch" >
                                         <input
                                             type="checkbox" class="form-check-input" id='showLegend' role="switch"
                                             bind:checked={colorDataDefs[currentTab].legendEnabled}
