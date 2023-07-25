@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>CartoSVG</title>
+
+  <style>
+    /* latin */
+    @font-face {
+      font-family: 'Open Sans';
+      font-style: normal;
+      font-weight: 300;
+      font-stretch: 100%;
+      font-display: swap;
+      src: url(https://fonts.gstatic.com/s/opensans/v35/memvYaGs126MiZpBA-UvWbX2vVnXBbObj2OVTS-muw.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+
+    @font-face {
+      font-family: 'Open Sans';
+      font-style: normal;
+      font-weight: 600;
+      font-stretch: 100%;
+      font-display: swap;
+      src: url(https://fonts.gstatic.com/s/opensans/v35/memvYaGs126MiZpBA-UvWbX2vVnXBbObj2OVTS-muw.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+
+    body,
+    html {
+      height: 100%;
+      line-height: 2;
+      font-family: 'Open Sans', sans-serif;
+      padding: 0;
+      margin: 0;
+    }
+
+    #intro {
+      display: flex;
+      align-items: center;
+      position: relative;
+      max-width: 900px;
+      width: 100%;
+      height: 480px;
+      margin: 0 auto;
+      color: white;
+    }
+
+
+    .hero {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: absolute;
+      width: 100%;
+      min-height: 480px;
+      height: 45vh;
+      max-height: 560px;
+      box-sizing: border-box;
+      padding: 48px 48px 32px 48px;
+      overflow: hidden;
+      transform: skewY(-7deg);
+      transform-origin: 0;
+    }
+
+    .background {
+      background: linear-gradient(45deg, #0d47a1, #42a5f5);
+      color: #000000de;
+    }
+
+    section#intro .hero-headline {
+      font-size: 3rem;
+      line-height: 64px;
+      line-height: 4.2rem;
+      font-weight: 600;
+      margin: 32px 0;
+      color: inherit;
+    }
+
+    section#intro .homepage-container {
+      width: 50%;
+      max-width: 1040px;
+      margin: -7% auto 0;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+
+    .home-row {
+      max-width: 920px;
+      margin: 32px auto;
+    }
+
+    .text-container:not(:last-child) {
+      padding-right: 5%;
+
+      @media (max-width: 600px) {
+        padding-right: 0;
+      }
+    }
+
+    section#intro .hero-logo {
+      display: flex;
+      min-width: 200px;
+      height: 275px;
+      margin-bottom: 8px;
+      margin-left: auto;
+    }
+
+    /* #72bcff
+#72a5e7
+#acd6ff
+#df9d88
+#ffb788 */
+
+    .text-headline {
+      font-weight: 600;
+      margin-top: 10px;
+      text-transform: uppercase;
+      color: #1976d2;
+      white-space: nowrap;
+    }
+
+
+    div[layout=row] {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      box-sizing: border-box;
+
+      @media (max-width: 600px) {
+        display: block;
+      }
+    }
+
+    .cta-link {
+      margin: auto;
+    }
+
+    .button.hero-cta {
+      padding: 5px 34px;
+      font-size: 1.5rem;
+      font-weight: 600;
+      line-height: 40px;
+      line-height: 4rem;
+      border-radius: 48px;
+      box-shadow: 0 2px 5px #00000080;
+      box-sizing: border-box;
+      cursor: pointer;
+      background-color: white;
+    }
+
+    a.button {
+      color: #1976d2;
+      text-decoration: none;
+      text-transform: uppercase;
+      overflow: hidden;
+      border: none;
+    }
+
+    p {
+      margin: 1em 0;
+    }
+
+    p,
+    ol,
+    ul,
+    li,
+    input,
+    a {
+      color: #444;
+      font-size: 1.4rem;
+    }
+
+    .home-row {
+      max-width: 920px;
+      margin: 32px auto;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      margin-bottom: 0;
+      font-weight: 600;
+      font-size: 2rem;
+    }
+
+    .example-map {
+      max-width: 700px;
+      margin: auto;
+    }
+    .text-body {
+      margin-top: 2rem;
+      line-height: 2.6rem;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <header>
+    <!-- BACKGROUND IMAGE -->
+    <div class="background hero"></div>
+    <!-- INTRO SECTION -->
+    <section id="intro">
+      <!-- LOGO -->
+      <div class="hero-logo">
+        <img src="<%=require('./src/assets/img/logo_transparent.webp')%>">
+      </div>
+      <!-- CONTAINER -->
+      <div class="homepage-container">
+        <h1 class="hero-headline no-title no-toc no-anchor" aria-label="Angular - Deliver web apps with confidence"
+          id="--------deliver-web-appswith-confidence------">
+          Elegant, simple interactive maps
+        </h1>
+        <div class="cta-button-container">
+          <p class="cta-link">
+            <a class="button hero-cta no-print" href="/app">Launch the app</a>
+          </p>
+        </div>
+      </div>
+    </section>
+  </header>
+
+  <article>
+    <div class="home-row">
+      <section aria-labelledby="promo-0-title" class="text-block">
+        <h2 id="promo-0-title" class="no-anchor">Design gorgeous and lightweight SVG maps with ease </h2>
+      </section>
+    </div>
+    <div layout="row" class="home-row homepage-container">
+      <div class="text-container">
+        <section aria-labelledby="promo-1-title" class="text-block">
+          <h2 id="promo-1-title" class="text-headline no-anchor">Interactive</h2>
+          <p class="text-body">CartoSVG uses SVG elements, which are interactive by nature.
+          </p>
+        </section>
+      </div>
+      <div class="text-container">
+        <section aria-labelledby="promo-2-title" class="text-block promo-2-desc">
+          <h2 id="promo-2-title" class="text-headline no-anchor">Beautiful</h2>
+          <p class="text-body">The maps are given depth through filters and rich styling possibilities.
+          </p>
+        </section>
+      </div>
+      <div class="text-container">
+        <section aria-labelledby="promo-3-title" class="text-block l-pad-top-2">
+          <h2 id="promo-3-title" class="text-headline no-anchor">Simple</h2>
+          <p class="text-body">Just copy / paste the exported file into your HTML, and you're done!.</p>
+        </section>
+      </div>
+      <div class="text-container">
+        <section aria-labelledby="promo-3-title" class="text-block l-pad-top-2">
+          <h2 id="promo-3-title" class="text-headline no-anchor">Small footprint</h2>
+          <p class="text-body">The final file size is made as small as possible using diverse optimization techniques.
+          </p>
+        </section>
+      </div>
+    </div>
+  </article>
+
+  <div class="home-row">
+    <section aria-labelledby="promo-0-title" class="text-block">
+      <h2 id="promo-0-title" class="no-anchor">Examples </h2>
+
+      <% htmlWebpackPlugin.options.svgs.forEach(function(svgDefinition){ %>
+        <p>
+          <%= svgDefinition.description %>
+        </p>
+        <div class="example-map">
+          <%= svgDefinition.content %>
+        </div>
+        <% }); %>
+    </section>
+  </div>
+</body>
+
+</html>

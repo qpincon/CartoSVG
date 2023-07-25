@@ -1,11 +1,11 @@
 export const transitionCss = `
 
-.animate-transition path, .animate-transition #graticule, .animate-transition image, .animate-transition text, .animate-transition #points-labels, .animate-transition #svg-map-legend *, .animate-transition #path-images {
+.animate-transition path, .animate-transition #graticule, .animate-transition #outline, .animate-transition image, .animate-transition text, .animate-transition #points-labels, .animate-transition #svg-map-legend *, .animate-transition #path-images {
     transition-property: fill-opacity, opacity;
     transition-duration: 1s;
     transition-timing-function: ease;
 }
-.animate-transition #graticule {
+.animate-transition #graticule, .animate-transition #outline {
     transition-delay: 0.5s;
 }
 .animate path, .animate rect, .animate circle {

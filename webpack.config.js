@@ -122,8 +122,13 @@ const config = {
     ],
 };
 
+const svgDefs = [];
 Object.entries(examplesMeta).forEach(([exampleName, description]) => {
     config.entry[exampleName] = `./src/examples/${exampleName}.js`;
+    const svgDef = {
+        content: fs.readFileSync(`./src/examples/${exampleName}.svg`),
+        description: description.title
+    }
     const plugin = new HtmlWebpackPlugin({
         template: './src/index.ejs',
         title: description.title,
@@ -133,13 +138,25 @@ Object.entries(examplesMeta).forEach(([exampleName, description]) => {
         filename: `${exampleName}.html`,
         chunks: [exampleName],
         favicon: './src/assets/img/logo_transparent.webp',
-        svgcontent: fs.readFileSync(`./src/examples/${exampleName}.svg`),
+        svgcontent: svgDef.content
     });
     config.plugins.push(plugin);
+    svgDefs.push(svgDef);
 });
+
+const frontPagePlugin = new HtmlWebpackPlugin({
+    template: './frontPage.ejs',
+    filename: `frontpage.html`,
+    favicon: './src/assets/img/logo_transparent.webp',
+    svgs: svgDefs,
+    inject: false
+});
+config.plugins.push(frontPagePlugin);
 
 if (!isProduction) {
     config.devtool = 'source-map';
 }
+
+console.log(config.plugins);
 
 module.exports = config;

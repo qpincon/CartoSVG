@@ -2017,9 +2017,6 @@ function getLegendColors(dataColorDef, tab, scale, data) {
 </Modal>
 
 <style lang="scss" scoped>
-.text-nowrap {
-    white-space: nowrap;
-}
 #params {
     flex: 1 1 400px;
     min-width: 300px;
