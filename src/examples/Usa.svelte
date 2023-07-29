@@ -16,7 +16,7 @@
             datamaps example.</a
         ><br />
         It features how the custom palette can be applied on categorical data to do a choropleth map. <br/>
-        The exported file weights ~50Ko.
+        The exported file weights ~30Ko.
     </p>
 </div>
 

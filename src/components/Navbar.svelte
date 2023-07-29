@@ -5,7 +5,7 @@
 </script>
 
 <div id="navbar">
-  <a href="/" class="logo">
+  <a href="app.html" class="logo">
     <img src={logo} alt="Logo" height="50" width="140" />
   </a>
   {#if activeTitle === "index.html"}

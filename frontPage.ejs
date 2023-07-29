@@ -67,8 +67,17 @@
       transform-origin: 0;
     }
 
+
+    /* #163b85
+#2f4d97
+#4360a8
+#5773ba
+#6a87cc
+#7e9cde
+*/
+
     .background {
-      background: linear-gradient(45deg, #0d47a1, #42a5f5);
+      background: linear-gradient(45deg, #163b85, #7e9cde);
       color: #000000de;
     }
 
@@ -110,17 +119,12 @@
       margin-left: auto;
     }
 
-    /* #72bcff
-#72a5e7
-#acd6ff
-#df9d88
-#ffb788 */
 
     .text-headline {
       font-weight: 600;
       margin-top: 10px;
       text-transform: uppercase;
-      color: #1976d2;
+      color: #4360a8;
       white-space: nowrap;
     }
 
@@ -152,9 +156,8 @@
       cursor: pointer;
       background-color: white;
     }
-
     a.button {
-      color: #1976d2;
+      color: #4360a8;
       text-decoration: none;
       text-transform: uppercase;
       overflow: hidden;
@@ -190,14 +193,24 @@
       font-weight: 600;
       font-size: 2rem;
     }
+    h1 {
+      font-size: 3rem;
+    }
 
     .example-map {
       max-width: 700px;
       margin: auto;
+      margin-bottom: 7rem;
     }
     .text-body {
       margin-top: 2rem;
       line-height: 2.6rem;
+    }
+    footer {
+      background-color: #4360a8;
+      color: white;
+      padding: 0.5rem;
+      text-align: right;
     }
   </style>
 
@@ -222,7 +235,7 @@
         </h1>
         <div class="cta-button-container">
           <p class="cta-link">
-            <a class="button hero-cta no-print" href="/app">Launch the app</a>
+            <a class="button hero-cta no-print" href="app.html">Launch the app</a>
           </p>
         </div>
       </div>
@@ -253,13 +266,13 @@
       <div class="text-container">
         <section aria-labelledby="promo-3-title" class="text-block l-pad-top-2">
           <h2 id="promo-3-title" class="text-headline no-anchor">Simple</h2>
-          <p class="text-body">Just copy / paste the exported file into your HTML, and you're done!.</p>
+          <p class="text-body">Just copy / paste the exported file into your HTML, and you're done!</p>
         </section>
       </div>
       <div class="text-container">
         <section aria-labelledby="promo-3-title" class="text-block l-pad-top-2">
           <h2 id="promo-3-title" class="text-headline no-anchor">Small footprint</h2>
-          <p class="text-body">The final file size is made as small as possible using diverse optimization techniques.
+          <p class="text-body">The final file size is made as small as possible using diverse optimization techniques, and compresses well.
           </p>
         </section>
       </div>
@@ -268,18 +281,20 @@
 
   <div class="home-row">
     <section aria-labelledby="promo-0-title" class="text-block">
-      <h2 id="promo-0-title" class="no-anchor">Examples </h2>
+      <h1 id="promo-0-title" class="no-anchor">Examples </h1>
 
       <% htmlWebpackPlugin.options.svgs.forEach(function(svgDefinition){ %>
-        <p>
-          <%= svgDefinition.description %>
-        </p>
+        <h2 > <%= svgDefinition.title %> </h2>
+        <p>  <%= svgDefinition.description %> </p>
         <div class="example-map">
           <%= svgDefinition.content %>
         </div>
         <% }); %>
     </section>
   </div>
+  <footer>
+    CartoSVG ©2023
+  </footer>
 </body>
 
 </html>

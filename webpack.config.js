@@ -107,6 +107,7 @@ const config = {
                 description: 'CartoSVG is a SVG map editor to create, tweak and export rich and splendid visualizations. It allows customization by binding data, displaying tooltips, drawing choropleth, and provides optimizations for exporting the SVG file as light as possible.'
             },
             chunks: ['main'],
+            filename: 'app.html',
             favicon: './src/assets/img/logo_transparent.webp'
         }),
         new HtmlWebpackPlugin({
@@ -127,7 +128,8 @@ Object.entries(examplesMeta).forEach(([exampleName, description]) => {
     config.entry[exampleName] = `./src/examples/${exampleName}.js`;
     const svgDef = {
         content: fs.readFileSync(`./src/examples/${exampleName}.svg`),
-        description: description.title
+        title: description.title,
+        description: `See the <a href="${exampleName}.html">standalone example in the app </a> for more information`
     }
     const plugin = new HtmlWebpackPlugin({
         template: './src/index.ejs',
@@ -146,7 +148,6 @@ Object.entries(examplesMeta).forEach(([exampleName, description]) => {
 
 const frontPagePlugin = new HtmlWebpackPlugin({
     template: './frontPage.ejs',
-    filename: `frontpage.html`,
     favicon: './src/assets/img/logo_transparent.webp',
     svgs: svgDefs,
     inject: false
@@ -156,7 +157,5 @@ config.plugins.push(frontPagePlugin);
 if (!isProduction) {
     config.devtool = 'source-map';
 }
-
-console.log(config.plugins);
 
 module.exports = config;

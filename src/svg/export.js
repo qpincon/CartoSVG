@@ -3,13 +3,28 @@ import svgoConfigText from '../svgoExportText.config';
 
 import { imageFromSpecialGElemStr, encodeSVGDataImageStr } from '../svg/contourMethods';
 import { htmlToElement } from '../util/common';
-import { indexBy, pick, download } from '../util/common';
+import { indexBy, pick, download, discriminateCssForExport } from '../util/common';
 import { reportStyle, reportStyleElem, fontsToCss, getUsedInlineFonts } from '../util/dom';
 
 const domParser = new DOMParser();
 
 const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`
-
+// regular function
+function isHexColor (hex) {
+    return (hex.length === 6 || hex.length === 3 || hex.length === 8) && !isNaN(Number('0x' + hex))
+}
+const replaceReferenceValue = (value, prefix) => {
+    let newValue;
+    // discriminate colors in hex notation
+    if (value[0] === '#' && !isHexColor(value.slice(1))) {
+        newValue = `#${prefix}-${value.slice(1)}`
+    }
+    if (value.slice(0, 3) === 'url') {
+        const existing = value.match(/url\(#(.*)\)/)[1];
+        newValue = `url(#${prefix}-${existing})`;
+    } 
+    return newValue;
+};
 const exportFontChoices = Object.freeze({
     noExport: 0,
     convertToPath: 1,
@@ -142,6 +157,53 @@ async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
         return true;
     }
     return false;
+}
+
+const urlUsingAttributes = ['marker-start', 'marker-mid', 'marker-end', 'clip-path', 'fill', 'filter', '*|href'];
+function changeIdAndReferences(exportedMapElem, newMapId) {
+    // change SVG definitions IDs
+    exportedMapElem.querySelectorAll('defs > [id], #paths > [id]').forEach(elem => {
+        const existingId = elem.getAttribute('id');
+        elem.setAttribute('id', `${newMapId}-${existingId}`);
+    });
+    
+    // change image-filter-name special attribute for contours
+    exportedMapElem.querySelectorAll('[image-filter-name]').forEach(elem => {
+        const existingFilterName = elem.getAttribute('image-filter-name');
+        elem.setAttribute('image-filter-name', `${newMapId}-${existingFilterName}`);
+    });
+
+    // change inline styles with url(#...)
+    exportedMapElem.querySelectorAll('[style*="url"]').forEach(elem => {
+        for (const prop in elem.style) {
+            if (elem.style.hasOwnProperty(prop)) {
+                const propValue = elem.style[prop];
+                if (!propValue.includes('url')) return;
+                const newValue = replaceReferenceValue(propValue, newMapId);
+                if (newValue) elem.style[prop] = newValue;
+            }
+        }
+    });
+    // change SVG elements attributes that could contain a reference to another element
+    exportedMapElem.querySelectorAll(urlUsingAttributes.map(x => `[${x}]`).join(',')).forEach(elem => {
+        console.log(elem);
+        for (const attributeName of urlUsingAttributes) {
+            let attributesToCheck = [attributeName];
+            if (attributeName.includes('href')) attributesToCheck = ['href', 'xlink:href'];
+            for (const finalAttributeName of attributesToCheck) {
+                const attribute = elem.getAttribute(finalAttributeName);
+                if (!attribute) continue;
+                const newValue = replaceReferenceValue(attribute, newMapId);
+                if (newValue) elem.setAttribute(finalAttributeName, newValue);
+            }
+        }
+    });
+    // remove ids from path elements
+    // exportedMapElem.querySelectorAll('.choro').forEach(layerElem => {
+    //     layerElem.childNodes.forEach(el => {
+    //         el.removeAttribute('id');
+    //     });
+    // });
 }
 
 // to insert at the end to have mapElement object defined
@@ -359,6 +421,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         }
     }` : '';
     let finalScript = `
+    (function() {
         ${encodeSVGDataImageStr}
         ${imageFromSpecialGElemStr}
         function duplicateContours(svgElem, transition=false) {
@@ -398,13 +461,22 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         ${tooltipCode}
         ${onMouseEvents}
         ${animated ? intersectionObservingPart : 'gElemsToImages()'}
+    })()
         `;
 
+    // === Styling ===
     const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
     const renderedCss = commonCss.replaceAll(/rgb\(.*?\)/g, rgb2hex) + additionnalCssExport;
-    styleElem.innerHTML = pathIsBetter ? renderedCss : renderedCss + fontsToCss(usedProvidedFonts);
+    const {mapId, finalCss } = discriminateCssForExport(renderedCss);
+    optimizedSVG.firstChild.setAttribute('id', mapId);
+    changeIdAndReferences(optimizedSVG.firstChild, mapId);
+    // === End styling ===
+
+    styleElem.innerHTML = pathIsBetter ? finalCss : finalCss + fontsToCss(usedProvidedFonts);
     optimizedSVG.firstChild.append(styleElem);
+    optimizedSVG.firstChild.classList.remove('animate-transition');
     if (!downloadExport) return optimizedSVG.firstChild.outerHTML;
+    console.log(finalScript);
     if (minifyJs != false) {
         const terser = await import('terser');
         finalScript = await terser.minify(finalScript, { toplevel: true, mangle: {eval: true, reserved: ['data', 'shapeId']}});

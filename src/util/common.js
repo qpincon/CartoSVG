@@ -151,4 +151,34 @@ function RGBAToHexA(rgba, forceRemoveAlpha = false) {
       .join("") // Puts the array to togehter to a string
   }
 
-export { download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, sortBy, pick, htmlToElement, getNumericCols, initTooltips, getBestFormatter, tapHold, RGBAToHexA, getColumns };
+
+const chars = 'azertyuiopqsdfghjklmwxcvbn-_';
+function randomString(length) {
+    var result = '';
+    for (var i = length; i > 0; --i) result += chars[Math.floor(Math.random() * chars.length)];
+    return result;
+}
+
+
+// see https://stackoverflow.com/a/12578281
+const cssSelectorRegex = /([^\r\n,{}]+)(,(?=[^}]*{)|\s*{)/gm;
+// will
+// - Generate a unique ID for the map 
+// - Replace #static-svg-map with this ID
+// - Prefix all selectors from provided CSS with generated ID
+function discriminateCssForExport(cssToTransform) {
+    const id = randomString(10);
+    cssToTransform = cssToTransform.replaceAll('#static-svg-map', `#${id}`);
+    const replacer = (group) => {
+        if (group.includes('animate')) return group;
+        if (group.includes(id)) return group;
+        if (group.includes('@keyframes') || group.includes('from {') || group.includes('to {')) return group;
+        return `#${id} ${group}`;
+    }
+    const transformed = cssToTransform.replaceAll(cssSelectorRegex, replacer);
+    return {mapId: id, finalCss: transformed };
+}
+
+export { download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, 
+    sortBy, pick, htmlToElement, getNumericCols, initTooltips, getBestFormatter, tapHold, RGBAToHexA, getColumns,
+    discriminateCssForExport };

@@ -134,17 +134,17 @@ let adm0Topo = null;
 let simpleLand = null;
 let openContextMenuInfo;
 
-const typeSizes = {
-  "undefined": () => 0,
-  "boolean": () => 4,
-  "number": () => 8,
-  "string": item => 2 * item.length,
-  "object": item => !item ? 0 : Object
-    .keys(item)
-    .reduce((total, key) => sizeOf(key) + sizeOf(item[key]) + total, 0)
-};
+// const typeSizes = {
+//   "undefined": () => 0,
+//   "boolean": () => 4,
+//   "number": () => 8,
+//   "string": item => 2 * item.length,
+//   "object": item => !item ? 0 : Object
+//     .keys(item)
+//     .reduce((total, key) => sizeOf(key) + sizeOf(item[key]) + total, 0)
+// };
 
-const sizeOf = value => typeSizes[typeof value](value);
+// const sizeOf = value => typeSizes[typeof value](value);
 const adm0LandTopoPromise = import('./assets/layers/world_adm0_simplified.topojson')
     .then(({default:topoAdm0}) => {
         adm0Topo = presimplify(topoAdm0);
@@ -154,18 +154,18 @@ function updateLayerSimplification() {
     updateAdm0LandAndCountries();
     Object.keys(resolvedAdmTopo).forEach(countryAdm => {
         const simplified = simplify(resolvedAdmTopo[countryAdm], visibleArea);
-        const sizeSimp = sizeOf(simplified);
-        const sizeTopo = sizeOf(resolvedAdmTopo[countryAdm]);
-        console.log(countryAdm, 'before', sizeTopo, 'simplified=', sizeSimp, `(${((sizeTopo - sizeSimp) / sizeTopo) * 100}% of reduction)`);
+        // const sizeSimp = sizeOf(simplified);
+        // const sizeTopo = sizeOf(resolvedAdmTopo[countryAdm]);
+        // console.log(countryAdm, 'before', sizeTopo, 'simplified=', sizeSimp, `(${((sizeTopo - sizeSimp) / sizeTopo) * 100}% of reduction)`);
         const firstKey = Object.keys(simplified.objects)[0];
         resolvedAdm[countryAdm] = topojson.feature(simplified, simplified.objects[firstKey]);
     });
 }
 function updateAdm0LandAndCountries() {
     const simplified = simplify(adm0Topo, visibleArea);
-    const sizeSimp = sizeOf(simplified);
-    const sizeTopo = sizeOf(adm0Topo);
-    console.log('before', sizeTopo, 'simplified=', sizeSimp, `(${((sizeTopo - sizeSimp) / sizeTopo) * 100}% of reduction)`);
+    // const sizeSimp = sizeOf(simplified);
+    // const sizeTopo = sizeOf(adm0Topo);
+    // console.log('before', sizeTopo, 'simplified=', sizeSimp, `(${((sizeTopo - sizeSimp) / sizeTopo) * 100}% of reduction)`);
     const firstKey = Object.keys(simplified.objects)[0];
     countries = topojson.feature(simplified, simplified.objects[firstKey]);
     countries.features.forEach(feat => {
@@ -646,12 +646,12 @@ async function draw(simplified = false, _) {
                 };
                 getZonesDataFormatters();
             }
-            groupData.push({ name: 'countries', data: countries, id: 'name', props: [], class: 'country', filter: filter });
+            groupData.push({ name: 'countries', data: countries, id: 'name', props: [], containerClass:'choro', class: 'country', filter: filter });
         }
         if (layer === 'land' && inlineProps.showLand) groupData.push({type: 'landImg', showSource: i === 0});
         // selected country
         else if (layer !== 'countries') {
-            groupData.push({ name: layer, data: resolvedAdm[layer], id: 'name', props: [], class: 'adm', filter: null });
+            groupData.push({ name: layer, data: resolvedAdm[layer], id: 'name', props: [], containerClass:'choro', class: 'adm', filter: null });
             const countryOutlineId = layer.substring(0, layer.length - 5);
             const countryData = countries.features.find(country => country.properties.name === countryOutlineId);
             countryFilteredImages.add(countryOutlineId);
@@ -669,6 +669,7 @@ async function draw(simplified = false, _) {
         if (data.type === 'filterImg') return appendCountryImageNew.call(this, data.countryData, data.filter, applyStyles, path, inlineStyles, animated);
         if (!data.data) return;
         const parentPathElem = d3.select(this).style('will-change', 'opacity'); 
+        if (data.containerClass) parentPathElem.classed(data.containerClass, true);
         const pathElem = parentPathElem.selectAll('path')
             .data(data.data.features ? data.data.features : data.data)
             .join('path')

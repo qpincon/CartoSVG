@@ -6,7 +6,7 @@ let defaultParams = {
         projection: 'satellite',
         fieldOfView: 50,
         altitude: 3200,
-        animate: true,
+        animate: false,
     },
     Border: {
         borderRadius: 1.5,
