@@ -140,7 +140,7 @@
 
     .home-row {
       max-width: 920px;
-      margin: 32px auto;
+      margin: auto;
     }
 
     .text-block {
@@ -201,7 +201,7 @@
 
     .home-row {
       max-width: 920px;
-      margin: 32px auto;
+      margin: auto;
     }
 
     h1,
@@ -226,6 +226,7 @@
     .text-body {
       margin-top: 2rem;
       line-height: 2.6rem;
+      text-align: center;
     }
     footer {
       background-color: #4360a8;
@@ -302,8 +303,21 @@
       </div>
     </div>
     <div class="home-row">
+      <h3> <b> Features: </b> </h3>
+      <ul>
+        <li> Multiple projections available, including "satellite" </li>
+        <li> Beautiful and performant SVG filters </li>
+        <li> Custom graticule density </li>
+        <li> Management of custom fonts and how to export them (can be converted to &lt;path&gt;) </li>
+        <li> Custom data binding for choropleth (numerical and categorical) and tooltip </li>
+        <li> Rich intuitive styling customization, including tooltip on hover </li>
+        <li> Drawing of &lt;path&gt; elements, alowing markers and image animations along it </li>
+      </ul>
+    </div>
+    <div class="home-row">
       <section aria-labelledby="promo-0-title">
         <h1 id="promo-0-title" class="no-anchor">Examples </h1>
+        <p> Here follows 4 examples built with CartoSVG. This entire page weights 470Ko, ~110 gzipped. </p>
   
         <% htmlWebpackPlugin.options.svgs.forEach(function(svgDefinition){ %>
           <h2 > <%= svgDefinition.title %> </h2>

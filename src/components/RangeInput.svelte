@@ -54,9 +54,9 @@
             class="form-range"
             {id}
             bind:value
-            {_min}
-            {_max}
-            {_step}
+            min={_min}
+            max={_max}
+            step={_step}
             on:change={(e) => onChange(parseFloat(e.target.value))}
         />
         <div class="d-flex align-items-center">
