@@ -63,18 +63,13 @@
       box-sizing: border-box;
       padding: 48px 48px 32px 48px;
       overflow: hidden;
-      transform: skewY(-7deg);
+      transform: skewY(-5deg);
       transform-origin: 0;
     }
 
-
-    /* #163b85
-#2f4d97
-#4360a8
-#5773ba
-#6a87cc
-#7e9cde
-*/
+    #promo-0-title {
+      margin-top: 4rem;
+    }
 
     .background {
       background: linear-gradient(45deg, #163b85, #7e9cde);
@@ -98,19 +93,6 @@
       padding-bottom: 0;
     }
 
-    .home-row {
-      max-width: 920px;
-      margin: 32px auto;
-    }
-
-    .text-container:not(:last-child) {
-      padding-right: 5%;
-
-      @media (max-width: 600px) {
-        padding-right: 0;
-      }
-    }
-
     section#intro .hero-logo {
       display: flex;
       min-width: 200px;
@@ -119,6 +101,63 @@
       margin-left: auto;
     }
 
+    @media (max-width: 65rem) {
+      .hero {
+        max-height: fit-content !important;
+      }
+      section#intro {
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: auto !important;
+      }
+      .hero-logo {
+        margin: 0 auto 2rem auto !important;
+      }
+      
+    }
+
+    .button.hero-cta {
+      padding: 0px 34px;
+      font-size: 1.5rem;
+      font-weight: 600;
+      border-radius: 48px;
+      white-space: nowrap;
+      box-shadow: 0 2px 5px #00000080;
+      box-sizing: border-box;
+      cursor: pointer;
+      background-color: white;
+      display: inline-block;
+    }
+    a.button {
+      color: #4360a8;
+      text-decoration: none;
+      text-transform: uppercase;
+      overflow: hidden;
+      border: none;
+    }
+
+
+    .home-row {
+      max-width: 920px;
+      margin: 32px auto;
+    }
+
+    .text-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 10rem;
+    }
+    .text-container:not(:last-child) {
+      padding-right: 5%;
+
+      @media (max-width: 600px) {
+        padding-right: 0;
+      }
+    }
+
+   
 
     .text-headline {
       font-weight: 600;
@@ -144,25 +183,7 @@
       margin: auto;
     }
 
-    .button.hero-cta {
-      padding: 5px 34px;
-      font-size: 1.5rem;
-      font-weight: 600;
-      line-height: 40px;
-      line-height: 4rem;
-      border-radius: 48px;
-      box-shadow: 0 2px 5px #00000080;
-      box-sizing: border-box;
-      cursor: pointer;
-      background-color: white;
-    }
-    a.button {
-      color: #4360a8;
-      text-decoration: none;
-      text-transform: uppercase;
-      overflow: hidden;
-      border: none;
-    }
+   
 
     p {
       margin: 1em 0;
@@ -212,6 +233,9 @@
       padding: 0.5rem;
       text-align: right;
     }
+    article {
+      padding: 1rem;
+    }
   </style>
 
 </head>
@@ -244,7 +268,7 @@
 
   <article>
     <div class="home-row">
-      <section aria-labelledby="promo-0-title" class="text-block">
+      <section aria-labelledby="promo-0-title">
         <h2 id="promo-0-title" class="no-anchor">Design gorgeous and lightweight SVG maps with ease </h2>
       </section>
     </div>
@@ -277,21 +301,21 @@
         </section>
       </div>
     </div>
+    <div class="home-row">
+      <section aria-labelledby="promo-0-title">
+        <h1 id="promo-0-title" class="no-anchor">Examples </h1>
+  
+        <% htmlWebpackPlugin.options.svgs.forEach(function(svgDefinition){ %>
+          <h2 > <%= svgDefinition.title %> </h2>
+          <p>  <%= svgDefinition.description %> </p>
+          <div class="example-map">
+            <%= svgDefinition.content %>
+          </div>
+          <% }); %>
+      </section>
+    </div>
   </article>
 
-  <div class="home-row">
-    <section aria-labelledby="promo-0-title" class="text-block">
-      <h1 id="promo-0-title" class="no-anchor">Examples </h1>
-
-      <% htmlWebpackPlugin.options.svgs.forEach(function(svgDefinition){ %>
-        <h2 > <%= svgDefinition.title %> </h2>
-        <p>  <%= svgDefinition.description %> </p>
-        <div class="example-map">
-          <%= svgDefinition.content %>
-        </div>
-        <% }); %>
-    </section>
-  </div>
   <footer>
     CartoSVG ©2023
   </footer>
