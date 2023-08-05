@@ -20,8 +20,8 @@ const replaceReferenceValue = (value, prefix) => {
         newValue = `#${prefix}-${value.slice(1)}`
     }
     if (value.slice(0, 3) === 'url') {
-        const existing = value.match(/url\(#(.*)\)/)[1];
-        newValue = `url(#${prefix}-${existing})`;
+        const existing = value.match(/url\(\"?#(.*?)\"?\)/)[1];
+        newValue = `url("#${prefix}-${existing}")`;
     } 
     return newValue;
 };
@@ -175,18 +175,16 @@ function changeIdAndReferences(exportedMapElem, newMapId) {
 
     // change inline styles with url(#...)
     exportedMapElem.querySelectorAll('[style*="url"]').forEach(elem => {
-        for (const prop in elem.style) {
-            if (elem.style.hasOwnProperty(prop)) {
-                const propValue = elem.style[prop];
-                if (!propValue.includes('url')) return;
-                const newValue = replaceReferenceValue(propValue, newMapId);
-                if (newValue) elem.style[prop] = newValue;
-            }
+        const computed = window.getComputedStyle(elem);
+        for (const prop of elem.style) {
+            const propValue = computed[prop];
+            if (!propValue.includes('url')) continue;
+            const newValue = replaceReferenceValue(propValue, newMapId);
+            if (newValue) elem.style[prop] = newValue;
         }
     });
     // change SVG elements attributes that could contain a reference to another element
     exportedMapElem.querySelectorAll(urlUsingAttributes.map(x => `[${x}]`).join(',')).forEach(elem => {
-        console.log(elem);
         for (const attributeName of urlUsingAttributes) {
             let attributesToCheck = [attributeName];
             if (attributeName.includes('href')) attributesToCheck = ['href', 'xlink:href'];
@@ -476,7 +474,6 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     optimizedSVG.firstChild.append(styleElem);
     optimizedSVG.firstChild.classList.remove('animate-transition');
     if (!downloadExport) return optimizedSVG.firstChild.outerHTML;
-    console.log(finalScript);
     if (minifyJs != false) {
         const terser = await import('terser');
         finalScript = await terser.minify(finalScript, { toplevel: true, mangle: {eval: true, reserved: ['data', 'shapeId']}});
