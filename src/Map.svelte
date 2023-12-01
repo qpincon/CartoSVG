@@ -569,9 +569,10 @@ async function draw(simplified = false, _) {
         let canvas = container.select('#canvas');
         if (canvas.empty()) canvas = container.append('canvas').attr('id', 'canvas').attr('width', width).attr('height', height);
         const context = canvas.node().getContext('2d');
-        context.clearRect(0, 0, width, height);
+        context.fillStyle = "#55a4c5";
+        context.rect(0, 0, width, height);
+        context.fillStyle = "#cdb396";
         path = d3.geoPath(projection, context);
-        context.fillStyle = "#88d";
         context.beginPath(), path(simplified ? simpleLand : land), context.fill();
         context.beginPath(),
             path(graticule),
