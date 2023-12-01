@@ -5,7 +5,7 @@
   "main": "index.js",
   "start": "sirv public -s",
   "scripts": {
-    "dev": "npx webpack --mode=development --watch",
+    "dev": "npx webpack --mode=development --watch ",
     "build": "npx webpack --mode=production",
     "start": "webpack serve --open --no-client-overlay"
   },
