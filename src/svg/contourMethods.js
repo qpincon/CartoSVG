@@ -7,7 +7,7 @@ import { appendGlow } from './svgDefs';
 
 // Using encodeURIComponent() as replacement function
 // allows to keep result code readable
-// should be in svg.js, but wif we import, the toString method on function will not work properly
+// should be in svg.js, but if we import, the toString method on function will not work properly
 function encodeSVGDataImage(data) {
     const symbols = /[\r\n%#()<>?[\\\]^`{|}]/g;
     if (data.indexOf(`http://www.w3.org/2000/svg`) < 0) {

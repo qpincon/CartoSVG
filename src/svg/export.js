@@ -421,7 +421,6 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     let finalScript = `
     (function() {
         ${encodeSVGDataImageStr}
-        ${imageFromSpecialGElemStr}
         function duplicateContours(svgElem, transition=false) {
             Array.from(svgElem.querySelectorAll('.contour-to-dup')).forEach(el => {
                 if (!el.hasAttribute('filter-name')) return;
@@ -444,7 +443,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         function gElemsToImages(transition=false) {
             const toTransformToImg = mapElement.querySelectorAll('g[image-class]');
             toTransformToImg.forEach(gElem => {
-                const image = imageFromSpecialGElem(gElem);
+                const image = ${imageFromSpecialGElemStr}(gElem);
                 gElem.parentNode.append(image);
                 if (transition) {
                     setTimeout(() => {
