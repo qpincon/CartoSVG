@@ -307,6 +307,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         for (const child of group.children) {
             const id = child.getAttribute('id');
             if (!id) continue;
+            if (!indexed[id]) continue;
             finalData[id] = pick(indexed[id], usedVars);
         }
         finalDataByGroup.data[groupId] = finalData;
@@ -326,11 +327,15 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
             const parent = e.target.parentNode;
             if (e.target.tagName === 'path' && parent.tagName === 'g') {
                 if (e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
-                if (e.target !== parent.lastElementChild) parent.append(e.target);
+                if (e.target !== parent.lastElementChild) {
+                    parent.append(e.target);
+                    e.target.classList.add('hovered');
+                }
             } 
         });
 
         mapElement.addEventListener('mouseout', (e) => {
+            e.target.classList.remove('hovered');
             const previousPos = e.target.previousPos;
             if (previousPos) {
                 const parent = e.target.parentNode;

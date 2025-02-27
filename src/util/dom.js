@@ -49,14 +49,22 @@ function styleSheetToText(sheet) {
     return styleTxt.replace(/undefined/g, '');
 }
 
-function exportStyleSheet(selectorToFind) {
+// returns [sheet, rule]
+function findStyleSheet(selectorToFind) {
     const sheets = document.styleSheets;
     for (let i in sheets) {
         const rules = sheets[i].cssRules;
         for (let r in rules) {
             const selectorText = rules[r].selectorText;
-            if (selectorText?.includes(selectorToFind)) return styleSheetToText(sheets[i]);
+            if (selectorText?.includes(selectorToFind)) {
+                return [sheets[i], rules[r]];
+            }
         }
     }
 }
-export { reportStyle, reportStyleElem, fontsToCss, exportStyleSheet, getUsedInlineFonts };
+
+function exportStyleSheet(selectorToFind) {
+    const [sheet, _] = findStyleSheet(selectorToFind);
+    if (sheet) return styleSheetToText(sheet);
+}
+export { reportStyle, reportStyleElem, fontsToCss, exportStyleSheet, getUsedInlineFonts, findStyleSheet };

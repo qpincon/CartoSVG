@@ -55,7 +55,7 @@ const scalesHelp = `
     Those scales are only available when numeric data is associated with the layer. 
 </div>
 `;
-const defaultTooltipStyle = `will-change: opacity; font-size: 14px; padding: 5px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content; border-radius:7px;`;
+const defaultTooltipStyle = `color:black; will-change: opacity; font-size: 14px; padding: 5px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content; border-radius:7px;`;
 
 const iconsReq = require.context('./assets/img/.?inline', false, /\.svg$/);
 const icons = iconsReq.keys().reduce((acc, iconFile) => {
@@ -304,6 +304,19 @@ onMount(async() => {
     projectAndDraw();
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
+            console.log(target, eventType, cssProp, value);
+            /** 
+             * Due to a Firefox bug (the :hover selector is not applied when we move the DOM node when hovering a polygon)
+             * we need to apply the :hover style to a custom class selector .hovered, that will be applied programatically
+             */
+            if (eventType.selectorText.includes(':hover')) {
+                const selectorTextToModify = eventType.selectorText.replace(':hover', '.hovered');
+                const rule = Array.from(eventType.parentStyleSheet.rules).find(r => r.selectorText === selectorTextToModify);
+                console.log(rule);
+                for (const propName of eventType.style) {
+                    rule.style.setProperty(propName, eventType.style[propName]);
+                }
+            }
             const elemId = target.getAttribute('id');
             if (legendSample && legendSample.contains(target) && cssProp !== 'fill') {
                 legendDefs[currentTab].sampleHtml = legendSample.outerHTML;
@@ -373,6 +386,7 @@ onMount(async() => {
             },
         },
         cssRuleFilter: (el, cssSelector) => {
+            console.log(el, cssSelector);
             if (cssSelector.includes('ssc-')) return false;
             return true;
         },
@@ -1050,11 +1064,13 @@ function addPath() {
     closeMenu();
     detachListeners();
     freeHandDrawPath(svg, projection, (finishedElem) => {
+        const d = finishedElem.getAttribute('d');
+        if (!d) return;
         attachListeners();
         const pathIndex = providedPaths.length;
         const id = `path-${pathIndex}`;
         finishedElem.setAttribute('id', id);
-        providedPaths.push({d: parseAndUnprojectPath(finishedElem.getAttribute('d'), projection)});
+        providedPaths.push({d: parseAndUnprojectPath(d, projection)});
         saveDebounced();
     });
 }
@@ -1539,7 +1555,7 @@ async function colorizeAndLegend(e) {
         let newCss = '';
         usedColors.forEach((color, i) => {
             newCss += `path.ssc-${tabIndex}-${i}{fill:${color};}
-            path.ssc-${tabIndex}-${i}:hover{fill:${d3.color(color).brighter(.2).hex()};}`;
+            path.ssc-${tabIndex}-${i}.hovered{fill:${d3.color(color).brighter(.2).hex()};}`;
         });
         colorsCss[tab] = newCss;
         const legendColors = getLegendColors(dataColorDef, tab, scale, data);

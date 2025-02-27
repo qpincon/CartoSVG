@@ -1,8 +1,8 @@
-import { reportStyle } from './util/dom';
+import { reportStyle} from './util/dom';
 import { htmlToElement } from './util/common';
 
 function addTooltipListener(map, tooltipDefs, zonesData) {
-    const tooltip = {shapeId: null, element: document.createElement('div')};
+    const tooltip = { shapeId: null, element: document.createElement('div') };
     map.append(tooltip.element);
     tooltip.element.style.display = 'none';
     map.addEventListener('mouseleave', (e) => {
@@ -13,11 +13,16 @@ function addTooltipListener(map, tooltipDefs, zonesData) {
         onMouseMove(e, map, tooltipDefs, zonesData, tooltip);
         const parent = e.target.parentNode;
         if (e.target.tagName === 'path' && parent.tagName === 'g') {
-            if(e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
-            if (e.target !== parent.lastElementChild) parent.append(e.target);
-        } 
+            if (e.target.previousPos === undefined) e.target.previousPos = Array.from(parent.children).indexOf(e.target);
+            if (e.target !== parent.lastElementChild) {
+                parent.append(e.target);
+                /** Firefox bug: the :hover selector is not applied when we move the DOM node, we have to apply a class */
+                e.target.classList.add('hovered');
+            }
+        }
     });
     map.addEventListener('mouseout', (e) => {
+        e.target.classList.remove('hovered');
         const previousPos = e.target.previousPos;
         if (previousPos) {
             const parent = e.target.parentNode;
@@ -47,10 +52,10 @@ function onMouseMove(e, map, tooltipDefs, zonesData, tooltip) {
             posX -= ttBounds.width + 20;
         }
         if (mapBounds.bottom - ttBounds.height < e.clientY + 10) {
-            posY -=  ttBounds.height + 20;
+            posY -= ttBounds.height + 20;
         }
     }
-    else if(groupId in zonesData) {
+    else if (groupId in zonesData) {
         tooltipVisibleOpacity = 0;
         setTimeout(() => {
             onMouseMove(e, map, tooltipDefs, zonesData, tooltip);
@@ -66,7 +71,7 @@ function onMouseMove(e, map, tooltipDefs, zonesData, tooltip) {
         tooltip.element.style.opacity = tooltipVisibleOpacity;
     }
     else {
-        const data = {...zonesData[groupId].data.find(row => row.name === shapeId)};
+        const data = { ...zonesData[groupId].data.find(row => row.name === shapeId) };
         zonesData[groupId].numericCols.forEach(colDef => {
             const col = colDef.column;
             data[col] = zonesData[groupId].formatters[col](data[col]);
