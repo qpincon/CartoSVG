@@ -247,13 +247,22 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     if (fo) document.body.append(fo);
     const svgNode = svg.node();
 
-    // === Remove contours ==
+    // === Remove contours images (keep only <g> element to duplicate afterwards) ==
     // let contours = Array.from(svg.node().querySelectorAll('.contour-to-dup[filter]'));
-    let contours = Array.from(svg.node().querySelectorAll('image.contour-to-dup'));
+    let contours = Array.from(svgNode.querySelectorAll('image.contour-to-dup'));
     contours = contours.map(el => {
         const parent = el.parentNode;
         document.body.append(el);
         return [el, parent];
+    });
+
+    /** Add an element using the SVG filter, otherwise it gets removed by SVGO as it's never used directly but later in JS*/
+    svgNode.querySelectorAll('[image-filter-name]').forEach(elem => {
+        const filterName = elem.getAttribute('image-filter-name');
+        const emptyElementTrickSvgo = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        emptyElementTrickSvgo.classList.add('svgo-trick');
+        emptyElementTrickSvgo.setAttribute('filter', `url(#${filterName})`);
+        svgNode.append(emptyElementTrickSvgo);
     });
     // === End remove contours ==
 
@@ -270,9 +279,11 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     contours.forEach(([el, parent]) => {
         parent.insertBefore(el, parent.firstChild);
     });
+    svgNode.querySelectorAll('.svgo-trick').forEach(el => el.remove());
     // === End re-insertion === 
 
     const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
+    optimizedSVG.querySelectorAll('.svgo-trick').forEach(el => el.remove());
     let pathIsBetter = false;
     if (exportFonts == exportFontChoices.smallest || exportFonts == exportFontChoices.convertToPath) {
         pathIsBetter = await inlineFontVsPath(optimizedSVG.firstChild, providedFonts);
