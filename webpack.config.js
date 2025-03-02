@@ -83,12 +83,6 @@ const config = {
                     },
                     {
                         type: 'asset/resource',
-                        use: [
-                            {
-                                loader: 'svgo-loader',
-                                options: {},
-                            },
-                        ],
                     }
                 ]
             },

@@ -112,7 +112,7 @@ async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
     let nbFontChars = 0;
     let nbPathChars = 0;
     const transformedTexts = {};
-    const SVGO = await import('svgo/dist/svgo.browser');
+    const SVGO = await import('svgo/browser');
     const TextToSVG  = (await import('text-to-svg')).default;
     const defaultStyles = getComputedStyle(document.body);
     await Promise.all(providedFonts.map(({ name, content }) => {
@@ -269,7 +269,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     const usedFonts = getUsedInlineFonts(svgNode);
     const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
     
-    const SVGO = await import('svgo/dist/svgo.browser');
+    const SVGO = await import('svgo/browser');
 
     // Optimize whole SVG
     const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig).data;
