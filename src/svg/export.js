@@ -371,8 +371,11 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         elem.setAttribute('height', 1);
         elem.style.overflow = 'visible';
         const parsed = parser.parseFromString(eval('\`' + templateStr + '\`' ), 'text/html').querySelector('body');
-        parsed.style['position'] = 'fixed';
-        elem.appendChild(parsed);
+        const container = document.createElementNS('http://www.w3.org/1999/xhtml', 'div')
+        container.style['position'] = 'fixed'; 
+        container.classList.add('.body');
+        container.append(parsed.firstChild);
+        elem.appendChild(container);
         return elem;
     }
     mapElement.addEventListener('mouseleave', hideTooltip);
@@ -388,7 +391,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         const mapBounds = mapElement.querySelector('#frame').getBoundingClientRect();
         const scaleX = width / mapBounds.width;
         const scaleY = height / mapBounds.height;
-        const ttBounds = tooltip.element.firstChild?.firstChild?.getBoundingClientRect();
+        const ttBounds = tooltip.element.firstChild?.firstChild?.getBoundingClientRect?.();
         let posX = (e.clientX - mapBounds.left + 10) * scaleX, posY = (e.clientY - mapBounds.top + 10) * scaleY;
         let tooltipVisibleOpacity = 1;
         const groupId = parent.getAttribute('id');

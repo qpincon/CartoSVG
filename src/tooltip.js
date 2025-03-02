@@ -97,7 +97,8 @@ function instanciateTooltip(dataRow, groupId, tooltipDefs) {
     elem.setAttribute('width', 1);
     elem.setAttribute('height', 1);
     elem.style.overflow = 'visible';
-    const body = document.createElementNS('http://www.w3.org/1999/xhtml', 'body');
+    const body = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+    body.classList.add('.body');
     const tooltip = document.createElement('div');
     tooltip.innerHTML = tooltipDefs?.[groupId]?.template?.formatUnicorn(dataRow) || '';
     reportStyle(htmlToElement(tooltipDefs?.[groupId]?.content || ''), tooltip);
