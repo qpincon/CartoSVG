@@ -491,6 +491,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     styleElem.innerHTML = pathIsBetter ? finalCss : finalCss + fontsToCss(usedProvidedFonts);
     optimizedSVG.firstChild.append(styleElem);
     optimizedSVG.firstChild.classList.remove('animate-transition');
+    optimizedSVG.firstChild.classList.add('cartosvg')
     if (!downloadExport) return optimizedSVG.firstChild.outerHTML;
     if (minifyJs != false) {
         const terser = await import('terser');
