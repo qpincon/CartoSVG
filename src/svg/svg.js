@@ -107,6 +107,8 @@ function duplicateContourCleanFirst(svgElem) {
     Array.from(svgElem.querySelectorAll('.contour-to-dup[filter]')).forEach(el => el.remove());
     duplicateContours(svgElem);
 }
+
+/** Duplicate contour <image> tags, that only contain stroke, to have a new one wiht a fill and a filter applied */
 function duplicateContours(svgElem) {
     Array.from(svgElem.querySelectorAll('.contour-to-dup')).forEach(el => {
         if (!el.hasAttribute('filter-name')) return;

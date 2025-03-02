@@ -248,7 +248,6 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     const svgNode = svg.node();
 
     // === Remove contours images (keep only <g> element to duplicate afterwards) ==
-    // let contours = Array.from(svg.node().querySelectorAll('.contour-to-dup[filter]'));
     let contours = Array.from(svgNode.querySelectorAll('image.contour-to-dup'));
     contours = contours.map(el => {
         const parent = el.parentNode;

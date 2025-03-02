@@ -304,15 +304,13 @@ onMount(async() => {
     projectAndDraw();
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
-            console.log(target, eventType, cssProp, value);
             /** 
              * Due to a Firefox bug (the :hover selector is not applied when we move the DOM node when hovering a polygon)
              * we need to apply the :hover style to a custom class selector .hovered, that will be applied programatically
              */
-            if (eventType.selectorText.includes(':hover')) {
+            if (eventType.selectorText?.includes?.(':hover')) {
                 const selectorTextToModify = eventType.selectorText.replace(':hover', '.hovered');
                 const rule = Array.from(eventType.parentStyleSheet.rules).find(r => r.selectorText === selectorTextToModify);
-                console.log(rule);
                 for (const propName of eventType.style) {
                     rule.style.setProperty(propName, eventType.style[propName]);
                 }
@@ -342,13 +340,14 @@ onMount(async() => {
                     }
                 }
             }
+            /** Update <image> tag corresponding to changed element */
             if ((eventType === 'inline' && target.classList.contains('country')) || (eventType?.selectorText === '.country')) {
                 computedOrderedTabs.forEach(tab => {
-                    if(tab.substring(0, tab.length - 5) == elemId) {
-                        const filter = zonesFilter[tab];
-                        const countryData = countries.features.find(country => country.properties.name === elemId);
-                        appendCountryImageNew.call(d3.select(`[id='${elemId}-img']`).node(), countryData, filter, applyStyles, path, inlineStyles, false, true);
-                    }
+                    if (tab.substring(0, tab.length - 5) !== elemId) return;
+                    const filter = zonesFilter[tab];
+                    const countryData = countries.features.find(country => country.properties.name === elemId);
+                    appendCountryImageNew.call(d3.select(`[id='${elemId}-img']`).node(), countryData, filter, applyStyles, path, inlineStyles, false, true);
+                    svg.selectAll('g[image-class]').classed('hidden-after', true);
                 })
             }
             save();
@@ -386,7 +385,6 @@ onMount(async() => {
             },
         },
         cssRuleFilter: (el, cssSelector) => {
-            console.log(el, cssSelector);
             if (cssSelector.includes('ssc-')) return false;
             return true;
         },
@@ -747,6 +745,7 @@ async function draw(simplified = false, _) {
     firstDraw = false;
     if (!animated) {
         svg.selectAll('path[pathLength]').attr('pathLength', null);
+        svg.selectAll('g[image-class]').classed('hidden-after', true);
     }
 }
 
