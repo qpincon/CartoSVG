@@ -264,7 +264,7 @@
         </use>
     </g>
     <rect x="1" y="1" id="frame" width="598" height="658" rx="6.6" />
-    <style>#static-svg-map, #canvas { display: block; height: auto; }#paths &gt; path { stroke:
+    <style>#static-svg-map, #canvas { display: block; height: auto;contain:content; }#paths &gt; path { stroke:
         rgba(76, 55, 0, 0.486); stroke-dasharray: 4px; stroke-width: 1.5px; fill: none; }#outline {
         pointer-events: none; }#graticule { pointer-events: none; fill: none; stroke: #777777;
         stroke-width: 0.5px; stroke-opacity: 0.5; }#land { pointer-events: none; stroke: rgba(0, 0,
