@@ -6,7 +6,7 @@ import { presimplify, simplify } from 'topojson-simplify';
 import * as d3 from "d3";
 import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
 import 'bootstrap/js/dist/dropdown';
-import { debounce, throttle} from 'lodash-es';
+import { clamp, debounce, throttle} from 'lodash-es';
 import dataExplanation from './assets/dataColor.svg';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import { transitionCss } from './svg/transition';
@@ -14,7 +14,7 @@ import PathEditor from './svg/pathEditor';
 import { paramDefs, defaultParams, helpParams, noSatelliteParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
-import { getProjection, updateAltitudeRange } from './util/projections';
+import { getGeographicalBounds, getProjection, updateAltitudeRange } from './util/projections';
 import PaletteEditor from "./components/PaletteEditor.svelte";
 
 import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, getBestFormatter, getColumns } from './util/common';
@@ -43,6 +43,8 @@ import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts } from '.
 import { saveState, getState } from './util/save';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
+import {getUniqueFeatures, interestingBasicV2Layers, MaplibreGeometryUtil} from './detailed'
+    import { Map } from 'maplibre-gl';
 
 const scalesHelp = `
 <div class="inline-tooltip">  
@@ -126,7 +128,9 @@ String.prototype.formatUnicorn = String.prototype.formatUnicorn || function () {
 const p = (propName, obj = params) => findProp(propName, obj);
 
 const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView', 'projection', 'width', 'height'];
-let timeoutId;
+const THRESH_ZOOM_MICRO = 14;
+let redrawTimeoutId;
+/** Used for shape simplification */
 let visibleArea;
 let countries = null;
 let land = null;
@@ -286,8 +290,13 @@ let exportForm;
 let htmlTooltipElem;
 let currentTab = 'countries';
 
-let mainMenuSelection = 0;
-$: if (true || mainMenuSelection) { tick().then(() => initTooltips()); }
+let mainMenuSelection = 'general';
+$: if (true || mainMenuSelection) { 
+    tick().then(() => {
+        initTooltips();
+        draw();
+    });
+}
 let editingPath = false;
 
 // This contains the common CSS that can ben editor with inline-css-editor
@@ -295,6 +304,9 @@ let editingPath = false;
 let commonStyleSheetElem;
 let zoomFunc;
 let dragFunc;
+let maplibreMap;
+let canDrawMicro = false;
+
 onMount(async() => {
     commonStyleSheetElem = document.createElement('style');
     document.head.appendChild(commonStyleSheetElem);
@@ -395,6 +407,19 @@ onMount(async() => {
     contextualMenu.style.position = 'absolute';
     contextualMenu.opened = false;
     attachListeners();
+    maplibreMap = new Map({
+        container: "maplibre-map", 
+        style: 'https://api.maptiler.com/maps/basic-v2/style.json?key=FDR0xJ9eyXD87yIqUjOi',
+        center: [ 2.3369480024747986, 48.86042010964684],
+        zoom: 15,
+        attributionControl: false
+    });
+    await maplibreMap.once('load');
+    maplibreMap.on('idle', (event) => {
+        canDrawMicro = maplibreMap.getZoom() >= THRESH_ZOOM_MICRO;
+        if (canDrawMicro) draw();
+    });
+
 });
 
 function attachListeners() {
@@ -423,13 +448,23 @@ function detachListeners() {
     container.on(".zoom", null);
 }
 
+function mapLibreFitBounds() {
+    if (!maplibreMap) return;
+    const bounds = getGeographicalBounds(projection, p('width'), p('height'));
+    maplibreMap.fitBounds(bounds, {animate: false})
+    if (mainMenuSelection === "micro") {
+        canDrawMicro = maplibreMap.getZoom() >= THRESH_ZOOM_MICRO
+    }
+}
+
 const redrawThrottle = throttle(redraw, 50);
 function redraw(propName) {
     if (positionVars.includes(propName)) {
+        mapLibreFitBounds();
         projectAndDraw(true);
     }
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
+    clearTimeout(redrawTimeoutId);
+    redrawTimeoutId = setTimeout(() => {
         updateLayerSimplification();
         draw(false);
     }, 300);
@@ -442,8 +477,14 @@ function zoomed(event) {
     if (!event.sourceEvent) return;
     if (event.sourceEvent.type === 'dblclick') return;
     if (!projection) return;
-    event.transform.k = Math.max(Math.min(event.transform.k, 1), 0.00001)
-    const newAltitude = Math.round(altScale(event.transform.k));
+    event.transform.k = Math.max(Math.min(event.transform.k, 1), 0.00001);
+    let newAltitude = Math.round(altScale(event.transform.k));
+    // Ensure that zooming at max of scale actlually decreases altitude
+    if (event.transform.k === 1 ) {
+        if (p('projection' )=== "satellite") newAltitude = inlineProps.altitude - 30;
+        else newAltitude = inlineProps.altitude + 30;
+        newAltitude = Math.max(newAltitude, 30);
+    }
     visibleArea = threshScale(event.transform.k);
     params["General"].altitude = newAltitude;
     inlineProps.altitude = newAltitude;
@@ -521,12 +562,7 @@ function changeProjection() {
     projectionLarger = getProjection({...projectionParams, larger:true});
 }
 
-const countryFilteredImages = new Set();
-let firstDraw = true;
-// without 'countries' if unchecked
-let computedOrderedTabs = [];
-async function draw(simplified = false, _) {
-    countryFilteredImages.clear();
+function computeCurrentTab() {
     computedOrderedTabs = orderedTabs.filter(x => {
         if (x === 'countries') return inlineProps.showCountries;
         if (x === 'land') return inlineProps.showLand;
@@ -538,11 +574,12 @@ async function draw(simplified = false, _) {
         while (computedOrderedTabs[i] === 'land') ++i;
         currentTab = computedOrderedTabs[i];
     }
+}
+
+async function initializeAdms(simplified) {
     for (const countryAdm of chosenCountriesAdm) {
         if (!(countryAdm in resolvedAdm)) {
             const resolved = await resolveAdm(countryAdm);
-            // const firstKey = Object.keys(resolved.objects)[0];
-            // resolvedAdmTopo[countryAdm] = topojson.feature(resolved, resolved.objects[firstKey]);
             resolvedAdmTopo[countryAdm] = presimplify(resolved);
             updateLayerSimplification();
             draw(simplified);
@@ -568,11 +605,40 @@ async function draw(simplified = false, _) {
             };
         }
     }
+}
+const countryFilteredImages = new Set();
+let firstDraw = true;
+// without 'countries' if unchecked
+let computedOrderedTabs = [];
+async function draw(simplified = false, _) {
     const width = p('width'), height = p('height');
     const borderWidth = p('borderWidth');
     const borderRadius = p('borderRadius');
     const container = d3.select('#map-container');
+    const mapLibreContainer = d3.select('#maplibre-map');
     const animated = p('animate');
+    mapLibreContainer.style('display', 'none');
+    container.style('display', 'block');
+
+    console.log('draw, mainMenuSelection=', mainMenuSelection);
+    if (mainMenuSelection === 'micro') {
+        if (canDrawMicro) {
+            console.log('draw pretty maps');
+            const geometries = maplibreMap.queryRenderedFeatures({ layers: interestingBasicV2Layers });
+            console.log('geometries', geometries);
+            console.log('unique', getUniqueFeatures(geometries));
+            return;
+        } else {
+            console.log('cannot draw micro yet');
+            mapLibreContainer.style('display', 'block');
+            container.style('display', 'none');
+            return;
+        }
+    }
+
+    countryFilteredImages.clear();
+    computeCurrentTab();
+    await initializeAdms(simplified);
     container.html('');
     const outline = {type: "Sphere"};
     const graticule = d3.geoGraticule().step([p('graticuleStep'), p('graticuleStep')])();
@@ -610,7 +676,7 @@ async function draw(simplified = false, _) {
         .attr('height', `${height}`)
     }
     container.style('width', `${width}px`).style('height', `${height}px`);
-    
+    mapLibreContainer.style('width', `${width}px`).style('height', `${height}px`);
     path = d3.geoPath(projection);
     pathLarger = d3.geoPath(projectionLarger)
     svg.html('');
@@ -742,6 +808,7 @@ async function draw(simplified = false, _) {
     await tick();
     addTooltipListener(map, tooltipDefs, zonesData);
     duplicateContourCleanFirst(svg.node());
+    if (firstDraw) mapLibreFitBounds();
     firstDraw = false;
     if (!animated) {
         svg.selectAll('path[pathLength]').attr('pathLength', null);
@@ -1670,34 +1737,49 @@ function getLegendColors(dataColorDef, tab, scale, data) {
 <div class="d-flex align-items-start h-100">
     <aside id="params" class="h-100">
         <div id="main-panel" class="d-flex flex-column align-items-center pt-4 h-100">
-            <div class="btn-group" role="group">
-                <input
-                    type="radio"
-                    class="btn-check"
-                    name="paramsSwitch"
-                    id="switchGeneral"
-                    bind:group={mainMenuSelection}
-                    value={0}
-                    autocomplete="off"
-                />
-                <label class="btn btn-outline-primary" for="switchGeneral">General</label
-                >
-                <input
-                    type="radio"
-                    class="btn-check"
-                    name="paramsSwitch"
-                    id="switchLayers"
-                    autocomplete="off"
-                    bind:group={mainMenuSelection}
-                    value={1}
-                />
-                <label class="btn btn-outline-primary" for="switchLayers">Layers</label>
+            <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups">
+                <div class="btn-group" role="group">
+                    <input
+                        type="radio"
+                        class="btn-check"
+                        name="paramsSwitch"
+                        id="switchGeneral"
+                        bind:group={mainMenuSelection}
+                        value='general'
+                        autocomplete="off"
+                    />
+                    <label class="btn btn-outline-primary" for="switchGeneral">General</label
+                    >
+                    
+                </div>
+                <div class="btn-group" role="group">
+                    <input
+                        type="radio"
+                        class="btn-check"
+                        name="paramsSwitch"
+                        id="switchMacro"
+                        autocomplete="off"
+                        bind:group={mainMenuSelection}
+                        value='macro'
+                    />
+                    <label class="btn btn-outline-primary" for="switchMacro">Macro</label>
+                    <input
+                        type="radio"
+                        class="btn-check"
+                        name="paramsSwitch"
+                        id="switchMicro"
+                        autocomplete="off"
+                        bind:group={mainMenuSelection}
+                        value='micro'
+                    />
+                    <label class="btn btn-outline-primary" for="switchMicro">Micro</label>
+                </div>
             </div>
     
             <div id="main-menu" class="mt-4">
-                {#if mainMenuSelection === 0}
+                {#if mainMenuSelection === 'general'}
                     <Accordions sections={params} {paramDefs} {helpParams} otherParams={accordionVisiblityParams}  on:change={handleChangeProp} ></Accordions>
-                {:else}
+                {:else if mainMenuSelection === 'macro'}
                 <div class="border border-primary rounded">
                     <div class="p-2">
                         <div class="form-check form-switch">
@@ -1903,6 +1985,10 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                         {/if}
                     </div> 
                 </div>
+                {:else if mainMenuSelection === 'micro'}
+                <div class="border border-primary rounded">
+                    COUCOU
+                </div>
                 {/if}
             </div>
         </div>
@@ -1919,7 +2005,13 @@ function getLegendColors(dataColorDef, tab, scale, data) {
             </div>
         </Navbar>
         <div class="d-flex flex-column justify-content-center align-items-center h-100">
-            <div id="map-container" class="col mx-4"></div>
+            {#if mainMenuSelection === 'micro' && !canDrawMicro} 
+                <span> Zoom more to be able to draw pretty maps! </span>
+            {/if}
+            <div id="map-content" style="position: relative;">
+                <div id="map-container" class="col mx-4"></div>
+                <div id="maplibre-map"></div>
+            </div>
             <div class="mt-4 d-flex align-items-center justify-content-center">
                 <div class="mx-2">
                     <label for="fontinput" class="m-2 d-flex align-items-center btn btn-outline-primary"> <Icon svg={icons['font']}/> Add font</label>
@@ -2067,6 +2159,12 @@ function getLegendColors(dataColorDef, tab, scale, data) {
 #map-container {
     margin: 0 auto;
     flex: 0 0 auto;
+}
+#maplibre-map {
+    // position: absolute;
+    // top: 0px;
+    // left: 1.5rem;
+    display: none;
 }
 #country-select{
   opacity: 0;
