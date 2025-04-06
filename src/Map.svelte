@@ -6,7 +6,7 @@ import { presimplify, simplify } from 'topojson-simplify';
 import * as d3 from "d3";
 import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
 import 'bootstrap/js/dist/dropdown';
-import { clamp, debounce, throttle} from 'lodash-es';
+import { debounce, throttle} from 'lodash-es';
 import dataExplanation from './assets/dataColor.svg';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import { transitionCss } from './svg/transition';
@@ -14,7 +14,7 @@ import PathEditor from './svg/pathEditor';
 import { paramDefs, defaultParams, helpParams, noSatelliteParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
-import { getGeographicalBounds, getProjection, updateAltitudeRange } from './util/projections';
+import { createD3ProjectionFromMapLibre, getGeographicalBounds, getProjection, updateAltitudeRange } from './util/projections';
 import PaletteEditor from "./components/PaletteEditor.svelte";
 
 import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, getBestFormatter, getColumns } from './util/common';
@@ -43,8 +43,10 @@ import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts } from '.
 import { saveState, getState } from './util/save';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
-import {getUniqueFeatures, interestingBasicV2Layers, MaplibreGeometryUtil} from './detailed'
-    import { Map } from 'maplibre-gl';
+import {interestingBasicV2Layers} from './detailed'
+import { getRenderedFeatures } from './util/stitch2';
+import { Map } from 'maplibre-gl';
+import { createDemoPage} from './svg/patternGenerator';
 
 const scalesHelp = `
 <div class="inline-tooltip">  
@@ -291,8 +293,11 @@ let htmlTooltipElem;
 let currentTab = 'countries';
 
 let mainMenuSelection = 'general';
+let currentMode = 'macro';
 $: if (true || mainMenuSelection) { 
     tick().then(() => {
+        /** Store latest mode selected */
+        if (mainMenuSelection !== "general") switchMode(mainMenuSelection);
         initTooltips();
         draw();
     });
@@ -304,6 +309,13 @@ let editingPath = false;
 let commonStyleSheetElem;
 let zoomFunc;
 let dragFunc;
+/**
+ * Map used for drawing zoomed-in cities as SVG using custom palette
+ * It is hidden when in "macro" mode.
+ * In "micro" mode, it is either:
+ *  - visible if the map is not zoomed enough
+ *  - hidden if it is zoomed enough. Instead, we have the custom SVG displaying
+ */
 let maplibreMap;
 let canDrawMicro = false;
 
@@ -415,12 +427,73 @@ onMount(async() => {
         attributionControl: false
     });
     await maplibreMap.once('load');
+    maplibreMap.showTileBoundaries = true;
     maplibreMap.on('idle', (event) => {
+        console.log('idle');
         canDrawMicro = maplibreMap.getZoom() >= THRESH_ZOOM_MICRO;
         if (canDrawMicro) draw();
     });
+    maplibreMap.on('click', (event) => {
+        console.log(event);
+        const features = maplibreMap.queryRenderedFeatures(event.point, { layers: interestingBasicV2Layers });
+        for (const f of features) {
+            console.log(f, f.geometry);
+        }   
+    });
+    // maplibreMap.on('mousemove', (event) => {
+    //     console.log(event.lngLat)
+    // });
+    maplibreMap.addLayer({
+        'id': 'test',
+        'type': 'line',
+        source: "maptiler_planet",
+        "source-layer": "building",
+        paint: {
+            'line-width': 1,
+            'line-color': '#000',
+        },
+        layout: {
+            visibility: 'visible',
+        }
+    });
+    // createDemoPage();
+    // const container = d3.select('#map-container');
+    // container.on('click', (e) => {
+    //     maplibreMap.fire('click');
+    // });
+    // container.on('onmousemove', (e) => {
+    //     console.log(e);
+    //     maplibreMap.fire('onmousemove');
+    // });
+    // container.on('dragstart', (e) => {
+    //     console.log(e);
+    // });
 
 });
+
+function maybeDisplayMaplibreMap() {
+    d3.select('#maplibre-map').classed('transparent', false);
+}
+
+function switchMode(newMode) {
+    currentMode = newMode;
+    const mapLibreContainer = d3.select('#maplibre-map');
+    if (currentMode === 'micro') {
+        mapLibreContainer.style('display', 'block');
+        if (canDrawMicro) {
+            // mapLibreContainer.classed('transparent', true);
+            draw();
+            return;
+        } else {
+            console.log('cannot draw micro yet');
+            mapLibreContainer.classed('transparent', false);
+            return;
+        }
+    } else {
+        projectAndDraw();
+    }
+}
+
 
 function attachListeners() {
     const container = d3.select('#map-container');
@@ -428,6 +501,8 @@ function attachListeners() {
         .filter((e) => !e.button)   // Remove ctrlKey
         .on("drag", dragged)
         .on('start', () => {
+            maybeDisplayMaplibreMap();
+            console.log('dragstart');
             if (menuStates.addingLabel) validateLabel();
             styleEditor.close();
             closeMenu();
@@ -450,11 +525,12 @@ function detachListeners() {
 
 function mapLibreFitBounds() {
     if (!maplibreMap) return;
+    maplibreMap.resize();
     const bounds = getGeographicalBounds(projection, p('width'), p('height'));
-    maplibreMap.fitBounds(bounds, {animate: false})
-    if (mainMenuSelection === "micro") {
-        canDrawMicro = maplibreMap.getZoom() >= THRESH_ZOOM_MICRO
-    }
+    maplibreMap.fitBounds(bounds, {animate: false});
+    // if (currentMode === "micro") {
+    //     canDrawMicro = maplibreMap.getZoom() >= THRESH_ZOOM_MICRO
+    // }
 }
 
 const redrawThrottle = throttle(redraw, 50);
@@ -617,30 +693,17 @@ async function draw(simplified = false, _) {
     const container = d3.select('#map-container');
     const mapLibreContainer = d3.select('#maplibre-map');
     const animated = p('animate');
-    mapLibreContainer.style('display', 'none');
-    container.style('display', 'block');
-
-    console.log('draw, mainMenuSelection=', mainMenuSelection);
-    if (mainMenuSelection === 'micro') {
-        if (canDrawMicro) {
-            console.log('draw pretty maps');
-            const geometries = maplibreMap.queryRenderedFeatures({ layers: interestingBasicV2Layers });
-            console.log('geometries', geometries);
-            console.log('unique', getUniqueFeatures(geometries));
-            return;
-        } else {
-            console.log('cannot draw micro yet');
-            mapLibreContainer.style('display', 'block');
-            container.style('display', 'none');
-            return;
-        }
+    console.log('draw, currentMode=', currentMode);
+    
+    if (currentMode === "micro" && !canDrawMicro) {
+        mapLibreContainer.style('display', 'block');
+        mapLibreContainer.classed('transparent', false);
+        return;
     }
-
     countryFilteredImages.clear();
     computeCurrentTab();
     await initializeAdms(simplified);
     container.html('');
-    const outline = {type: "Sphere"};
     const graticule = d3.geoGraticule().step([p('graticuleStep'), p('graticuleStep')])();
     if (!p('showGraticule')) graticule.coordinates = [];
     if (simplified) {
@@ -710,58 +773,12 @@ async function draw(simplified = false, _) {
         if (!filterName) return;
         appendGlow(svg, filterName, false, p(filterName));
     });
-
-    const groupData = [];
-    groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
-    groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
-    computedOrderedTabs.forEach((layer, i) => {
-        const filter = zonesFilter[layer] ? zonesFilter[layer] : null;
-        if (layer === 'countries' && inlineProps.showCountries && countries) {
-            if (!('countries' in zonesData) && !zonesData?.['countries']?.provided) {
-                const data = sortBy(countries.features.map(f => f.properties), 'name');
-                zonesData['countries'] = {
-                    data: data,
-                    numericCols: getNumericCols(data),
-                };
-                getZonesDataFormatters();
-            }
-            groupData.push({ name: 'countries', data: countries, id: 'name', props: [], containerClass:'choro', class: 'country', filter: filter });
-        }
-        if (layer === 'land' && inlineProps.showLand) groupData.push({type: 'landImg', showSource: i === 0});
-        // selected country
-        else if (layer !== 'countries') {
-            groupData.push({ name: layer, data: resolvedAdm[layer], id: 'name', props: [], containerClass:'choro', class: 'adm', filter: null });
-            const countryOutlineId = layer.substring(0, layer.length - 5);
-            const countryData = countries.features.find(country => country.properties.name === countryOutlineId);
-            countryFilteredImages.add(countryOutlineId);
-            groupData.push({name: `${countryOutlineId}-img`, type:"filterImg", countryData, filter});
-        }
-    });
-    groupData.push({ name: 'paths', data: [], id: null, props: [], class: null, filter: null });
-    groupData.push({ name: 'points-labels', data: [], id: null, props: [], class: null, filter: null });
-    // const groups = svg.selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
-    const groups = svg.append('svg')
-    .selectAll('g').data(groupData).join('g').attr('id', d => d.name);
-        // .attr('clip-path', 'url(#clipMapBorder)')
-    function drawPaths(data) {
-        if (data.type === 'landImg') return appendLandImageNew.call(this, data.showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, p(zonesFilter['land']), animated);
-        if (data.type === 'filterImg') return appendCountryImageNew.call(this, data.countryData, data.filter, applyStyles, path, inlineStyles, animated);
-        if (!data.data) return;
-        const parentPathElem = d3.select(this).style('will-change', 'opacity'); 
-        if (data.containerClass) parentPathElem.classed(data.containerClass, true);
-        const pathElem = parentPathElem.selectAll('path')
-            .data(data.data.features ? data.data.features : data.data)
-            .join('path')
-                .attr('pathLength', 1)
-                .attr('d', (d) => {return path(d)});
-        if (data.id) pathElem.attr('id', (d) => d.properties[data.id]);
-        if (data.class) pathElem.attr('class', data.class);
-        if (data.filter) parentPathElem.attr('filter', `url(#${data.filter})`);
-        data.props.forEach((prop) => pathElem.attr(prop, (d) => d.properties[prop]))
+    if (currentMode === "macro") {
+        mapLibreContainer.style('display', 'none');
+        container.style('display', 'block');
+        drawMacro(graticule);
     }
-
-    groups.each(drawPaths);
-
+    else if (currentMode === "micro") drawMicro();
     drawCustomPaths(providedPaths, svg, projection, inlineStyles);
     
     appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
@@ -814,6 +831,101 @@ async function draw(simplified = false, _) {
         svg.selectAll('path[pathLength]').attr('pathLength', null);
         svg.selectAll('g[image-class]').classed('hidden-after', true);
     }
+}
+
+function drawMacro(graticule) {
+    const width = p('width'), height = p('height');
+    const borderWidth = p('borderWidth');
+    const animated = p('animate');
+    const outline = {type: "Sphere"};
+    const groupData = [];
+    groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
+    groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
+    computedOrderedTabs.forEach((layer, i) => {
+        const filter = zonesFilter[layer] ? zonesFilter[layer] : null;
+        if (layer === 'countries' && inlineProps.showCountries && countries) {
+            if (!('countries' in zonesData) && !zonesData?.['countries']?.provided) {
+                const data = sortBy(countries.features.map(f => f.properties), 'name');
+                zonesData['countries'] = {
+                    data: data,
+                    numericCols: getNumericCols(data),
+                };
+                getZonesDataFormatters();
+            }
+            groupData.push({ name: 'countries', data: countries, id: 'name', props: [], containerClass:'choro', class: 'country', filter: filter });
+        }
+        if (layer === 'land' && inlineProps.showLand) groupData.push({type: 'landImg', showSource: i === 0});
+        // selected country
+        else if (layer !== 'countries') {
+            groupData.push({ name: layer, data: resolvedAdm[layer], id: 'name', props: [], containerClass:'choro', class: 'adm', filter: null });
+            const countryOutlineId = layer.substring(0, layer.length - 5);
+            const countryData = countries.features.find(country => country.properties.name === countryOutlineId);
+            countryFilteredImages.add(countryOutlineId);
+            groupData.push({name: `${countryOutlineId}-img`, type:"filterImg", countryData, filter});
+        }
+    });
+    groupData.push({ name: 'paths', data: [], id: null, props: [], class: null, filter: null });
+    groupData.push({ name: 'points-labels', data: [], id: null, props: [], class: null, filter: null });
+    // const groups = svg.selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
+    const groups = svg.append('svg')
+    .selectAll('g').data(groupData).join('g').attr('id', d => d.name);
+        // .attr('clip-path', 'url(#clipMapBorder)')
+    function drawPaths(data) {
+        if (data.type === 'landImg') return appendLandImageNew.call(this, data.showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, p(zonesFilter['land']), animated);
+        if (data.type === 'filterImg') return appendCountryImageNew.call(this, data.countryData, data.filter, applyStyles, path, inlineStyles, animated);
+        if (!data.data) return;
+        const parentPathElem = d3.select(this).style('will-change', 'opacity'); 
+        if (data.containerClass) parentPathElem.classed(data.containerClass, true);
+        const pathElem = parentPathElem.selectAll('path')
+            .data(data.data.features ? data.data.features : data.data)
+            .join('path')
+                .attr('pathLength', 1)
+                .attr('d', (d) => {return path(d)});
+        if (data.id) pathElem.attr('id', (d) => d.properties[data.id]);
+        if (data.class) pathElem.attr('class', data.class);
+        if (data.filter) parentPathElem.attr('filter', `url(#${data.filter})`);
+        data.props.forEach((prop) => pathElem.attr(prop, (d) => d.properties[prop]))
+    }
+
+    groups.each(drawPaths);
+}
+
+function drawMicro() {
+    const container = d3.select('#map-container');
+    const mapLibreContainer = d3.select('#maplibre-map');
+    console.log('drawMicro');
+    console.log(maplibreMap.getStyle());
+    projection = createD3ProjectionFromMapLibre(maplibreMap);
+    path = d3.geoPath(projection);
+    const geometries = getRenderedFeatures(maplibreMap, { layers: interestingBasicV2Layers });
+    // const geometries = maplibreMap.querySourceFeatures("maptiler_planet", {sourceLayer: "building"});
+    console.log('geometries', geometries);
+    svg.style("background-color", "#efff7e");
+    svg.append('g')
+        .attr('id', 'micro')
+        .selectAll('path')
+        .data(geometries)
+        .enter()
+        .append("path")
+        .attr("d", (d) => {return path(d.geometry);})
+        .attr("class", d => {
+            const c = d.properties.computedId;
+            if (c === "undefined") console.log(d);
+            return c
+        })
+        .attr("uuid", d => d.properties.uuid)
+        // .attr("class", d => `${d.sourceLayer}${d.properties.class ? '-' + d.properties.class : ''}`)
+        .attr("id", d => d.id)
+        .attr("stroke", d => {
+            if (d.properties.tileExtent) return 'blue';
+            if (d.properties.deadZone) return 'orange';
+            return "black"
+        })
+        .attr("fill", "transparent")
+        .attr("stroke-width", 1);
+
+    mapLibreContainer.classed('transparent', true);
+    console.log(svg.node());
 }
 
 function projectAndDraw(simplified = false) {
@@ -2010,7 +2122,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
             {/if}
             <div id="map-content" style="position: relative;">
                 <div id="map-container" class="col mx-4"></div>
-                <div id="maplibre-map"></div>
+                <div id="maplibre-map" class="transparent"></div>
             </div>
             <div class="mt-4 d-flex align-items-center justify-content-center">
                 <div class="mx-2">
@@ -2161,10 +2273,14 @@ function getLegendColors(dataColorDef, tab, scale, data) {
     flex: 0 0 auto;
 }
 #maplibre-map {
-    // position: absolute;
-    // top: 0px;
-    // left: 1.5rem;
-    display: none;
+    position: absolute;
+    top: 0px;
+    left: 1.5rem;
+    background-color: white;
+}
+#maplibre-map.transparent {
+    opacity: 0.1;
+    pointer-events: none;
 }
 #country-select{
   opacity: 0;

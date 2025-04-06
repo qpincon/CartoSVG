@@ -193,3 +193,34 @@ aside .nav-link.active {
 .hidden, .hidden-after {
     display: none;
 }
+
+#micro > path {
+    fill-opacity: 0.5;
+}
+#micro > .building {
+    fill: #f5dc98;
+} 
+#micro > .transportation-minor {
+    fill: #ffffff;
+} 
+#micro > .transportation-service {
+    fill: #c0c0c0;
+} 
+#micro > .landcover-grass {
+    fill: #b7f380;
+} 
+#micro > .landcover-wood {
+    fill: #7cd12c;
+} 
+#micro > .water-river {
+    fill: #2c8fd1;
+} 
+#micro > .water-lake {
+    fill: #3da1e4;
+} 
+#micro > .water-pond {
+    fill: #5bb9f8;
+} 
+#micro > .water-swiming_pool {
+    fill: #8ed2ff;
+} 
