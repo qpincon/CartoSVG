@@ -44,7 +44,7 @@ import { saveState, getState } from './util/save';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
 import {interestingBasicV2Layers} from './detailed'
-import { getRenderedFeatures } from './util/stitch2';
+import { getRenderedFeatures } from './util/geometryStitch';
 import { Map } from 'maplibre-gl';
 import { createDemoPage} from './svg/patternGenerator';
 

@@ -23,8 +23,9 @@
     "webpack-cli": "^5.0.1"
   },
   "dependencies": {
-    "@popperjs/core": "^2.11.6",
+    "@mapbox/tile-cover": "^3.0.2",
     "@turf/bbox": "^7.2.0",
+    "@turf/bbox-clip": "^7.2.0",
     "@turf/bbox-polygon": "^7.2.0",
     "@turf/boolean-disjoint": "^7.2.0",
     "@turf/boolean-overlap": "^7.2.0",

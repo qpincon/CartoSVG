@@ -25,7 +25,7 @@
 - [ ] Add spinner on loading (geosjon / font)
 - [x] Fix dragging created paths
 - [ ] Display labels using projection (how?)
-- [ ] Add credits to:
+- [x] Add credits to:
     - geoboundaries
     - d3
     - github
@@ -58,7 +58,7 @@
 - [ ] Sitemap
 - [x] Allow change fill color for land when base layer
 - [ ] README github: explain how optimizations work
-- [ ] Add example(s)
+- [x] Add example(s)
 - [x] Change default filter 2 
 - [x] Make more fine-tuning altitude/FOV more intuitive
 - [x] Allow minification of JS
