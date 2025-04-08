@@ -195,32 +195,44 @@ aside .nav-link.active {
 }
 
 #micro > path {
-    fill-opacity: 0.5;
+    fill: none;
 }
 #micro > .building {
-    fill: #f5dc98;
+    fill: #d0c9ad;
 } 
-#micro > .transportation-minor {
-    stroke: #000;
+
+#micro > .road-network {
+    stroke: #ffffff;
+    stroke-width: 5px;
 } 
-#micro > .transportation-service {
-    stroke: #c0c0c0;
+
+#micro > .path-minor {
+    stroke: #ffffff;
+    stroke-dasharray: 5;
+    stroke-width: 3px;
 } 
-#micro > .landcover-grass {
-    fill: #b7f380;
+
+#micro > .path {
+    stroke: #ffffff;
+    stroke-dasharray: 5;
+    stroke-width: 3px;
 } 
-#micro > .landcover-wood {
-    fill: #7cd12c;
+
+#micro > .grass {
+    fill: #bcd5a2;
 } 
-#micro > .water-river {
-    fill: #2c8fd1;
+#micro > .forest {
+    fill: #b4d296;
 } 
-#micro > .water-lake {
-    fill: #3da1e4;
+#micro > .wood {
+    fill: #bcd5a2;
 } 
-#micro > .water-pond {
-    fill: #5bb9f8;
-} 
-#micro > .water-swiming_pool {
-    fill: #8ed2ff;
-} 
+#micro > .water {
+    fill: #94c1e1;
+}
+#micro > .river {
+    stroke: #94c1e1;
+}
+#micro > .sand {
+    fill: #e8e2a4;
+}

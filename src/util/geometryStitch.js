@@ -9,7 +9,6 @@ import center from "@turf/center";
 import { groupBy } from 'lodash-es';
 import { tiles as getTiles } from '@mapbox/tile-cover';
 import bboxClip from "@turf/bbox-clip";
-// import { testBounds, testRendered, testTiles} from "./testData";
 
 
 /**
@@ -111,6 +110,7 @@ export function getRenderedFeatures(map, options) {
     return {
       // _vectorTileFeature: f._vectorTileFeature,
       id: f.id,
+      layer: f.layer,
       properties: f.properties,
       geometry: f.geometry,
       source: f.source,
@@ -149,9 +149,9 @@ export function getRenderedFeatures(map, options) {
 
   const finalGeometries = stitch(renderedFeatures, tiles, mapBounds);
 
-  tiles.forEach(t => {
-    finalGeometries.splice(0, 0, t.polyBuffer);
-  });
+  // tiles.forEach(t => {
+  //   finalGeometries.splice(0, 0, t.polyBuffer);
+  // });
   return finalGeometries;
 }
 
@@ -195,8 +195,8 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
     }
   });
 
-  console.log('cuts=', cuts);
-  console.log('deadZones=', deadZones);
+  // console.log('cuts=', cuts);
+  // console.log('deadZones=', deadZones);
 
   const allPolygons = [];
   const allLines = [];
@@ -205,6 +205,8 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
   /** Explode and filter polygon features */
   renderedFeatures.forEach(feature => {
     feature.properties.computedId = getComputedId(feature);
+    feature.properties.mapLayerId = feature.layer.id;
+    feature.properties.sourceLayer = feature.sourceLayer;
     allClasses.add(feature.properties.computedId);
     if (feature.geometry.type === 'Polygon') {
       feature.boundingBox = bbox(feature);
@@ -263,35 +265,51 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
 
   console.log("allLines=", allLines);
   console.log("allPolygons=", allPolygons);
-  const allLinesWithCutLines = [...allLines];
-  tiles.forEach(t => {
-    allLinesWithCutLines.splice(0, 0, t.polyBuffer);
-  });
-
-  console.log("allLinesWithCutLines=", featureCollection(allLinesWithCutLines));
   console.log("allClasses=", allClasses);
   return [...stitchPolygons(allPolygons, cuts, deadZones, tiles), ...stitchLines(allLines, cuts, deadZones, tiles)];
 }
+
 function stitchLines(allLines, cuts, deadZones, tiles) {
   const featuresByClass = groupBy(allLines, f => f.properties.computedId);
-  // console.log('featuresByClass', featuresByClass);
+  console.log('featuresByClass', featuresByClass);
   const finalFeatures = [];
 
   Object.values(featuresByClass).forEach(lines => {
-    // console.log("lines", JSON.parse(JSON.stringify(lines)));
-
+    console.log("lines", JSON.parse(JSON.stringify(lines)));
+    const linesToStitch = [];
     for (let lineIndex = 0; lineIndex < lines.length; ++lineIndex) {
       const line = lines[lineIndex];
       const tile = tiles.find(t => t.x === line.properties.x && t.y === line.properties.y);
       const tileBounds = tile.tileBounds;
       const bboxTile = [tileBounds.west, tileBounds.south, tileBounds.east, tileBounds.north];
       /** The line is fully contained in the tile, no need to clip it */
-      if (bboxContains(bboxTile, line.boundingBox)) continue;
-      lines[lineIndex] = bboxClip(line, bboxTile);
+      if (bboxContains(bboxTile, line.boundingBox)) {
+        linesToStitch.push(line);
+        continue;
+      }
+      const clipped = bboxClip(line, bboxTile);
+
+      if (clipped.geometry.type === 'LineString') {
+        linesToStitch.push(clipped);
+      } else if (clipped.geometry.type === 'MultiLineString') {
+        clipped.geometry.coordinates.forEach(linestring => {
+          const lineFeature = {
+            id: clipped.id,
+            properties: clipped.properties,
+            geometry: {
+              type: "LineString",
+              coordinates: linestring
+            },
+            type: "Feature",
+          };
+          linesToStitch.push(lineFeature);
+        });
+      }
+      
     }
 
-    // console.log("lines after clipping", lines);
-    finalFeatures.push(...mergeLineStrings(lines));
+    console.log("linesToStitch", linesToStitch);
+    finalFeatures.push(...mergeLineStrings(linesToStitch));
   });
   return finalFeatures;
 }
@@ -357,7 +375,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
     for (let i = 0; i < segmentsToProcess.length; ++i) {
       const [polygonIndex, ringIndex, coordIndex, cutDirection] = segmentsToProcess[i];
       if (polygonCutIndexExclude.has(polygonIndex)) continue;
-      console.log('finding match for', segmentsToProcess[i]);
+      // console.log('finding match for', segmentsToProcess[i]);
       const matching = segmentsToProcess.filter(segment => {
         const [curPolygonIndex, curRingIndex, curCoordIndex, curCutDirection] = segment;
         if (polygonCutIndexExclude.has(curPolygonIndex)) return;
@@ -414,9 +432,9 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
     console.log('finalPolygons=', finalPolygons);
     mergedFeatures.push(...finalPolygons);
 
-    for (const deadZone of deadZones) {
-      mergedFeatures.push(bboxPolygon(deadZone.bbox, { properties: { deadZone: true } }));
-    }
+    // for (const deadZone of deadZones) {
+    //   mergedFeatures.push(bboxPolygon(deadZone.bbox, { properties: { deadZone: true } }));
+    // }
   });
   return mergedFeatures;
 }
@@ -525,7 +543,7 @@ function mergeLineStrings(features) {
 
   // Helper function to merge two LineString Features
   const mergeTwoFeatures = (feature1, feature2, connectFirst1, connectFirst2) => {
-    console.log("merging", feature1, feature2, connectFirst1, connectFirst2);
+    console.log('merge', feature1, feature2);
     const coords1 = feature1.geometry.coordinates;
     const coords2 = feature2.geometry.coordinates;
     let mergedCoords = [];
@@ -681,776 +699,3 @@ function checkSegmentVerticalCut(p1, p2, cuts) {
   if (Math.abs(p1[0] - p2[0]) > 0.0000001) return false;
   return cuts['v'].some(p => Math.abs(p - p1[0]) < 0.0000001);
 }
-
-
-const testRendered = [
-  {
-    "id": 41804121,
-    "properties": {
-      "class": "grass",
-      "subclass": "meadow",
-      "id": 41804121,
-      "x": 16615,
-      "y": 11461,
-      "computedId": "landcover-grass-meadow",
-      "center": [
-        2.546357810497284,
-        47.472917595641974
-      ],
-      "uuid": "2.5463578-47.4729176",
-      "index": 0
-    },
-    "geometry": {
-      "type": "Polygon",
-      "coordinates": [
-        [
-          [
-            2.547385096549988,
-            47.47254683536755
-          ],
-          [
-            2.5451722741127014,
-            47.47254683536755
-          ],
-          [
-            2.5456926226615906,
-            47.473288355916395
-          ],
-          [
-            2.5475433468818665,
-            47.47286592617718
-          ],
-          [
-            2.547385096549988,
-            47.47254683536755
-          ]
-        ]
-      ]
-    },
-    "source": "maptiler_planet",
-    "sourceLayer": "landcover",
-    "type": "Feature",
-    "boundingBox": [
-      2.5451722741127014,
-      47.47254683536755,
-      2.5475433468818665,
-      47.473288355916395
-    ]
-  },
-  {
-    "id": 385230348,
-    "properties": {
-      "class": "grass",
-      "subclass": "grass",
-      "id": 385230348,
-      "x": 16615,
-      "y": 11462,
-      "computedId": "landcover-grass-grass",
-      "center": [
-        2.546282708644867,
-        47.47168111043963
-      ],
-      "uuid": "2.5462827-47.4716811",
-      "index": 1
-    },
-    "geometry": {
-      "type": "Polygon",
-      "coordinates": [
-        [
-          [
-            2.5461968779563904,
-            47.47173278242363
-          ],
-          [
-            2.5461727380752563,
-            47.47175091291601
-          ],
-          [
-            2.546210289001465,
-            47.471745473768976
-          ],
-          [
-            2.546255886554718,
-            47.471738221572
-          ],
-          [
-            2.5462961196899414,
-            47.47173459547315
-          ],
-          [
-            2.5463470816612244,
-            47.47173096937405
-          ],
-          [
-            2.5463926792144775,
-            47.47173278242363
-          ],
-          [
-            2.5463256239891052,
-            47.47168020396032
-          ],
-          [
-            2.546277344226837,
-            47.47164394292048
-          ],
-          [
-            2.5462505221366882,
-            47.47161130796326
-          ],
-          [
-            2.5462505221366882,
-            47.47163306460368
-          ],
-          [
-            2.5462505221366882,
-            47.47165300818281
-          ],
-          [
-            2.5462424755096436,
-            47.471674764805954
-          ],
-          [
-            2.546231746673584,
-            47.47169833447083
-          ],
-          [
-            2.5462183356285095,
-            47.47171646497512
-          ],
-          [
-            2.5461968779563904,
-            47.47173278242363
-          ]
-        ]
-      ]
-    },
-    "source": "maptiler_planet",
-    "sourceLayer": "landcover",
-    "type": "Feature",
-    "boundingBox": [
-      2.5461727380752563,
-      47.47161130796326,
-      2.5463926792144775,
-      47.47175091291601
-    ]
-  },
-  {
-    "id": 41804121,
-    "properties": {
-      "class": "grass",
-      "subclass": "meadow",
-      "id": 41804121,
-      "x": 16615,
-      "y": 11462,
-      "computedId": "landcover-grass-meadow",
-      "index": 3
-    },
-    "geometry": {
-      "type": "MultiPolygon",
-      "coordinates": [
-        [
-          [
-            [
-              2.5444936752319336,
-              47.46883544937785
-            ],
-            [
-              2.5436004996299744,
-              47.469635042227
-            ],
-            [
-              2.543882131576538,
-              47.46970031457556
-            ],
-            [
-              2.5443997979164124,
-              47.47025150006456
-            ],
-            [
-              2.544981837272644,
-              47.470039366859965
-            ],
-            [
-              2.5458428263664246,
-              47.47064856760781
-            ],
-            [
-              2.545005977153778,
-              47.4709477261041
-            ],
-            [
-              2.5445660948753357,
-              47.470641315259485
-            ],
-            [
-              2.5447887182235718,
-              47.47199567395111
-            ],
-            [
-              2.54533588886261,
-              47.47277890160308
-            ],
-            [
-              2.547500431537628,
-              47.47277890160308
-            ],
-            [
-              2.5470900535583496,
-              47.47195216096151
-            ],
-            [
-              2.547428011894226,
-              47.47199023482938
-            ],
-            [
-              2.5475353002548218,
-              47.47092415610254
-            ],
-            [
-              2.5484901666641235,
-              47.470730156457506
-            ],
-            [
-              2.548999786376953,
-              47.47080993209917
-            ],
-            [
-              2.548999786376953,
-              47.469379391414435
-            ],
-            [
-              2.548653781414032,
-              47.46958790103591
-            ],
-            [
-              2.547755241394043,
-              47.46981998033746
-            ],
-            [
-              2.5467440485954285,
-              47.46970575393428
-            ],
-            [
-              2.5465750694274902,
-              47.469212583121674
-            ],
-            [
-              2.546685039997101,
-              47.46860336572894
-            ],
-            [
-              2.5467950105667114,
-              47.468222601272515
-            ],
-            [
-              2.5472429394721985,
-              47.4678001308142
-            ],
-            [
-              2.5466206669807434,
-              47.466889903952705
-            ],
-            [
-              2.5452205538749695,
-              47.46742480013367
-            ],
-            [
-              2.5443193316459656,
-              47.466855452825655
-            ],
-            [
-              2.544485628604889,
-              47.4661301606987
-            ],
-            [
-              2.5448745489120483,
-              47.46540848509943
-            ],
-            [
-              2.5427421927452087,
-              47.46602136601646
-            ],
-            [
-              2.5421226024627686,
-              47.46512017474103
-            ],
-            [
-              2.539786398410797,
-              47.46512017474103
-            ],
-            [
-              2.5409477949142456,
-              47.46636588173769
-            ],
-            [
-              2.5414520502090454,
-              47.466442037539736
-            ],
-            [
-              2.542581260204315,
-              47.467468316871674
-            ],
-            [
-              2.543310821056366,
-              47.46773304291827
-            ],
-            [
-              2.5445473194122314,
-              47.46780557036959
-            ],
-            [
-              2.5444936752319336,
-              47.46883544937785
-            ]
-          ]
-        ],
-        [
-          [
-            [
-              2.548256814479828,
-              47.46840935751723
-            ],
-            [
-              2.548999786376953,
-              47.4691309919161
-            ],
-            [
-              2.548999786376953,
-              47.467932493168576
-            ],
-            [
-              2.548256814479828,
-              47.46840935751723
-            ]
-          ]
-        ]
-      ]
-    },
-    "source": "maptiler_planet",
-    "sourceLayer": "landcover",
-    "type": "Feature"
-  },
-  {
-    "id": 41804121,
-    "properties": {
-      "class": "grass",
-      "subclass": "meadow",
-      "id": 41804121,
-      "x": 16616,
-      "y": 11462,
-      "computedId": "landcover-grass-meadow",
-      "center": [
-        2.5543212890625,
-        47.468949538172055
-      ],
-      "uuid": "2.5543213-47.4689495",
-      "index": 4
-    },
-    "geometry": {
-      "type": "Polygon",
-      "coordinates": [
-        [
-          [
-            2.548656463623047,
-            47.46958608791229
-          ],
-          [
-            2.548656463623047,
-            47.47075735271258
-          ],
-          [
-            2.549726665019989,
-            47.470920529947534
-          ],
-          [
-            2.5514674186706543,
-            47.47106920209828
-          ],
-          [
-            2.551523745059967,
-            47.47118342553813
-          ],
-          [
-            2.55107581615448,
-            47.47164212986786
-          ],
-          [
-            2.551751732826233,
-            47.47202105651175
-          ],
-          [
-            2.5520119071006775,
-            47.47277890160308
-          ],
-          [
-            2.5534656643867493,
-            47.47277890160308
-          ],
-          [
-            2.5528165698051453,
-            47.471600429639665
-          ],
-          [
-            2.555117905139923,
-            47.471023875267605
-          ],
-          [
-            2.556247115135193,
-            47.47231839416611
-          ],
-          [
-            2.557590901851654,
-            47.47177992169085
-          ],
-          [
-            2.558363378047943,
-            47.47027144416796
-          ],
-          [
-            2.5589239597320557,
-            47.4702206773444
-          ],
-          [
-            2.5597071647644043,
-            47.471100024320776
-          ],
-          [
-            2.5591492652893066,
-            47.47158773825933
-          ],
-          [
-            2.559911012649536,
-            47.47221323835868
-          ],
-          [
-            2.559811770915985,
-            47.47226037719494
-          ],
-          [
-            2.559986114501953,
-            47.472289385688526
-          ],
-          [
-            2.559986114501953,
-            47.46512017474103
-          ],
-          [
-            2.557413876056671,
-            47.46512017474103
-          ],
-          [
-            2.557397782802582,
-            47.46538491261376
-          ],
-          [
-            2.5574541091918945,
-            47.465994167310726
-          ],
-          [
-            2.5570088624954224,
-            47.46656715040359
-          ],
-          [
-            2.556391954421997,
-            47.46698600434567
-          ],
-          [
-            2.5561103224754333,
-            47.466376761144744
-          ],
-          [
-            2.5551554560661316,
-            47.46672127453661
-          ],
-          [
-            2.5549891591072083,
-            47.4673305137444
-          ],
-          [
-            2.5551608204841614,
-            47.46801589941245
-          ],
-          [
-            2.552918493747711,
-            47.46855259729409
-          ],
-          [
-            2.55144864320755,
-            47.46672671420367
-          ],
-          [
-            2.5508853793144226,
-            47.466119281240594
-          ],
-          [
-            2.5504937767982483,
-            47.46657802976898
-          ],
-          [
-            2.5499922037124634,
-            47.467225347956884
-          ],
-          [
-            2.549152672290802,
-            47.467836394506094
-          ],
-          [
-            2.548656463623047,
-            47.468151887569746
-          ],
-          [
-            2.548656463623047,
-            47.46879737322445
-          ],
-          [
-            2.549158036708832,
-            47.46928329539739
-          ],
-          [
-            2.548656463623047,
-            47.46958608791229
-          ]
-        ]
-      ]
-    },
-    "source": "maptiler_planet",
-    "sourceLayer": "landcover",
-    "type": "Feature",
-    "boundingBox": [
-      2.548656463623047,
-      47.46512017474103,
-      2.559986114501953,
-      47.47277890160308
-    ]
-  }
-];
-const testTiles = [
-  {
-    "tileBounds": {
-      "north": 47.48008846346321,
-      "south": 47.47266286861342,
-      "east": 2.548828125,
-      "west": 2.537841796875
-    },
-    "polyBuffer": {
-      "type": "Feature",
-      "properties": {
-        "tileExtent": true
-      },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [
-          [
-            [
-              2.537670135498047,
-              47.47254684369389
-            ],
-            [
-              2.537670135498047,
-              47.48020448838274
-            ],
-            [
-              2.548999786376953,
-              47.48020448838274
-            ],
-            [
-              2.548999786376953,
-              47.47254684369389
-            ],
-            [
-              2.537670135498047,
-              47.47254684369389
-            ]
-          ]
-        ]
-      }
-    },
-    "tileBufferBounds": {
-      "north": 47.48020448838274,
-      "south": 47.47254684369389,
-      "west": 2.537670135498047,
-      "east": 2.548999786376953
-    },
-    "x": 16615,
-    "y": 11461
-  },
-  {
-    "tileBounds": {
-      "north": 47.48008846346321,
-      "south": 47.47266286861342,
-      "east": 2.559814453125,
-      "west": 2.548828125
-    },
-    "polyBuffer": {
-      "type": "Feature",
-      "properties": {
-        "tileExtent": true
-      },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [
-          [
-            [
-              2.548656463623047,
-              47.47254684369389
-            ],
-            [
-              2.548656463623047,
-              47.48020448838274
-            ],
-            [
-              2.559986114501953,
-              47.48020448838274
-            ],
-            [
-              2.559986114501953,
-              47.47254684369389
-            ],
-            [
-              2.548656463623047,
-              47.47254684369389
-            ]
-          ]
-        ]
-      }
-    },
-    "tileBufferBounds": {
-      "north": 47.48020448838274,
-      "south": 47.47254684369389,
-      "west": 2.548656463623047,
-      "east": 2.559986114501953
-    },
-    "x": 16616,
-    "y": 11461
-  },
-  {
-    "tileBounds": {
-      "north": 47.47266286861342,
-      "south": 47.46523622438362,
-      "east": 2.559814453125,
-      "west": 2.548828125
-    },
-    "polyBuffer": {
-      "type": "Feature",
-      "properties": {
-        "tileExtent": true
-      },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [
-          [
-            [
-              2.548656463623047,
-              47.465120183067526
-            ],
-            [
-              2.548656463623047,
-              47.47277890992951
-            ],
-            [
-              2.559986114501953,
-              47.47277890992951
-            ],
-            [
-              2.559986114501953,
-              47.465120183067526
-            ],
-            [
-              2.548656463623047,
-              47.465120183067526
-            ]
-          ]
-        ]
-      }
-    },
-    "tileBufferBounds": {
-      "north": 47.47277890992951,
-      "south": 47.465120183067526,
-      "west": 2.548656463623047,
-      "east": 2.559986114501953
-    },
-    "x": 16616,
-    "y": 11462
-  },
-  {
-    "tileBounds": {
-      "north": 47.47266286861342,
-      "south": 47.46523622438362,
-      "east": 2.548828125,
-      "west": 2.537841796875
-    },
-    "polyBuffer": {
-      "type": "Feature",
-      "properties": {
-        "tileExtent": true
-      },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [
-          [
-            [
-              2.537670135498047,
-              47.465120183067526
-            ],
-            [
-              2.537670135498047,
-              47.47277890992951
-            ],
-            [
-              2.548999786376953,
-              47.47277890992951
-            ],
-            [
-              2.548999786376953,
-              47.465120183067526
-            ],
-            [
-              2.537670135498047,
-              47.465120183067526
-            ]
-          ]
-        ]
-      }
-    },
-    "tileBufferBounds": {
-      "north": 47.47277890992951,
-      "south": 47.465120183067526,
-      "west": 2.537670135498047,
-      "east": 2.548999786376953
-    },
-    "x": 16615,
-    "y": 11462
-  }
-];
-const testBounds = {
-  "type": "Feature",
-  "properties": {},
-  "geometry": {
-    "type": "Polygon",
-    "coordinates": [
-      [
-        [
-          2.5440872586023886,
-          47.47414349614263
-        ],
-        [
-          2.5514315271361454,
-          47.47414349614263
-        ],
-        [
-          2.5514315271361454,
-          47.46859989290638
-        ],
-        [
-          2.5440872586023886,
-          47.46859989290638
-        ],
-        [
-          2.5440872586023886,
-          47.47414349614263
-        ]
-      ]
-    ]
-  }
-};
-stitch(testRendered, testTiles, testBounds)

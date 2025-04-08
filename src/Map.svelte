@@ -6,7 +6,7 @@ import { presimplify, simplify } from 'topojson-simplify';
 import * as d3 from "d3";
 import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
 import 'bootstrap/js/dist/dropdown';
-import { debounce, throttle} from 'lodash-es';
+import { debounce, kebabCase, throttle} from 'lodash-es';
 import dataExplanation from './assets/dataColor.svg';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import { transitionCss } from './svg/transition';
@@ -43,7 +43,7 @@ import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts } from '.
 import { saveState, getState } from './util/save';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
-import {interestingBasicV2Layers} from './detailed'
+import {interestingBasicV2Layers, orderFeaturesByLayer} from './detailed'
 import { getRenderedFeatures } from './util/geometryStitch';
 import { Map } from 'maplibre-gl';
 import { createDemoPage} from './svg/patternGenerator';
@@ -434,7 +434,8 @@ onMount(async() => {
         if (canDrawMicro) draw();
     });
     maplibreMap.on('click', (event) => {
-        console.log(event);
+        console.log(maplibreMap.getStyle());
+
         const features = maplibreMap.queryRenderedFeatures(event.point, { layers: interestingBasicV2Layers });
         for (const f of features) {
             console.log(f, f.geometry);
@@ -443,19 +444,19 @@ onMount(async() => {
     // maplibreMap.on('mousemove', (event) => {
     //     console.log(event.lngLat)
     // });
-    maplibreMap.addLayer({
-        'id': 'test',
-        'type': 'line',
-        source: "maptiler_planet",
-        "source-layer": "building",
-        paint: {
-            'line-width': 1,
-            'line-color': '#000',
-        },
-        layout: {
-            visibility: 'visible',
-        }
-    });
+    // maplibreMap.addLayer({
+    //     'id': 'test',
+    //     'type': 'line',
+    //     source: "maptiler_planet",
+    //     "source-layer": "building",
+    //     paint: {
+    //         'line-width': 1,
+    //         'line-color': '#000',
+    //     },
+    //     layout: {
+    //         visibility: 'visible',
+    //     }
+    // });
     // createDemoPage();
     // const container = d3.select('#map-container');
     // container.on('click', (e) => {
@@ -898,31 +899,20 @@ function drawMicro() {
     projection = createD3ProjectionFromMapLibre(maplibreMap);
     path = d3.geoPath(projection);
     const geometries = getRenderedFeatures(maplibreMap, { layers: interestingBasicV2Layers });
-    // const geometries = maplibreMap.querySourceFeatures("maptiler_planet", {sourceLayer: "building"});
+    orderFeaturesByLayer(geometries);
     console.log('geometries', geometries);
-    svg.style("background-color", "#efff7e");
+    svg.style("background-color", "#e8e8da");
     svg.append('g')
         .attr('id', 'micro')
         .selectAll('path')
         .data(geometries)
         .enter()
         .append("path")
-        .attr("d", (d) => {return path(d.geometry);})
-        .attr("class", d => {
-            const c = d.properties.computedId;
-            if (c === "undefined") console.log(d);
-            return c
-        })
+        .attr("d", (d) => path(d.geometry))
+        .attr("class", d => kebabCase(d.properties.mapLayerId))
+        .attr("computed-id", d => d.properties.computedId)
         .attr("uuid", d => d.properties.uuid)
-        // .attr("class", d => `${d.sourceLayer}${d.properties.class ? '-' + d.properties.class : ''}`)
-        .attr("id", d => d.id)
-        .attr("stroke", d => {
-            if (d.properties.tileExtent) return 'blue';
-            if (d.properties.deadZone) return 'orange';
-            return "black"
-        })
-        .attr("fill", "transparent")
-        .attr("stroke-width", 1);
+        .attr("id", d => d.id);
 
     mapLibreContainer.classed('transparent', true);
     console.log(svg.node());
