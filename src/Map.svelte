@@ -43,7 +43,7 @@ import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts } from '.
 import { saveState, getState } from './util/save';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
-import {interestingBasicV2Layers, orderFeaturesByLayer} from './detailed'
+import {drawPrettyMap, interestingBasicV2Layers, orderFeaturesByLayer} from './detailed'
 import { getRenderedFeatures } from './util/geometryStitch';
 import { Map } from 'maplibre-gl';
 import { createDemoPage} from './svg/patternGenerator';
@@ -321,6 +321,7 @@ let canDrawMicro = false;
 
 onMount(async() => {
     commonStyleSheetElem = document.createElement('style');
+    commonStyleSheetElem.setAttribute('id', 'common-style-sheet-elem');
     document.head.appendChild(commonStyleSheetElem);
     commonStyleSheetElem.innerHTML = baseCss;
     await layerPromises;
@@ -435,41 +436,7 @@ onMount(async() => {
     });
     maplibreMap.on('click', (event) => {
         console.log(maplibreMap.getStyle());
-
-        const features = maplibreMap.queryRenderedFeatures(event.point, { layers: interestingBasicV2Layers });
-        for (const f of features) {
-            console.log(f, f.geometry);
-        }   
     });
-    // maplibreMap.on('mousemove', (event) => {
-    //     console.log(event.lngLat)
-    // });
-    // maplibreMap.addLayer({
-    //     'id': 'test',
-    //     'type': 'line',
-    //     source: "maptiler_planet",
-    //     "source-layer": "building",
-    //     paint: {
-    //         'line-width': 1,
-    //         'line-color': '#000',
-    //     },
-    //     layout: {
-    //         visibility: 'visible',
-    //     }
-    // });
-    // createDemoPage();
-    // const container = d3.select('#map-container');
-    // container.on('click', (e) => {
-    //     maplibreMap.fire('click');
-    // });
-    // container.on('onmousemove', (e) => {
-    //     console.log(e);
-    //     maplibreMap.fire('onmousemove');
-    // });
-    // container.on('dragstart', (e) => {
-    //     console.log(e);
-    // });
-
 });
 
 function maybeDisplayMaplibreMap() {
@@ -892,30 +859,9 @@ function drawMacro(graticule) {
 }
 
 function drawMicro() {
-    const container = d3.select('#map-container');
-    const mapLibreContainer = d3.select('#maplibre-map');
-    console.log('drawMicro');
-    console.log(maplibreMap.getStyle());
     projection = createD3ProjectionFromMapLibre(maplibreMap);
     path = d3.geoPath(projection);
-    const geometries = getRenderedFeatures(maplibreMap, { layers: interestingBasicV2Layers });
-    orderFeaturesByLayer(geometries);
-    console.log('geometries', geometries);
-    svg.style("background-color", "#e8e8da");
-    svg.append('g')
-        .attr('id', 'micro')
-        .selectAll('path')
-        .data(geometries)
-        .enter()
-        .append("path")
-        .attr("d", (d) => path(d.geometry))
-        .attr("class", d => kebabCase(d.properties.mapLayerId))
-        .attr("computed-id", d => d.properties.computedId)
-        .attr("uuid", d => d.properties.uuid)
-        .attr("id", d => d.id);
-
-    mapLibreContainer.classed('transparent', true);
-    console.log(svg.node());
+    drawPrettyMap(maplibreMap, svg, path) 
 }
 
 function projectAndDraw(simplified = false) {

@@ -204,6 +204,7 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
   let i = 0;
   /** Explode and filter polygon features */
   renderedFeatures.forEach(feature => {
+    if (feature.properties.brunnel === "tunnel") return;
     feature.properties.computedId = getComputedId(feature);
     feature.properties.mapLayerId = feature.layer.id;
     feature.properties.sourceLayer = feature.sourceLayer;
@@ -263,23 +264,25 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
     }
   });
 
-  console.log("allLines=", allLines);
-  console.log("allPolygons=", allPolygons);
-  console.log("allClasses=", allClasses);
+  // console.log("allLines=", allLines);
+  // console.log("allPolygons=", allPolygons);
+  // console.log("allClasses=", allClasses);
   return [...stitchPolygons(allPolygons, cuts, deadZones, tiles), ...stitchLines(allLines, cuts, deadZones, tiles)];
 }
 
 function stitchLines(allLines, cuts, deadZones, tiles) {
   const featuresByClass = groupBy(allLines, f => f.properties.computedId);
-  console.log('featuresByClass', featuresByClass);
+  // console.log('featuresByClass', featuresByClass);
   const finalFeatures = [];
 
   Object.values(featuresByClass).forEach(lines => {
-    console.log("lines", JSON.parse(JSON.stringify(lines)));
+    // console.log("lines", JSON.parse(JSON.stringify(lines)));
+
     const linesToStitch = [];
     for (let lineIndex = 0; lineIndex < lines.length; ++lineIndex) {
       const line = lines[lineIndex];
       const tile = tiles.find(t => t.x === line.properties.x && t.y === line.properties.y);
+      if (!tile) continue;
       const tileBounds = tile.tileBounds;
       const bboxTile = [tileBounds.west, tileBounds.south, tileBounds.east, tileBounds.north];
       /** The line is fully contained in the tile, no need to clip it */
@@ -308,7 +311,7 @@ function stitchLines(allLines, cuts, deadZones, tiles) {
       
     }
 
-    console.log("linesToStitch", linesToStitch);
+    // console.log("linesToStitch", linesToStitch);
     finalFeatures.push(...mergeLineStrings(linesToStitch));
   });
   return finalFeatures;
@@ -323,7 +326,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
   const mergedFeatures = [];
   Object.values(featuresByClass).forEach(layerPolygons => {
 
-    console.log("layerPolygons=", layerPolygons);
+    // console.log("layerPolygons=", layerPolygons);
 
     // Identify cut polygon
     let segmentsToProcess = [];
@@ -345,10 +348,9 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
         }
       });
     });
-    console.log('segmentsToProcess', segmentsToProcess);
-
+    // console.log('segmentsToProcess', segmentsToProcess);
     const polygonIndexesCut = new Set(segmentsToProcess.map(s => s[0]));
-    console.log('polygonIndexesCut=', polygonIndexesCut);
+    // console.log('polygonIndexesCut=', polygonIndexesCut);
 
     // Filter cut polygons entirely in dead zones
     const polygonCutIndexExclude = new Set([...polygonIndexesCut].map(polygonIndex => {
@@ -366,7 +368,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
         polygonUuidDuplicated[p.properties.uuid] = pIndex;
       }
     });
-    console.log("polygonUuidDuplicated", polygonUuidDuplicated);
+    // console.log("polygonUuidDuplicated", polygonUuidDuplicated);
 
     // Determine which polygons to stitch together by:
     // - checking if pairwise segments are closeby together
@@ -400,7 +402,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
         }
       }
     }
-    console.log('stitchGroups=', stitchGroups);
+    // console.log('stitchGroups=', stitchGroups);
 
     // merge groups that have intersection
     const finalStichGroups = mergeSets(stitchGroups);
@@ -429,7 +431,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
       finalPolygons.push(stitched)
     }
 
-    console.log('finalPolygons=', finalPolygons);
+    // console.log('finalPolygons=', finalPolygons);
     mergedFeatures.push(...finalPolygons);
 
     // for (const deadZone of deadZones) {
@@ -543,7 +545,6 @@ function mergeLineStrings(features) {
 
   // Helper function to merge two LineString Features
   const mergeTwoFeatures = (feature1, feature2, connectFirst1, connectFirst2) => {
-    console.log('merge', feature1, feature2);
     const coords1 = feature1.geometry.coordinates;
     const coords2 = feature2.geometry.coordinates;
     let mergedCoords = [];
