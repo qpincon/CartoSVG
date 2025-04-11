@@ -6,7 +6,7 @@ import { presimplify, simplify } from 'topojson-simplify';
 import * as d3 from "d3";
 import InlineStyleEditor from '../node_modules/inline-style-editor/dist/inline-style-editor.mjs';
 import 'bootstrap/js/dist/dropdown';
-import { debounce, kebabCase, throttle} from 'lodash-es';
+import { debounce, throttle} from 'lodash-es';
 import dataExplanation from './assets/dataColor.svg';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import { transitionCss } from './svg/transition';
@@ -36,6 +36,8 @@ import Accordions from './components/Accordions.svelte';
 import Navbar from './components/Navbar.svelte';
 import ColorPickerPreview from './components/ColorPickerPreview.svelte';
 
+import macroImg from "./assets/img/macro.png";
+import microImg from "./assets/img/micro.png";
 import Instructions from './components/Instructions.svelte';
 import Icon from './components/Icon.svelte';
 import RangeInput from './components/RangeInput.svelte';
@@ -43,8 +45,7 @@ import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts } from '.
 import { saveState, getState } from './util/save';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
-import {drawPrettyMap, interestingBasicV2Layers, orderFeaturesByLayer} from './detailed'
-import { getRenderedFeatures } from './util/geometryStitch';
+import {drawPrettyMap} from './detailed'
 import { Map } from 'maplibre-gl';
 import { createDemoPage} from './svg/patternGenerator';
 
@@ -294,14 +295,8 @@ let currentTab = 'countries';
 
 let mainMenuSelection = 'general';
 let currentMode = 'macro';
-$: if (true || mainMenuSelection) { 
-    tick().then(() => {
-        /** Store latest mode selected */
-        if (mainMenuSelection !== "general") switchMode(mainMenuSelection);
-        initTooltips();
-        draw();
-    });
-}
+$: if (true || mainMenuSelection) { tick().then(() => initTooltips()); }
+$: if (true || currentMode) { switchMode() }
 let editingPath = false;
 
 // This contains the common CSS that can ben editor with inline-css-editor
@@ -431,7 +426,8 @@ onMount(async() => {
     maplibreMap.showTileBoundaries = true;
     maplibreMap.on('idle', (event) => {
         console.log('idle');
-        canDrawMicro = maplibreMap.getZoom() >= THRESH_ZOOM_MICRO;
+        // canDrawMicro = maplibreMap.getZoom() >= THRESH_ZOOM_MICRO;
+        canDrawMicro = true;
         if (canDrawMicro) draw();
     });
     maplibreMap.on('click', (event) => {
@@ -443,8 +439,7 @@ function maybeDisplayMaplibreMap() {
     d3.select('#maplibre-map').classed('transparent', false);
 }
 
-function switchMode(newMode) {
-    currentMode = newMode;
+function switchMode() {
     const mapLibreContainer = d3.select('#maplibre-map');
     if (currentMode === 'micro') {
         mapLibreContainer.style('display', 'block');
@@ -496,9 +491,6 @@ function mapLibreFitBounds() {
     maplibreMap.resize();
     const bounds = getGeographicalBounds(projection, p('width'), p('height'));
     maplibreMap.fitBounds(bounds, {animate: false});
-    // if (currentMode === "micro") {
-    //     canDrawMicro = maplibreMap.getZoom() >= THRESH_ZOOM_MICRO
-    // }
 }
 
 const redrawThrottle = throttle(redraw, 50);
@@ -1785,8 +1777,57 @@ function getLegendColors(dataColorDef, tab, scale, data) {
 <div class="d-flex align-items-start h-100">
     <aside id="params" class="h-100">
         <div id="main-panel" class="d-flex flex-column align-items-center pt-4 h-100">
-            <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups">
-                <div class="btn-group" role="group">
+            <div class="mode-selection btn-group" role="group">
+                <input
+                    type="radio"
+                    class="btn-check"
+                    name="mainModeSwitch"
+                    id="switchMacro"
+                    bind:group={currentMode}
+                    value='macro'
+                    autocomplete="off"
+                />
+                <label class="btn btn-outline-primary fs-3" for="switchMacro">
+                    <img src="{macroImg}" width="50">
+                    Macro
+                </label>
+                
+                <input
+                type="radio"
+                class="btn-check"
+                name="mainModeSwitch"
+                id="switchMicro"
+                autocomplete="off"
+                bind:group={currentMode}
+                value='micro'
+                />
+                <label class="btn btn-outline-primary fs-3" for="switchMicro">
+                    Detailed
+                    <img src="{microImg}" width="50">
+                </label>
+            </div>
+
+
+            <div class="w-100 ">
+                <ul class="nav nav-tabs align-items-center justify-content-center m-1">
+                    <li class="nav-item d-flex align-items-center mx-1">
+                        <a href="javascript:;" class="nav-link d-flex align-items-center position-relative fs-5"
+                        on:click={() => mainMenuSelection = "general"}
+                        class:active={mainMenuSelection === "general"}>
+                            General
+                        </a>
+                </li>
+                <li class="nav-item d-flex align-items-center mx-1">
+                    <a href="javascript:;" class="nav-link d-flex align-items-center position-relative fs-5"
+                        on:click={() => mainMenuSelection = "layers"}
+                        class:active={mainMenuSelection === "layers"}>
+                            Layers
+                        </a>
+                    </li>
+
+                </ul>
+            </div>
+                <!-- <div class="btn-group" role="group">
                     <input
                         type="radio"
                         class="btn-check"
@@ -1796,38 +1837,24 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                         value='general'
                         autocomplete="off"
                     />
-                    <label class="btn btn-outline-primary" for="switchGeneral">General</label
-                    >
+                    <label class="btn btn-outline-primary" for="switchGeneral">General</label>
                     
-                </div>
-                <div class="btn-group" role="group">
                     <input
-                        type="radio"
-                        class="btn-check"
-                        name="paramsSwitch"
-                        id="switchMacro"
-                        autocomplete="off"
-                        bind:group={mainMenuSelection}
-                        value='macro'
+                    type="radio"
+                    class="btn-check"
+                    name="paramsSwitch"
+                    id="switchLayers"
+                    autocomplete="off"
+                    bind:group={mainMenuSelection}
+                    value='layers'
                     />
-                    <label class="btn btn-outline-primary" for="switchMacro">Macro</label>
-                    <input
-                        type="radio"
-                        class="btn-check"
-                        name="paramsSwitch"
-                        id="switchMicro"
-                        autocomplete="off"
-                        bind:group={mainMenuSelection}
-                        value='micro'
-                    />
-                    <label class="btn btn-outline-primary" for="switchMicro">Micro</label>
-                </div>
-            </div>
-    
+                    <label class="btn btn-outline-primary" for="switchLayers">Layers</label>
+                </div> -->
+            <!-- </div> -->
             <div id="main-menu" class="mt-4">
                 {#if mainMenuSelection === 'general'}
                     <Accordions sections={params} {paramDefs} {helpParams} otherParams={accordionVisiblityParams}  on:change={handleChangeProp} ></Accordions>
-                {:else if mainMenuSelection === 'macro'}
+                {:else if mainMenuSelection === 'layers'}
                 <div class="border border-primary rounded">
                     <div class="p-2">
                         <div class="form-check form-switch">
@@ -1840,7 +1867,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                         </div>
                     </div>
                     
-                    <ul class="nav nav-pills align-items-center m-1">
+                    <ul class="nav nav-tabs align-items-center m-1">
                         {#each computedOrderedTabs as tabTitle, index (tabTitle) }
                         {@const isLand = tabTitle === "land"}
                         <li class="nav-item d-flex align-items-center mx-1"
@@ -2184,6 +2211,9 @@ function getLegendColors(dataColorDef, tab, scale, data) {
     overflow-y: auto;
 }
 
+.settings-tab {
+    width: 100%;
+}
 #main-panel > .btn-group {
     .btn-check:checked + .btn {
         background-color: #465da3;
@@ -2191,7 +2221,22 @@ function getLegendColors(dataColorDef, tab, scale, data) {
     .btn {
         width: 100px;
     }
+   
+    &.mode-selection {
+        margin-bottom: 20px;
+        width: 80%;
+        img {
+            border-radius: 3px;
+        }
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+        }
+    }
 }
+
+
 
 #country-select:hover ~ span {
     color: #aeafaf;
