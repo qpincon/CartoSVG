@@ -406,6 +406,7 @@ onMount(async() => {
         },
         cssRuleFilter: (el, cssSelector) => {
             if (cssSelector.includes('ssc-')) return false;
+            if (cssSelector.includes('#micro > path')) return false;
             return true;
         },
         inlineDeletable: () => (false)
@@ -1788,8 +1789,8 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                     value='macro'
                     autocomplete="off"
                 />
-                <label class="btn btn-outline-primary fs-3" for="switchMacro">
-                    <img src="{macroImg}" width="50">
+                <label class="btn btn-outline-primary fs-3" for="switchMacro" class:active={currentMode === "macro"}>
+                    <img src="{macroImg}" width="50" height="50" >
                     Macro
                 </label>
                 
@@ -1802,9 +1803,9 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                 bind:group={currentMode}
                 value='micro'
                 />
-                <label class="btn btn-outline-primary fs-3" for="switchMicro">
+                <label class="btn btn-outline-primary fs-3" for="switchMicro" class:active={currentMode === "micro"}>
                     Detailed
-                    <img src="{microImg}" width="50">
+                    <img src="{microImg}" width="50" height="50">
                 </label>
             </div>
 
@@ -2223,13 +2224,17 @@ function getLegendColors(dataColorDef, tab, scale, data) {
     &.mode-selection {
         margin-bottom: 20px;
         width: 80%;
-        img {
-            border-radius: 3px;
-        }
         .btn {
             display: flex;
             align-items: center;
             justify-content: space-around;
+            img {
+                border: 2px solid transparent;
+                border-radius: 3px;
+            }
+            &.active img {
+                border: 2px solid white;
+            } 
         }
     }
 }

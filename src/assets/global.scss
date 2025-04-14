@@ -196,6 +196,8 @@ aside .nav-link.active {
 
 #micro > path {
     fill: none;
+    // stroke: black !important;
+    // stroke-width: 1px !important;
 }
 #micro > .building {
     fill: #d0c9ad;
@@ -232,4 +234,8 @@ aside .nav-link.active {
 }
 #micro > .sand {
     fill: #e8e2a4;
+}
+
+#micro > .tileExtent {
+    stroke: red !important;
 }

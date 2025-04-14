@@ -1,4 +1,4 @@
-const PRECISION = 5;
+const PRECISION = 7;
 
 
 function toFixed(num) {
@@ -31,7 +31,7 @@ export function mergeLineStrings(features) {
 
     // Helper function to create a string key from a point
     const pointToKey = (point) => {
-        return `${toFixed(point[0])},${toFixed(point[1])}`;
+        return `${point[0].toFixed(PRECISION)},${point[1].toFixed(PRECISION)}`;
     };
 
     // Create an index of endpoints to LineString features

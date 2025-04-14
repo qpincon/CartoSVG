@@ -4,7 +4,6 @@ import booleanDisjoint from "@turf/boolean-disjoint";
 import { featureCollection, polygon } from "@turf/helpers";
 import intersect from "@turf/intersect";
 import union from "@turf/union";
-import booleanOverlap from "@turf/boolean-overlap";
 import center from "@turf/center";
 import { groupBy } from 'lodash-es';
 import { tiles as getTiles } from '@mapbox/tile-cover';
@@ -45,6 +44,15 @@ import { mergeLineStrings } from "./linestitch";
 
 const MAX_ZOOM = 15;
 const FLOAT_DECIMALS = 7;
+
+function getTolerance(zoom) {
+  if (zoom < 3) return 0.1;
+  if (zoom < 6) return 0.01;
+  if (zoom < 10) return 0.001;
+  if (zoom < 13) return 0.0001;
+  return 0.000001;
+}
+
 // Get bounds of a tile
 function getTileBounds(x, y, zoom) {
   zoom = Math.min(Math.floor(zoom), MAX_ZOOM);
@@ -107,6 +115,7 @@ export function getRenderedFeatures(map, options) {
     f.properties.id = f.id;
     f.properties.x = f._vectorTileFeature._x;
     f.properties.y = f._vectorTileFeature._y;
+    f.properties.sourceLayer= f.sourceLayer;
     // visibleTiles.add(`${f._vectorTileFeature._x}-${f._vectorTileFeature._y}`);
     return {
       // _vectorTileFeature: f._vectorTileFeature,
@@ -115,7 +124,6 @@ export function getRenderedFeatures(map, options) {
       properties: f.properties,
       geometry: f.geometry,
       source: f.source,
-      sourceLayer: f.sourceLayer,
       type: f.type,
     }
   });
@@ -146,6 +154,8 @@ export function getRenderedFeatures(map, options) {
     return getTileBounds(x, y, zoom);
   });
 
+  tiles.zoom = map.getZoom();
+
   console.log('renderedFeatures=', renderedFeatures);
 
   const finalGeometries = stitch(renderedFeatures, tiles, mapBounds);
@@ -159,9 +169,9 @@ export function getRenderedFeatures(map, options) {
 export function stitch(renderedFeatures, tiles, mapBounds) {
   console.log('mapBounds=', mapBounds);
   console.log('tiles=', tiles);
-  console
   const cuts = { 'h': [], 'v': [] };
 
+  cuts.zoom = tiles.zoom;
   /** Polygons fully contained in this area are useless, as it means it is already complete in the adjacent tile */
   const deadZones = [];
   tiles.forEach(tile => {
@@ -198,79 +208,65 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
     }
   });
 
-  // console.log('cuts=', cuts);
-  // console.log('deadZones=', deadZones);
+  console.log('cuts=', cuts);
+  console.log('deadZones=', deadZones);
 
-  const allPolygons = [];
-  const allLines = [];
-  const allClasses = new Set();
+  const allPolygons = explodeGeometry(renderedFeatures, "Polygon").filter(feature => {
+    feature.boundingBox = bbox(feature);
+    feature.bboxPoly = bboxPolygon(feature.boundingBox);
+    if (booleanDisjoint(mapBounds, feature.bboxPoly)) return false;
+    return true;
+  });
+
+  const allLines = explodeGeometry(renderedFeatures, "LineString").filter(feature => {
+    if (feature.properties.brunnel === "tunnel") return false;
+    feature.boundingBox = bbox(feature);
+    feature.bboxPoly = bboxPolygon(feature.boundingBox);
+    if (booleanDisjoint(mapBounds, feature.bboxPoly)) return false;
+    return true;
+  });
+
   let i = 0;
-  /** Explode and filter polygon features */
-  renderedFeatures.forEach(feature => {
-    if (feature.properties.brunnel === "tunnel") return;
+  [...allPolygons, ...allLines].forEach(feature => {
     feature.properties.computedId = getComputedId(feature);
-    feature.properties.mapLayerId = feature.layer.id;
-    feature.properties.sourceLayer = feature.sourceLayer;
-    allClasses.add(feature.properties.computedId);
-    if (feature.geometry.type === 'Polygon') {
-      feature.boundingBox = bbox(feature);
-      if (booleanDisjoint(mapBounds, bboxPolygon(feature.boundingBox))) return;
-      computeFeatureUuid(feature);
-      feature.bboxPoly = bboxPolygon(feature.boundingBox);
-      feature.properties.index = i++;
-      allPolygons.push(feature);
-    } else if (feature.geometry.type === 'MultiPolygon') {
-      feature.geometry.coordinates.forEach(polygon => {
-        const polygonGeom = {
-          type: "Polygon",
-          coordinates: polygon
+    feature.properties.index = i++;
+    computeFeatureUuid(feature);
+  });
+
+
+  console.log("allLines=", allLines);
+  console.log("allPolygons=", allPolygons);
+  return [
+    ...explodeGeometry(stitchPolygons(allPolygons, cuts, deadZones, tiles), "Polygon"),
+    ...stitchLines(allLines, cuts, deadZones, tiles)
+  ];
+}
+
+function explodeGeometry(geometries, type = 'LineString') {
+  const multiType = `Multi${type}`;
+  const exploded = [];
+
+  geometries.forEach(feature => {
+    if (feature.layer) feature.properties.mapLayerId = feature.layer.id;
+    if (feature.geometry.type === type) {
+      exploded.push(feature);
+    } else if (feature.geometry.type === multiType) {
+      feature.geometry.coordinates.forEach(geom => {
+        const newGeom = {
+          type: type,
+          coordinates: geom
         };
-        const boundingBox = bbox(polygonGeom);
-        if (booleanDisjoint(mapBounds, bboxPolygon(boundingBox))) return;
-        feature.properties.index = i++;
-        const polygonFeature = {
+        const newFeature = {
           id: feature.id,
           properties: { ...feature.properties },
-          boundingBox,
-          bboxPoly: bboxPolygon(boundingBox),
-          geometry: polygonGeom,
+          geometry: newGeom,
           type: "Feature",
         };
-        computeFeatureUuid(polygonFeature);
-        allPolygons.push(polygonFeature);
-      });
-    } else if (feature.geometry.type === 'LineString') {
-      feature.boundingBox = bbox(feature);
-      if (booleanDisjoint(mapBounds, bboxPolygon(feature.boundingBox))) return;
-      computeFeatureUuid(feature);
-      feature.properties.index = i++;
-      allLines.push(feature);
-    } else if (feature.geometry.type === 'MultiLineString') {
-      feature.geometry.coordinates.forEach(linestring => {
-        const linestringGeom = {
-          type: "LineString",
-          coordinates: linestring
-        };
-        const boundingBox = bbox(linestringGeom);
-        if (booleanDisjoint(mapBounds, bboxPolygon(boundingBox))) return;
-        feature.properties.index = i++;
-        const lineFeature = {
-          id: feature.id,
-          properties: { ...feature.properties },
-          boundingBox,
-          geometry: linestringGeom,
-          type: "Feature",
-        };
-        computeFeatureUuid(lineFeature);
-        allLines.push(lineFeature);
+        exploded.push(newFeature);
       });
     }
   });
-
-  // console.log("allLines=", allLines);
-  // console.log("allPolygons=", allPolygons);
-  // console.log("allClasses=", allClasses);
-  return [...stitchPolygons(allPolygons, cuts, deadZones, tiles), ...stitchLines(allLines, cuts, deadZones, tiles)];
+  return exploded;
 }
 
 function stitchLines(allLines, cuts, deadZones, tiles) {
@@ -326,12 +322,14 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
 
   const featuresByClass = groupBy(allPolygons, (f) => f.properties.computedId);
 
-  // console.log('featuresByClass', featuresByClass);
+  console.log('featuresByClass', featuresByClass);
+  cuts.tolerance = getTolerance(cuts.zoom);
+  console.log("tolerance", cuts.tolerance, cuts.zoom);
 
   const mergedFeatures = [];
   Object.values(featuresByClass).forEach(layerPolygons => {
 
-    // console.log("layerPolygons=", layerPolygons);
+    console.log("layerPolygons=", layerPolygons);
 
     // Identify cut polygon
     let segmentsToProcess = [];
@@ -353,9 +351,9 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
         }
       });
     });
-    // console.log('segmentsToProcess', segmentsToProcess);
+    console.log('segmentsToProcess', segmentsToProcess);
     const polygonIndexesCut = new Set(segmentsToProcess.map(s => s[0]));
-    // console.log('polygonIndexesCut=', polygonIndexesCut);
+    console.log('polygonIndexesCut=', polygonIndexesCut);
 
     // Filter cut polygons entirely in dead zones
     const polygonCutIndexExclude = new Set([...polygonIndexesCut].map(polygonIndex => {
@@ -363,7 +361,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
       if (deadZones.some(deadZone => bboxContains(deadZone.bbox, polygon.boundingBox))) return polygonIndex;
     }).filter(i => i !== undefined));
 
-    // console.log('polygonCutIndexExclude', polygonCutIndexExclude);
+    console.log('polygonCutIndexExclude', polygonCutIndexExclude);
 
     /** Polygons that are not cut and fully contained in a dead zone are duplicated among tiles: we must remove one */
     const polygonUuidDuplicated = {};
@@ -390,10 +388,11 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
         if (cutDirection !== curCutDirection) return false;
 
         const areCut = polygonsAreCutByTile(segmentsToProcess[i], segment, layerPolygons, deadZones);
-        if (areCut) {
-          return bboxIntersects(layerPolygons[polygonIndex].boundingBox, layerPolygons[curPolygonIndex].boundingBox) &&
-            booleanOverlap(layerPolygons[polygonIndex], layerPolygons[curPolygonIndex]);
-        }
+        return areCut;
+        // if (areCut) {
+        //   return bboxIntersects(layerPolygons[polygonIndex].boundingBox, layerPolygons[curPolygonIndex].boundingBox) &&
+        //     booleanOverlap(layerPolygons[polygonIndex], layerPolygons[curPolygonIndex]);
+        // }
       });
       if (matching.length) {
         for (const m of matching) {
@@ -407,7 +406,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
         }
       }
     }
-    // console.log('stitchGroups=', stitchGroups);
+    console.log('stitchGroups=', stitchGroups);
 
     // merge groups that have intersection
     const finalStichGroups = mergeSets(stitchGroups);
@@ -457,14 +456,14 @@ function polygonsAreCutByTile(segmentInfo1, segmentInfo2, polygons, deadZones) {
   // console.log('comparing', segmentInfo1, segmentInfo2, ring2);
 
   if (cutDirection1 === "v") {
-    // check horizontal overlap
     const pos1 = checkRingPosition(ring1, coordIndex1, cutDirection1);
     // console.log(polygons[polygonIndex1], pos1);
     const pos2 = checkRingPosition(ring2, coordIndex2, cutDirection2);
     // console.log(polygons[polygonIndex2], pos2);
     if (pos1 !== pos2) {
       const distance = Math.abs(ring1[coordIndex1][0] - ring2[coordIndex2][0]);
-      const distanceIsDeadZoneExtent = Math.abs(distance - deadZones.extentLat) < 0.00001;
+      const distanceIsDeadZoneExtent = Math.abs(distance - deadZones.extentLng) < 0.00001;
+      // console.log("distanceLng", distance, distanceIsDeadZoneExtent);
       if (pos1 === "left") {
         // check that the leftmost segment is at the right of rightmost segment: if it is, there is overlap
         return distanceIsDeadZoneExtent && polygon2.properties.x === polygon1.properties.x + 1 && ring1[coordIndex1][0] > ring2[coordIndex2][0];
@@ -480,7 +479,8 @@ function polygonsAreCutByTile(segmentInfo1, segmentInfo2, polygons, deadZones) {
     // console.log(polygons[polygonIndex2], pos2);
     if (pos1 !== pos2) {
       const distance = Math.abs(ring1[coordIndex1][1] - ring2[coordIndex2][1]);
-      const distanceIsDeadZoneExtent = Math.abs(distance - deadZones.extentLng) < 0.00001;
+      const distanceIsDeadZoneExtent = Math.abs(distance - deadZones.extentLat) < 0.00001;
+      // console.log("distanceLat", distance, distanceIsDeadZoneExtent);
       if (pos1 === "top") {
         return distanceIsDeadZoneExtent && polygon2.properties.y === polygon1.properties.y + 1 && ring1[coordIndex1][1] < ring2[coordIndex2][1];
       }
@@ -514,126 +514,13 @@ function checkRingPosition(ring, coordIndex, cutDirection) {
 }
 
 function getComputedId(feature) {
-  let computedId = feature.sourceLayer;
+  let computedId = feature.properties.sourceLayer;
   if (feature.properties.class) computedId += '-' + feature.properties.class;
   if (feature.properties.subclass) computedId += '-' + feature.properties.subclass;
   return computedId;
 }
 
-/**
- * Merges GeoJSON LineString Features that share their first or last points
- * @param {Array<Object>} features - Array of GeoJSON Features with LineString geometry
- * @returns {Array<Object>} - Array of merged GeoJSON Features
- */
-function _mergeLineStrings(features) {
-  if (!features || features.length === 0) {
-    return [];
-  }
 
-  // Validate and extract LineStrings
-  const validFeatures = features.filter(feature =>
-    feature &&
-    feature.geometry &&
-    feature.geometry.type === 'LineString' &&
-    Array.isArray(feature.geometry.coordinates) &&
-    feature.geometry.coordinates.length > 0
-  );
-
-  if (validFeatures.length === 0) {
-    return [];
-  }
-
-  // Helper function to merge two LineString Features
-  const mergeTwoFeatures = (feature1, feature2, connectFirst1, connectFirst2) => {
-    const coords1 = feature1.geometry.coordinates;
-    const coords2 = feature2.geometry.coordinates;
-    let mergedCoords = [];
-
-    // Handle different connection scenarios
-    if (connectFirst1 && connectFirst2) {
-      // First point of feature1 connects to first point of feature2
-      const reversedCoords1 = [...coords1].reverse();
-      mergedCoords = [...reversedCoords1, ...coords2.slice(1)];
-    } else if (connectFirst1 && !connectFirst2) {
-      // First point of feature1 connects to last point of feature2
-      mergedCoords = [...coords2, ...coords1.slice(1)];
-    } else if (!connectFirst1 && connectFirst2) {
-      // Last point of feature1 connects to first point of feature2
-      mergedCoords = [...coords1, ...coords2.slice(1)];
-    } else {
-      // Last point of feature1 connects to last point of feature2
-      const reversedCoords2 = [...coords2].reverse();
-      mergedCoords = [...coords1, ...reversedCoords2.slice(1)];
-    }
-
-    // Create a new merged feature with combined properties
-    const mergedFeature = {
-      type: "Feature",
-      geometry: {
-        type: "LineString",
-        coordinates: mergedCoords
-      },
-      properties: feature1.properties
-    };
-
-    return mergedFeature;
-  };
-
-  let lines = [...validFeatures]; // Create a copy to work with
-  let merged = true;
-
-  // Continue merging until no more merges are possible
-  while (merged) {
-    merged = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      if (merged) break; // If a merge occurred, restart the process
-
-      const feature1 = lines[i];
-      const first1 = feature1.geometry.coordinates[0];
-      const last1 = feature1.geometry.coordinates[feature1.geometry.coordinates.length - 1];
-
-      for (let j = i + 1; j < lines.length; j++) {
-        const feature2 = lines[j];
-        const first2 = feature2.geometry.coordinates[0];
-        const last2 = feature2.geometry.coordinates[feature2.geometry.coordinates.length - 1];
-
-        // Check for connections between endpoints
-        let connection = null;
-
-        if (pointsAreCloseBy(first1, first2)) {
-          connection = { i, j, connectFirst1: true, connectFirst2: true };
-        } else if (pointsAreCloseBy(first1, last2)) {
-          connection = { i, j, connectFirst1: true, connectFirst2: false };
-        } else if (pointsAreCloseBy(last1, first2)) {
-          connection = { i, j, connectFirst1: false, connectFirst2: true };
-        } else if (pointsAreCloseBy(last1, last2)) {
-          connection = { i, j, connectFirst1: false, connectFirst2: false };
-        }
-
-        if (connection) {
-          // Merge the features
-          const mergedFeature = mergeTwoFeatures(
-            feature1,
-            feature2,
-            connection.connectFirst1,
-            connection.connectFirst2
-          );
-
-          // Remove the original features and add the merged one
-          lines.splice(j, 1); // Remove feature2 first (higher index)
-          lines.splice(i, 1); // Remove feature1
-          lines.push(mergedFeature); // Add merged feature
-
-          merged = true;
-          break;
-        }
-      }
-    }
-  }
-
-  return lines;
-}
 
 function mergeSets(setList) {
   // Clone the input sets to avoid modifying originals
@@ -695,10 +582,10 @@ function segmentsOverlap(start1, end1, start2, end2) {
 
 function checkSegmentHorizontalCut(p1, p2, cuts) {
   if (Math.abs(p1[1] - p2[1]) > 0.0000001) return false;
-  return cuts['h'].some(p => Math.abs(p - p1[1]) < 0.0000001);
+  return cuts['h'].some(p => Math.abs(p - p1[1]) < cuts.tolerance);
 }
 
 function checkSegmentVerticalCut(p1, p2, cuts) {
   if (Math.abs(p1[0] - p2[0]) > 0.0000001) return false;
-  return cuts['v'].some(p => Math.abs(p - p1[0]) < 0.0000001);
+  return cuts['v'].some(p => Math.abs(p - p1[0]) < cuts.tolerance);
 }
