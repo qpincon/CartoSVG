@@ -9,6 +9,7 @@ import center from "@turf/center";
 import { groupBy } from 'lodash-es';
 import { tiles as getTiles } from '@mapbox/tile-cover';
 import bboxClip from "@turf/bbox-clip";
+import { mergeLineStrings } from "./linestitch";
 
 
 /**
@@ -177,6 +178,7 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
       // [minX, minY, maxX, maxY] 
       const extentLng = intersection.bbox[2] - intersection.bbox[0];
       const buffAmount = extentLng * 0.01;
+      deadZones.extentLng = extentLng;
       intersection.bbox[0] -= buffAmount;
       intersection.bbox[2] += buffAmount;
       deadZones.push(intersection);
@@ -188,6 +190,7 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
       // const apply small buffering on latitude to ensure it's bigger than fully contained geometries within
       // [minX, minY, maxX, maxY] 
       const extentLat = intersection.bbox[3] - intersection.bbox[1];
+      deadZones.extentLat = extentLat;
       const buffAmount = extentLat * 0.01;
       intersection.bbox[1] -= buffAmount;
       intersection.bbox[3] += buffAmount;
@@ -275,7 +278,9 @@ function stitchLines(allLines, cuts, deadZones, tiles) {
   // console.log('featuresByClass', featuresByClass);
   const finalFeatures = [];
 
-  Object.values(featuresByClass).forEach(lines => {
+  Object.entries(featuresByClass).forEach(([computedId, lines]) => {
+    // console.log(computedId);
+    // if (computedId !== "transportation-primary") return;
     // console.log("lines", JSON.parse(JSON.stringify(lines)));
 
     const linesToStitch = [];
@@ -308,10 +313,10 @@ function stitchLines(allLines, cuts, deadZones, tiles) {
           linesToStitch.push(lineFeature);
         });
       }
-      
+
     }
 
-    // console.log("linesToStitch", linesToStitch);
+    console.log("linesToStitch", linesToStitch);
     finalFeatures.push(...mergeLineStrings(linesToStitch));
   });
   return finalFeatures;
@@ -384,7 +389,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
         if (curPolygonIndex === polygonIndex) return false;
         if (cutDirection !== curCutDirection) return false;
 
-        const areCut = polygonsAreCutByTile(segmentsToProcess[i], segment, layerPolygons);
+        const areCut = polygonsAreCutByTile(segmentsToProcess[i], segment, layerPolygons, deadZones);
         if (areCut) {
           return bboxIntersects(layerPolygons[polygonIndex].boundingBox, layerPolygons[curPolygonIndex].boundingBox) &&
             booleanOverlap(layerPolygons[polygonIndex], layerPolygons[curPolygonIndex]);
@@ -442,7 +447,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
 }
 
 
-function polygonsAreCutByTile(segmentInfo1, segmentInfo2, polygons) {
+function polygonsAreCutByTile(segmentInfo1, segmentInfo2, polygons, deadZones) {
   const [polygonIndex1, ringIndex1, coordIndex1, cutDirection1] = segmentInfo1;
   const [polygonIndex2, ringIndex2, coordIndex2, cutDirection2] = segmentInfo2;
   const polygon1 = polygons[polygonIndex1];
@@ -458,12 +463,14 @@ function polygonsAreCutByTile(segmentInfo1, segmentInfo2, polygons) {
     const pos2 = checkRingPosition(ring2, coordIndex2, cutDirection2);
     // console.log(polygons[polygonIndex2], pos2);
     if (pos1 !== pos2) {
+      const distance = Math.abs(ring1[coordIndex1][0] - ring2[coordIndex2][0]);
+      const distanceIsDeadZoneExtent = Math.abs(distance - deadZones.extentLat) < 0.00001;
       if (pos1 === "left") {
         // check that the leftmost segment is at the right of rightmost segment: if it is, there is overlap
-        return polygon2.properties.x === polygon1.properties.x + 1 && ring1[coordIndex1][0] > ring2[coordIndex2][0];
+        return distanceIsDeadZoneExtent && polygon2.properties.x === polygon1.properties.x + 1 && ring1[coordIndex1][0] > ring2[coordIndex2][0];
       }
       else {
-        return polygon1.properties.x === polygon2.properties.x + 1 && ring1[coordIndex1][0] < ring2[coordIndex2][0]
+        return distanceIsDeadZoneExtent && polygon1.properties.x === polygon2.properties.x + 1 && ring1[coordIndex1][0] < ring2[coordIndex2][0]
       }
     }
   } else {
@@ -472,11 +479,13 @@ function polygonsAreCutByTile(segmentInfo1, segmentInfo2, polygons) {
     const pos2 = checkRingPosition(ring2, coordIndex2, cutDirection2);
     // console.log(polygons[polygonIndex2], pos2);
     if (pos1 !== pos2) {
+      const distance = Math.abs(ring1[coordIndex1][1] - ring2[coordIndex2][1]);
+      const distanceIsDeadZoneExtent = Math.abs(distance - deadZones.extentLng) < 0.00001;
       if (pos1 === "top") {
-        return polygon2.properties.y === polygon1.properties.y + 1 && ring1[coordIndex1][1] < ring2[coordIndex2][1];
+        return distanceIsDeadZoneExtent && polygon2.properties.y === polygon1.properties.y + 1 && ring1[coordIndex1][1] < ring2[coordIndex2][1];
       }
       else {
-        return polygon1.properties.y === polygon2.properties.y + 1 && ring1[coordIndex1][1] > ring2[coordIndex2][1];
+        return distanceIsDeadZoneExtent && polygon1.properties.y === polygon2.properties.y + 1 && ring1[coordIndex1][1] > ring2[coordIndex2][1];
       }
     }
   }
@@ -516,16 +525,16 @@ function getComputedId(feature) {
  * @param {Array<Object>} features - Array of GeoJSON Features with LineString geometry
  * @returns {Array<Object>} - Array of merged GeoJSON Features
  */
-function mergeLineStrings(features) {
+function _mergeLineStrings(features) {
   if (!features || features.length === 0) {
     return [];
   }
 
   // Validate and extract LineStrings
-  const validFeatures = features.filter(feature => 
-    feature && 
-    feature.geometry && 
-    feature.geometry.type === 'LineString' && 
+  const validFeatures = features.filter(feature =>
+    feature &&
+    feature.geometry &&
+    feature.geometry.type === 'LineString' &&
     Array.isArray(feature.geometry.coordinates) &&
     feature.geometry.coordinates.length > 0
   );
@@ -534,21 +543,12 @@ function mergeLineStrings(features) {
     return [];
   }
 
-  // Helper function to get the first and last points of a LineString
-  const getEndPoints = (feature) => {
-    const coords = feature.geometry.coordinates;
-    return {
-      first: coords[0],
-      last: coords[coords.length - 1]
-    };
-  };
-
   // Helper function to merge two LineString Features
   const mergeTwoFeatures = (feature1, feature2, connectFirst1, connectFirst2) => {
     const coords1 = feature1.geometry.coordinates;
     const coords2 = feature2.geometry.coordinates;
     let mergedCoords = [];
-    
+
     // Handle different connection scenarios
     if (connectFirst1 && connectFirst2) {
       // First point of feature1 connects to first point of feature2
@@ -565,7 +565,7 @@ function mergeLineStrings(features) {
       const reversedCoords2 = [...coords2].reverse();
       mergedCoords = [...coords1, ...reversedCoords2.slice(1)];
     }
-    
+
     // Create a new merged feature with combined properties
     const mergedFeature = {
       type: "Feature",
@@ -575,61 +575,63 @@ function mergeLineStrings(features) {
       },
       properties: feature1.properties
     };
-    
+
     return mergedFeature;
   };
 
   let lines = [...validFeatures]; // Create a copy to work with
   let merged = true;
-  
+
   // Continue merging until no more merges are possible
   while (merged) {
     merged = false;
-    
+
     for (let i = 0; i < lines.length; i++) {
       if (merged) break; // If a merge occurred, restart the process
-      
+
       const feature1 = lines[i];
-      const endpoints1 = getEndPoints(feature1);
-      
+      const first1 = feature1.geometry.coordinates[0];
+      const last1 = feature1.geometry.coordinates[feature1.geometry.coordinates.length - 1];
+
       for (let j = i + 1; j < lines.length; j++) {
         const feature2 = lines[j];
-        const endpoints2 = getEndPoints(feature2);
-        
+        const first2 = feature2.geometry.coordinates[0];
+        const last2 = feature2.geometry.coordinates[feature2.geometry.coordinates.length - 1];
+
         // Check for connections between endpoints
         let connection = null;
-        
-        if (pointsAreCloseBy(endpoints1.first, endpoints2.first)) {
+
+        if (pointsAreCloseBy(first1, first2)) {
           connection = { i, j, connectFirst1: true, connectFirst2: true };
-        } else if (pointsAreCloseBy(endpoints1.first, endpoints2.last)) {
+        } else if (pointsAreCloseBy(first1, last2)) {
           connection = { i, j, connectFirst1: true, connectFirst2: false };
-        } else if (pointsAreCloseBy(endpoints1.last, endpoints2.first)) {
+        } else if (pointsAreCloseBy(last1, first2)) {
           connection = { i, j, connectFirst1: false, connectFirst2: true };
-        } else if (pointsAreCloseBy(endpoints1.last, endpoints2.last)) {
+        } else if (pointsAreCloseBy(last1, last2)) {
           connection = { i, j, connectFirst1: false, connectFirst2: false };
         }
-        
+
         if (connection) {
           // Merge the features
           const mergedFeature = mergeTwoFeatures(
-            feature1, 
-            feature2, 
-            connection.connectFirst1, 
+            feature1,
+            feature2,
+            connection.connectFirst1,
             connection.connectFirst2
           );
-          
+
           // Remove the original features and add the merged one
           lines.splice(j, 1); // Remove feature2 first (higher index)
           lines.splice(i, 1); // Remove feature1
           lines.push(mergedFeature); // Add merged feature
-          
+
           merged = true;
           break;
         }
       }
     }
   }
-  
+
   return lines;
 }
 

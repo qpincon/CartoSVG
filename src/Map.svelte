@@ -433,6 +433,7 @@ onMount(async() => {
     maplibreMap.on('click', (event) => {
         console.log(maplibreMap.getStyle());
     });
+    // createDemoPage();
 });
 
 function maybeDisplayMaplibreMap() {
@@ -2211,9 +2212,6 @@ function getLegendColors(dataColorDef, tab, scale, data) {
     overflow-y: auto;
 }
 
-.settings-tab {
-    width: 100%;
-}
 #main-panel > .btn-group {
     .btn-check:checked + .btn {
         background-color: #465da3;

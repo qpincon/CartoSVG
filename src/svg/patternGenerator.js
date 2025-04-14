@@ -93,24 +93,40 @@ export class HatchPatternGenerator {
   }
   
   /**
-   * Add a diagonal line to the pattern
-   */
+ * Add a seamless diagonal line to the pattern that works with any stroke width
+ * @param {SVGElement} pattern - The SVG pattern element to add the line to
+ * @param {number} size - Size of the pattern tile
+ * @param {string} color - Stroke color
+ * @param {number} strokeWidth - Width of the stroke
+ * @param {boolean} isForward - True for forward slash (/), false for backslash (\)
+ */
   _addDiagonalLine(pattern, size, color, strokeWidth, isForward) {
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    // Calculate the extension needed to ensure seamless tiling
+    // We extend the line beyond the pattern boundaries by half the stroke width
+    const ext = size / 4;
+
+    // Create path instead of line for more control
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+
+    // Define the path data - extending beyond the pattern boundary in both directions
+    let d;
     if (isForward) {
-      line.setAttribute('x1', '0');
-      line.setAttribute('y1', size);
-      line.setAttribute('x2', size);
-      line.setAttribute('y2', '0');
+      // Forward diagonal (/) extended in both directions
+      d = `M${0} ${size} L${size} ${0} M${-ext} ${ext} L${ext} ${-ext} M${size-ext} ${size+ext} L${size+ext} ${size-ext}`;
     } else {
-      line.setAttribute('x1', '0');
-      line.setAttribute('y1', '0');
-      line.setAttribute('x2', size);
-      line.setAttribute('y2', size);
+      // Backward diagonal (\) extended in both directions
+      d = `M0 0 L${size} ${size} M${size-ext} ${-ext} L${size+ext} ${ext} M${-ext} ${size-ext} L${ext} ${size + ext}`;
     }
-    line.setAttribute('stroke', color);
-    line.setAttribute('stroke-width', strokeWidth);
-    pattern.appendChild(line);
+
+    path.setAttribute('d', d);
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', strokeWidth);
+    path.setAttribute('stroke-linecap', 'square'); // Sharp ends for better tiling
+
+    // Ensure the path doesn't create a fill
+    path.setAttribute('fill', 'none');
+
+    pattern.appendChild(path);
   }
   
   /**

@@ -33,9 +33,11 @@ const roadPrimaryStrokeWidth = scaleLinear([14, 18], [5, 14]).clamp(true);
 const roadSecondaryStrokeWidth = scaleLinear([14, 18], [4, 12]).clamp(true);
 const roadTertiaryStrokeWidth = scaleLinear([14, 18], [3, 10]).clamp(true);
 const roadMinorStrokeWidth = scaleLinear([14, 18], [2, 6]).clamp(true);
+const scaleLowZoom = scaleLinear([4, 14], [0.5, 2.5]).clamp(true);
 
 export function getRoadStrokeWidth(roadFeature, zoom) {
     if (roadFeature.properties.sourceLayer !== "transportation") return null;
+    if (zoom <= 14) return scaleLowZoom(zoom);
     const computedId = roadFeature.properties.computedId;
     if (computedId.includes('path')) return pathStrokeWidth(zoom);
     if (computedId.includes('primary') || computedId.includes('motorway') || computedId.includes('trunk')) return roadPrimaryStrokeWidth(zoom);
