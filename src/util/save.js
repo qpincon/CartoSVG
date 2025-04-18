@@ -1,11 +1,9 @@
-const key = 'map-builder-state';
-
-function saveState(params) {
+function saveState(params, key = 'map-builder-state') {
     const serialized = JSON.stringify(params);
     localStorage.setItem(key, serialized);
 }
 
-function getState() {
+function getState(key = 'map-builder-state') {
     const state = localStorage.getItem(key);
     if (!state) return null;
     return JSON.parse(state);

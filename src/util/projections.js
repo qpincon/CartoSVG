@@ -179,21 +179,46 @@ function getProjection(params) {
 
 
 function createD3ProjectionFromMapLibre(map) {
-    const projection = geoTransform({
-        point: function (x, y) {
-            const lngLat = new LngLat(x, y);
-            const point = map.project(lngLat);
-            this.stream.point(point.x, point.y);
-        }
-    });
 
-    projection.invert = function (pixels) {
+    const projection = function(coordinates) {
+        const lngLat = new LngLat(coordinates[0], coordinates[1]);
+        const point = map.project(lngLat);
+        return [point.x, point.y];
+    };
+    
+    // Add the stream method expected by D3
+    projection.stream = function(stream) {
+        return geoTransform({
+            point: function(x, y) {
+                const lngLat = new LngLat(x, y);
+                const point = map.project(lngLat);
+                stream.point(point.x, point.y);
+            }
+        }).stream(stream);
+    };
+    
+    // Add invert method
+    projection.invert = function(pixels) {
         const point = new Point(pixels[0], pixels[1]);
         const lngLat = map.unproject(point);
         return [lngLat.lng, lngLat.lat];
     };
-    return projection
 
+
+    // const projection = geoTransform({
+    //     point: function (x, y) {
+    //         const lngLat = new LngLat(x, y);
+    //         const point = map.project(lngLat);
+    //         this.stream.point(point.x, point.y);
+    //     }
+    // });
+
+    // projection.invert = function (pixels) {
+    //     const point = new Point(pixels[0], pixels[1]);
+    //     const lngLat = map.unproject(point);
+    //     return [lngLat.lng, lngLat.lat];
+    // };
+    return projection
 }
 
 export { updateAltitudeRange, getProjection, getGeographicalBounds, createD3ProjectionFromMapLibre };

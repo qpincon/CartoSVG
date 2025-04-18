@@ -84,3 +84,29 @@
 - [x] Inline style editor: give name to other elements. Add parent <text> element for <tspan>
 - [x] Only include code for tooltip when one tooltip included
 - [x] Delay optimizing content of <image> at export time (for performance)
+
+- [x] ISE open on click
+- [ ] Micro: Lock / unlock mechanism (allow map drag when on SVG) 
+- [ ] Micro: MapTiler attribution 
+- [x] Micro: Persist currentMode in state
+- [x] Micro: remove forward element on hover
+- [ ] Micro: Order building layer elements by height
+- [ ] Micro: Building: Add 3 classes at random
+- [x] Micro: Allow write labels / add points
+- [ ] Micro: Add nominatim search
+- [ ] Micro: CSS themes as separate .css files
+    - [ ] Color + lighter color on hover
+- [ ] Micro: Toggle layers 
+- [ ] Micro: Layers parametrization
+    - [ ] SVG pattern: density + color + width + pattern (/o\*...)
+    - [ ] Stroke color + fill color
+    - [ ] 3 colors for buildings (3 classes)
+    - [ ] Bind style change from ISE to layer stroke / fill color 
+    - [ ] Noise?
+- [ ] Micro: Background colors customization (as non-disableable layer )
+- [ ] Micro: Animation on visible 
+- [ ] Micro: Export (CSS + font, no tooltip mechanism)
+- [ ] Micro: Bonus: cut geometries outside of border when high border radius
+- [ ] Micro: Bonus: Freehand drawing: https://github.com/steveruizok/perfect-freehand?tab=readme-ov-file
+
+

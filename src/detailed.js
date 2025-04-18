@@ -46,9 +46,8 @@ export function getRoadStrokeWidth(roadFeature, zoom) {
     return roadMinorStrokeWidth(zoom);
 }
 
-export function drawPrettyMap(maplibreMap, svg, d3PathFunction) {
+export function drawPrettyMap(maplibreMap, svg, d3PathFunction, inlineStyles) {
     const zoom = maplibreMap.getZoom();
-    console.log("zoom=", zoom);
     const mapLibreContainer = select('#maplibre-map');
     const geometries = getRenderedFeatures(maplibreMap, { layers: interestingBasicV2Layers });
     orderFeaturesByLayer(geometries);
@@ -65,9 +64,9 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction) {
         .attr("class", d => d.properties.tileExtent ? 'tileExtent' : kebabCase(d.properties.mapLayerId))
         .attr("stroke-width", d => getRoadStrokeWidth(d, zoom))
         .attr("computed-id", d => d.properties.computedId)
-        .attr("uuid", d => d.properties.uuid)
-        .attr("id", d => d.id);
+        .attr("id", d => d.properties.uuid);
+        // .attr("id", d => d.id);
+    svg.append('g').attr('id', 'points-labels');
 
     mapLibreContainer.classed('transparent', true);
-    console.log(svg.node());
 }

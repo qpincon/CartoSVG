@@ -1,3 +1,4 @@
+import { setTransformScale } from "../svg/svg";
 
 function reportStyle(reference, target) {
     const walkerRef = document.createTreeWalker(reference, NodeFilter.SHOW_ELEMENT);
@@ -67,4 +68,30 @@ function exportStyleSheet(selectorToFind) {
     const [sheet, _] = findStyleSheet(selectorToFind);
     if (sheet) return styleSheetToText(sheet);
 }
-export { reportStyle, reportStyleElem, fontsToCss, exportStyleSheet, getUsedInlineFonts, findStyleSheet };
+
+//  if countryFilteredImages set is passed, we ignore elements with ids in the set
+function applyStyles(inlineStyles, countryFilteredImages = null) {
+    // apply inline styles
+    Object.entries(inlineStyles).forEach((([elemId, style]) => {
+        if (countryFilteredImages != null && countryFilteredImages.has(elemId)) return;
+        const elem = document.getElementById(elemId);
+        if (!elem) return;
+        Object.entries(style).forEach(([cssProp, cssValue]) => {
+            if (cssProp === 'scale') {
+                setTransformScale(elem, `scale(${cssValue})`);
+            }
+            else if (cssProp === 'bringtofront') {
+                elem.parentNode.append(elem);
+            }
+            // if no width, remove width and color. Width will be inherited
+            else if (cssProp === 'stroke-width' && cssValue === null) {
+                elem.style.removeProperty('stroke-width');
+                elem.style.removeProperty('stroke');
+            }
+            else elem.style[cssProp] = cssValue;
+        });
+    }));
+}
+
+
+export { reportStyle, reportStyleElem, fontsToCss, exportStyleSheet, getUsedInlineFonts, findStyleSheet, applyStyles };

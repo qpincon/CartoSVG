@@ -147,7 +147,7 @@ export function getRenderedFeatures(map, options) {
   // [minX, minY, maxX, maxY]
   const coordinates = [cUL, cUR, cLR, cLL, cUL];
   const mapBounds = polygon([coordinates]);
-  console.log('mapbounds', mapBounds);
+  // console.log('mapbounds', mapBounds);
   const zoom = Math.min(Math.floor(map.getZoom()), MAX_ZOOM);
 
   const tiles = getTiles(mapBounds.geometry, { min_zoom: zoom, max_zoom: zoom }).map(([x, y, z]) => {
@@ -156,7 +156,7 @@ export function getRenderedFeatures(map, options) {
 
   tiles.zoom = map.getZoom();
 
-  console.log('renderedFeatures=', renderedFeatures);
+  // console.log('renderedFeatures=', renderedFeatures);
 
   const finalGeometries = stitch(renderedFeatures, tiles, mapBounds);
 
@@ -167,8 +167,8 @@ export function getRenderedFeatures(map, options) {
 }
 
 export function stitch(renderedFeatures, tiles, mapBounds) {
-  console.log('mapBounds=', mapBounds);
-  console.log('tiles=', tiles);
+  // console.log('mapBounds=', mapBounds);
+  // console.log('tiles=', tiles);
   const cuts = { 'h': [], 'v': [] };
 
   cuts.zoom = tiles.zoom;
@@ -208,8 +208,8 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
     }
   });
 
-  console.log('cuts=', cuts);
-  console.log('deadZones=', deadZones);
+  // console.log('cuts=', cuts);
+  // console.log('deadZones=', deadZones);
 
   const allPolygons = explodeGeometry(renderedFeatures, "Polygon").filter(feature => {
     feature.boundingBox = bbox(feature);
@@ -234,8 +234,8 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
   });
 
 
-  console.log("allLines=", allLines);
-  console.log("allPolygons=", allPolygons);
+  // console.log("allLines=", allLines);
+  // console.log("allPolygons=", allPolygons);
   return [
     ...explodeGeometry(stitchPolygons(allPolygons, cuts, deadZones, tiles), "Polygon"),
     ...stitchLines(allLines, cuts, deadZones, tiles)
@@ -312,7 +312,7 @@ function stitchLines(allLines, cuts, deadZones, tiles) {
 
     }
 
-    console.log("linesToStitch", linesToStitch);
+    // console.log("linesToStitch", linesToStitch);
     finalFeatures.push(...mergeLineStrings(linesToStitch));
   });
   return finalFeatures;
@@ -322,14 +322,14 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
 
   const featuresByClass = groupBy(allPolygons, (f) => f.properties.computedId);
 
-  console.log('featuresByClass', featuresByClass);
+  // console.log('featuresByClass', featuresByClass);
   cuts.tolerance = getTolerance(cuts.zoom);
-  console.log("tolerance", cuts.tolerance, cuts.zoom);
+  // console.log("tolerance", cuts.tolerance, cuts.zoom);
 
   const mergedFeatures = [];
   Object.values(featuresByClass).forEach(layerPolygons => {
 
-    console.log("layerPolygons=", layerPolygons);
+    // console.log("layerPolygons=", layerPolygons);
 
     // Identify cut polygon
     let segmentsToProcess = [];
@@ -351,9 +351,9 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
         }
       });
     });
-    console.log('segmentsToProcess', segmentsToProcess);
+    // console.log('segmentsToProcess', segmentsToProcess);
     const polygonIndexesCut = new Set(segmentsToProcess.map(s => s[0]));
-    console.log('polygonIndexesCut=', polygonIndexesCut);
+    // console.log('polygonIndexesCut=', polygonIndexesCut);
 
     // Filter cut polygons entirely in dead zones
     const polygonCutIndexExclude = new Set([...polygonIndexesCut].map(polygonIndex => {
@@ -361,7 +361,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
       if (deadZones.some(deadZone => bboxContains(deadZone.bbox, polygon.boundingBox))) return polygonIndex;
     }).filter(i => i !== undefined));
 
-    console.log('polygonCutIndexExclude', polygonCutIndexExclude);
+    // console.log('polygonCutIndexExclude', polygonCutIndexExclude);
 
     /** Polygons that are not cut and fully contained in a dead zone are duplicated among tiles: we must remove one */
     const polygonUuidDuplicated = {};
@@ -406,7 +406,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
         }
       }
     }
-    console.log('stitchGroups=', stitchGroups);
+    // console.log('stitchGroups=', stitchGroups);
 
     // merge groups that have intersection
     const finalStichGroups = mergeSets(stitchGroups);

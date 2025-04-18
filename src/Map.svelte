@@ -11,7 +11,7 @@ import dataExplanation from './assets/dataColor.svg';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
 import { transitionCss } from './svg/transition';
 import PathEditor from './svg/pathEditor';
-import { paramDefs, defaultParams, helpParams, noSatelliteParams } from './params';
+import { paramDefs, defaultParams, helpParams, noSatelliteParams, microDefaultParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
 import { splitMultiPolygons } from './util/geojson';
 import { createD3ProjectionFromMapLibre, getGeographicalBounds, getProjection, updateAltitudeRange } from './util/projections';
@@ -41,7 +41,7 @@ import microImg from "./assets/img/micro.png";
 import Instructions from './components/Instructions.svelte';
 import Icon from './components/Icon.svelte';
 import RangeInput from './components/RangeInput.svelte';
-import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts } from './util/dom';
+import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts, applyStyles } from './util/dom';
 import { saveState, getState } from './util/save';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
@@ -70,6 +70,17 @@ const icons = iconsReq.keys().reduce((acc, iconFile) => {
 }, {});
 
 let params = JSON.parse(JSON.stringify(defaultParams));
+let microParams = JSON.parse(JSON.stringify(microDefaultParams));
+// Computed
+let currentParams;
+$: if (params || microParams || currentMode) {
+    currentParams = currentMode === "micro" ? microParams: params;
+    projectAndDraw();
+    console.log('change', currentParams);
+}
+// $: currentParams =  ((params || microParams) && currentMode === 'micro') ? microParams : params;
+
+$: if (true || mainMenuSelection) { tick().then(() => initTooltips()); }
 const iso3DataById = indexBy(iso3Data, 'alpha-3');
 const resolvedAdm = {};
 const resolvedAdmTopo = {};
@@ -128,10 +139,9 @@ String.prototype.formatUnicorn = String.prototype.formatUnicorn || function () {
     return str;
 };
 
-const p = (propName, obj = params) => findProp(propName, obj);
+const p = (propName, obj = currentParams ?? params) => findProp(propName, obj);
 
 const positionVars = ['longitude', 'latitude', 'rotation', 'tilt', 'altitude', 'fieldOfView', 'projection', 'width', 'height'];
-const THRESH_ZOOM_MICRO = 14;
 let redrawTimeoutId;
 /** Used for shape simplification */
 let visibleArea;
@@ -141,17 +151,6 @@ let adm0Topo = null;
 let simpleLand = null;
 let openContextMenuInfo;
 
-// const typeSizes = {
-//   "undefined": () => 0,
-//   "boolean": () => 4,
-//   "number": () => 8,
-//   "string": item => 2 * item.length,
-//   "object": item => !item ? 0 : Object
-//     .keys(item)
-//     .reduce((total, key) => sizeOf(key) + sizeOf(item[key]) + total, 0)
-// };
-
-// const sizeOf = value => typeSizes[typeof value](value);
 const adm0LandTopoPromise = import('./assets/layers/world_adm0_simplified.topojson')
     .then(({default:topoAdm0}) => {
         adm0Topo = presimplify(topoAdm0);
@@ -235,7 +234,9 @@ const defaultInlineProps = {
     showCountries: true
 };
 
-// ====== State =======
+// ====== State micro ====
+
+// ====== State macro =======
 let baseCss = defaultBaseCss;
 let providedPaths = [];
 let providedShapes = []; // {name, coords, scale, id}
@@ -345,19 +346,7 @@ onMount(async() => {
             }
             else if (eventType === 'inline') {
                 if (target.hasAttribute('id')) {
-                    if (elemId.includes('label')) {
-                        lastUsedLabelProps[cssProp] = value;
-                    }
-                    if (elemId in inlineStyles) inlineStyles[elemId][cssProp] = value;
-                    else inlineStyles[elemId] = {[cssProp]: value};
-                    // update path markers
-                    if (cssProp === 'stroke' && target.hasAttribute('marker-end')) {
-                        const markerId = target.getAttribute('marker-end').match(/url\(#(.*)\)/)[1];
-                        const newMarkerId = `${markerId.split('-')[0]}-${value.substring(1)}`;
-                        d3.select(`#${markerId}`).attr('fill', value)
-                            .attr('id', newMarkerId);
-                        d3.select(target).attr('marker-end', `url(#${newMarkerId})`);
-                    }
+                    handleInlineStyleChange(elemId, target, cssProp, value);
                 }
             }
             /** Update <image> tag corresponding to changed element */
@@ -366,7 +355,7 @@ onMount(async() => {
                     if (tab.substring(0, tab.length - 5) !== elemId) return;
                     const filter = zonesFilter[tab];
                     const countryData = countries.features.find(country => country.properties.name === elemId);
-                    appendCountryImageNew.call(d3.select(`[id='${elemId}-img']`).node(), countryData, filter, applyStyles, path, inlineStyles, false, true);
+                    appendCountryImageNew.call(d3.select(`[id='${elemId}-img']`).node(), countryData, filter, applyInlineStyles, path, inlineStyles, false, true);
                     svg.selectAll('g[image-class]').classed('hidden-after', true);
                 })
             }
@@ -426,6 +415,7 @@ onMount(async() => {
     await maplibreMap.once('load');
     maplibreMap.showTileBoundaries = true;
     maplibreMap.on('idle', (event) => {
+        if (currentMode !== "micro") return;
         console.log('idle');
         // canDrawMicro = maplibreMap.getZoom() >= THRESH_ZOOM_MICRO;
         canDrawMicro = true;
@@ -436,6 +426,22 @@ onMount(async() => {
     });
     // createDemoPage();
 });
+
+function handleInlineStyleChange(elemId, target, cssProp, value) {
+    if (elemId.includes('label')) {
+        lastUsedLabelProps[cssProp] = value;
+    }
+    if (elemId in inlineStyles) inlineStyles[elemId][cssProp] = value;
+    else inlineStyles[elemId] = {[cssProp]: value};
+    // update path markers
+    if (cssProp === 'stroke' && target.hasAttribute('marker-end')) {
+        const markerId = target.getAttribute('marker-end').match(/url\(#(.*)\)/)[1];
+        const newMarkerId = `${markerId.split('-')[0]}-${value.substring(1)}`;
+        d3.select(`#${markerId}`).attr('fill', value)
+            .attr('id', newMarkerId);
+        d3.select(target).attr('marker-end', `url(#${newMarkerId})`);
+    }
+}
 
 function maybeDisplayMaplibreMap() {
     d3.select('#maplibre-map').classed('transparent', false);
@@ -649,6 +655,7 @@ let firstDraw = true;
 // without 'countries' if unchecked
 let computedOrderedTabs = [];
 async function draw(simplified = false, _) {
+    console.log('currentParams=', currentParams);
     const width = p('width'), height = p('height');
     const borderWidth = p('borderWidth');
     const borderRadius = p('borderRadius');
@@ -727,23 +734,27 @@ async function draw(simplified = false, _) {
         showMenu(e, target);
         return false;
     }, false);
+
     svg.on("click", function(e) {
-        closeMenu();
+        if (contextualMenu.opened) closeMenu();
+        else if (styleEditor.isOpened()) styleEditor.close();
+        else openEditor(e);
     });
 
-    Object.values(zonesFilter).forEach(filterName => {
-        if (!filterName) return;
-        appendGlow(svg, filterName, false, p(filterName));
-    });
+    const groupData = [];
     if (currentMode === "macro") {
+        Object.values(zonesFilter).forEach(filterName => {
+            if (!filterName) return;
+            appendGlow(svg, filterName, false, p(filterName));
+        });
         mapLibreContainer.style('display', 'none');
         container.style('display', 'block');
-        drawMacro(graticule);
+        drawMacro(graticule, groupData);
+        appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
     }
     else if (currentMode === "micro") drawMicro();
     drawCustomPaths(providedPaths, svg, projection, inlineStyles);
     
-    appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
     
     const rx = Math.max(width, height) * (borderRadius / 100);
     d3.select('#outline').style('fill', "url(#noise)");
@@ -770,13 +781,13 @@ async function draw(simplified = false, _) {
                     appendLandImageNew.call(landElem.node(), landGroupDef.showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, p(zonesFilter['land']), false);
                 }
                 countryGroupDefs.forEach(def => {
-                    appendCountryImageNew.call(svg.select(`[id='${def.name}']`).node(), def.countryData, def.filter, applyStyles, path, inlineStyles, false);
+                    appendCountryImageNew.call(svg.select(`[id='${def.name}']`).node(), def.countryData, def.filter, applyInlineStyles, path, inlineStyles, false);
                 });
                 duplicateContourCleanFirst(svg.node());
                 setTimeout(() => {
                     svg.selectAll('g[image-class]').classed('hidden-after', true);
                     svg.classed('animate-transition', false);
-                }, 1500)
+                }, 1500);
             }, 200);
         });
     }
@@ -785,8 +796,10 @@ async function draw(simplified = false, _) {
     const map = document.getElementById('static-svg-map');
     if(!map) return;
     await tick();
-    addTooltipListener(map, tooltipDefs, zonesData);
-    duplicateContourCleanFirst(svg.node());
+    if (currentMode === "macro") {
+        addTooltipListener(map, tooltipDefs, zonesData);
+        duplicateContourCleanFirst(svg.node());
+    }
     if (firstDraw) mapLibreFitBounds();
     firstDraw = false;
     if (!animated) {
@@ -795,12 +808,11 @@ async function draw(simplified = false, _) {
     }
 }
 
-function drawMacro(graticule) {
+function drawMacro(graticule, groupData) {
     const width = p('width'), height = p('height');
     const borderWidth = p('borderWidth');
     const animated = p('animate');
     const outline = {type: "Sphere"};
-    const groupData = [];
     groupData.push({ name: 'outline', data: [outline], id: null, props: [], class: 'outline', filter: null });
     groupData.push({ name: 'graticule', data: [graticule], id: null, props: [], class: 'graticule', filter: null });
     computedOrderedTabs.forEach((layer, i) => {
@@ -834,7 +846,7 @@ function drawMacro(graticule) {
         // .attr('clip-path', 'url(#clipMapBorder)')
     function drawPaths(data) {
         if (data.type === 'landImg') return appendLandImageNew.call(this, data.showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, p(zonesFilter['land']), animated);
-        if (data.type === 'filterImg') return appendCountryImageNew.call(this, data.countryData, data.filter, applyStyles, path, inlineStyles, animated);
+        if (data.type === 'filterImg') return appendCountryImageNew.call(this, data.countryData, data.filter, applyInlineStyles, path, inlineStyles, animated);
         if (!data.data) return;
         const parentPathElem = d3.select(this).style('will-change', 'opacity'); 
         if (data.containerClass) parentPathElem.classed(data.containerClass, true);
@@ -855,7 +867,8 @@ function drawMacro(graticule) {
 function drawMicro() {
     projection = createD3ProjectionFromMapLibre(maplibreMap);
     path = d3.geoPath(projection);
-    drawPrettyMap(maplibreMap, svg, path) 
+    drawPrettyMap(maplibreMap, svg, path);
+    applyInlineStyles();
 }
 
 function projectAndDraw(simplified = false) {
@@ -893,15 +906,17 @@ function computeCss() {
 
 function save() {
     baseCss = exportStyleSheet('#paths > path');
-    saveState({params, inlineProps, baseCss, providedFonts, 
+    saveState({params, microParams, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
-        tooltipDefs, contourParams, colorDataDefs, legendDefs, customCategoricalPalette
+        tooltipDefs, contourParams, colorDataDefs, legendDefs, customCategoricalPalette,
+        currentMode,
     });
 }
 
 function resetState() {
     params = JSON.parse(JSON.stringify(defaultParams));
+    microParams = JSON.parse(JSON.stringify(microDefaultParams));
     baseCss = defaultBaseCss;
     commonStyleSheetElem.innerHTML = baseCss;
     providedPaths = [];
@@ -947,11 +962,14 @@ function restoreState(givenState) {
     }
     else state = getState();
     if (!state) return resetState();
+    console.log(state);
     ({  params, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, contourParams, colorDataDefs, legendDefs, customCategoricalPalette
     } = JSON.parse(JSON.stringify(state)));
+    if (state.microParams) microParams = state.microParams;
+    if (state.currentMode) currentMode = state.currentMode;
     if (!baseCss) baseCss = defaultBaseCss;
     commonStyleSheetElem.innerHTML = baseCss;
     const tabsWoLand = orderedTabs.filter(x => x !== 'land');
@@ -963,7 +981,7 @@ function restoreState(givenState) {
 
 function saveProject() {
     baseCss = exportStyleSheet('#paths > path'); 
-    const state = {params, inlineProps, baseCss, providedFonts, 
+    const state = {params, microParams, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, contourParams, colorDataDefs, legendDefs, customCategoricalPalette
@@ -994,27 +1012,8 @@ function loadExample(e) {
     projectAndDraw();
 }
 
-function applyStyles(styleAll = false) {
-    // apply inline styles
-    Object.entries(inlineStyles).forEach((([elemId, style]) => {
-        if (!styleAll && countryFilteredImages.has(elemId)) return;
-        const elem = document.getElementById(elemId);
-        if (!elem) return;
-        Object.entries(style).forEach(([cssProp, cssValue]) => {
-            if (cssProp === 'scale') {
-                setTransformScale(elem, `scale(${cssValue})`);
-            }
-            else if (cssProp === 'bringtofront') {
-                elem.parentNode.append(elem);
-            }
-            // if no width, remove width and color. Width will be inherited
-            else if (cssProp === 'stroke-width' && cssValue === null) {
-                elem.style.removeProperty('stroke-width');
-                elem.style.removeProperty('stroke');
-            }
-            else elem.style[cssProp] = cssValue;
-        });
-    }));
+function applyInlineStyles(styleAll = false) {
+    applyStyles(inlineStyles, styleAll ? countryFilteredImages : null);
     save();
 }
 
@@ -1072,7 +1071,7 @@ function importImagePath(e) {
             providedPaths[selectedPathIndex].height = 10;
         }
         drawCustomPaths(providedPaths, svg, projection, inlineStyles);
-        applyStyles();
+        applyInlineStyles();
         save();
     });
     reader.readAsDataURL(file);
@@ -1107,9 +1106,10 @@ function deleteImage() {
     providedPaths[selectedPathIndex] = providedPaths[selectedPathIndex];
     drawShapesAndSave();
 }
+
 function drawShapesAndSave() {
     drawCustomPaths(providedPaths, svg, projection, inlineStyles);
-    applyStyles();
+    applyInlineStyles();
     saveDebounced();
 }
 
@@ -1277,7 +1277,7 @@ function drawAndSetupShapes() {
         showMenu(e);
         return false;
     }, false);
-    applyStyles();
+    applyInlineStyles();
 }
 
 function showMenu(e, target = null) {
@@ -1296,6 +1296,7 @@ async function addShape(shapeName) {
     closeMenu();
     await tick();
     setTimeout(() => {
+        console.log(providedShapes);
         const lastShape = document.getElementById(providedShapes[providedShapes.length -1].id);
         styleEditor.open(lastShape, openContextMenuInfo.event.pageX, openContextMenuInfo.event.pageY);
     }, 0);
@@ -1670,10 +1671,10 @@ async function colorizeAndLegend(e) {
         if (!legendColors) return;
         if (tab === currentTab) sampleLegend = {color: legendColors[0][0], text: legendColors[0][1]};
         const sampleElem = htmlToElement(legendDefs[tab].sampleHtml);
-        displayedLegend[tab] = drawLegend(legendSelection, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', sampleElem, tab, saveDebounced, applyStyles);
+        displayedLegend[tab] = drawLegend(legendSelection, legendDefs[tab], legendColors, dataColorDef.colorScale === 'category', sampleElem, tab, saveDebounced, applyInlineStyles);
     });
     computeCss();
-    applyStyles();
+    applyInlineStyles();
     applyStylesToTemplate();
 }
 
@@ -1855,7 +1856,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
             <!-- </div> -->
             <div id="main-menu" class="mt-4">
                 {#if mainMenuSelection === 'general'}
-                    <Accordions sections={params} {paramDefs} {helpParams} otherParams={accordionVisiblityParams}  on:change={handleChangeProp} ></Accordions>
+                    <Accordions sections={currentParams} {paramDefs} {helpParams} otherParams={accordionVisiblityParams}  on:change={handleChangeProp} ></Accordions>
                 {:else if mainMenuSelection === 'layers'}
                 <div class="border border-primary rounded">
                     <div class="p-2">
