@@ -68,6 +68,6 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction) {
         .attr("id", d => d.properties.uuid);
         // .attr("id", d => d.id);
     svg.append('g').attr('id', 'points-labels');
-
-    mapLibreContainer.classed('transparent', true);
+    svg.style("pointer-events", "none");
+    mapLibreContainer.style('opacity', 0);
 }

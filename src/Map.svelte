@@ -322,8 +322,8 @@ let dragFunc;
  *  - hidden if it is zoomed enough. Instead, we have the custom SVG displaying
  */
 let maplibreMap;
-let mounted = false;
 let mapLoadedPromise;
+let microLocked = false;
 onMount(async() => {
     commonStyleSheetElem = document.createElement('style');
     commonStyleSheetElem.setAttribute('id', 'common-style-sheet-elem');
@@ -332,34 +332,7 @@ onMount(async() => {
     console.log('mounting');
     await layerPromises;
     restoreState();
-    maplibreMap = new Map({
-        container: "maplibre-map", 
-        style: 'https://api.maptiler.com/maps/basic-v2/style.json?key=FDR0xJ9eyXD87yIqUjOi',
-        center: inlinePropsMicro.center,
-        zoom: inlinePropsMicro.zoom,
-        pitch: inlinePropsMicro.pitch,
-        bearing: inlinePropsMicro.bearing,
-        attributionControl: false
-    });
-    maplibreMap.on('idle', (event) => {
-        if (currentMode !== "micro") return;
-        console.log('idle');
-        const center = maplibreMap.getCenter().toArray();
-        if (center[0] !== 0 && center[1] !== 0) {
-            inlinePropsMicro = {
-                center,
-                zoom: maplibreMap.getZoom(),
-                pitch: maplibreMap.getPitch(),
-                bearing: maplibreMap.getBearing(),
-            }
-        }
-        draw();
-    });
-    maplibreMap.on('click', (event) => {
-        console.log(maplibreMap.queryRenderedFeatures(event.point));
-        console.log(maplibreMap.getStyle());
-    });
-    mapLoadedPromise = maplibreMap.once('load');
+    createMaplibreMap();
     await mapLoadedPromise;
     
     projectAndDraw();
@@ -446,10 +419,72 @@ onMount(async() => {
     contextualMenu.style.position = 'absolute';
     contextualMenu.opened = false;
     attachListeners();
-    maplibreMap.showTileBoundaries = true;
-    mounted = true;
+    // maplibreMap.showTileBoundaries = true;
     // createDemoPage();
 });
+
+function lockUnlock(isLocked) {
+    console.log("lockUnlock", isLocked);
+    microLocked = isLocked;
+    
+    const mapLibreContainer = d3.select('#maplibre-map');
+    if (microLocked) {
+        svg.style("pointer-events", "auto");
+        mapLibreContainer.style('pointer-events', "none");
+    } else {
+        svg.style("pointer-events", "none");
+        mapLibreContainer.style('pointer-events', "auto");
+    }
+}
+
+const drawDebounced = debounce(draw, 500);
+function createMaplibreMap() {
+    maplibreMap = new Map({
+        container: "maplibre-map", 
+        style: 'https://api.maptiler.com/maps/basic-v2/style.json?key=FDR0xJ9eyXD87yIqUjOi',
+        center: inlinePropsMicro.center,
+        zoom: inlinePropsMicro.zoom,
+        pitch: inlinePropsMicro.pitch,
+        bearing: inlinePropsMicro.bearing,
+        attributionControl: false
+    });
+
+    maplibreMap.on('moveend', (event) => {
+        if (currentMode !== "micro") return;
+        console.log('moveend');
+        const center = maplibreMap.getCenter().toArray();
+        if (center[0] !== 0 && center[1] !== 0) {
+            inlinePropsMicro = {
+                center,
+                zoom: maplibreMap.getZoom(),
+                pitch: maplibreMap.getPitch(),
+                bearing: maplibreMap.getBearing(),
+            }
+        }
+        drawDebounced();
+    });
+
+    maplibreMap.on('movestart', (event) => {
+        console.log('movestart');
+        if (currentMode !== "micro") return;
+        d3.select('#maplibre-map').style('opacity', 1);
+    });
+
+    maplibreMap.on('click', (event) => {
+        console.log(event);
+        console.log(maplibreMap.queryRenderedFeatures(event.point));
+        console.log(maplibreMap.getStyle());
+    });
+    maplibreMap.on('contextmenu', e => {
+        if (!microLocked) {
+            lockUnlock(true);
+            const clickedElem = document.elementFromPoint(e.originalEvent.clientX, e.originalEvent.clientY);
+            Object.defineProperty(e.originalEvent, 'target', {writable: false, value: clickedElem});
+            svg.node().dispatchEvent(e.originalEvent);
+        }
+    });
+    mapLoadedPromise = maplibreMap.once('load');
+}
 
 function handleInlineStyleChange(elemId, target, cssProp, value) {
     if (elemId.includes('label')) {
@@ -465,10 +500,6 @@ function handleInlineStyleChange(elemId, target, cssProp, value) {
             .attr('id', newMarkerId);
         d3.select(target).attr('marker-end', `url(#${newMarkerId})`);
     }
-}
-
-function maybeDisplayMaplibreMap() {
-    d3.select('#maplibre-map').classed('transparent', false);
 }
 
 
@@ -489,10 +520,9 @@ function switchMode(newMode) {
 function attachListeners() {
     const container = d3.select('#map-container');
     dragFunc = d3.drag()
-        .filter((e) => !e.button)   // Remove ctrlKey
+        .filter((e) => currentMode === "macro" && !e.button)   // Remove ctrlKey
         .on("drag", dragged)
         .on('start', () => {
-            maybeDisplayMaplibreMap();
             console.log('dragstart');
             if (menuStates.addingLabel) validateLabel();
             styleEditor.close();
@@ -500,10 +530,11 @@ function attachListeners() {
         });
 
     zoomFunc = d3.zoom()
-    .wheelDelta((event) => -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002))
-    .on('zoom', zoomed).on('start', () => {
-        closeMenu();
-    });
+        .filter((e) => currentMode === "macro")
+        .wheelDelta((event) => -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002))
+        .on('zoom', zoomed).on('start', () => {
+            closeMenu();
+        });
     container.call(dragFunc);
     container.call(zoomFunc);
 }
@@ -730,6 +761,7 @@ async function draw(simplified = false, _) {
     svg.html('');
     svg.append('defs');
     svg.on('contextmenu', function(e) {
+        console.log('svg contextmenu', e);
         if (editingPath) return;
         e.preventDefault();
         closeMenu();
@@ -2112,9 +2144,18 @@ function getLegendColors(dataColorDef, tab, scale, data) {
             </div>
         </Navbar>
         <div class="d-flex flex-column justify-content-center align-items-center h-100">
+            {#if currentMode === "micro"}
+                <div class="mb-4 d-flex align-items-center justify-content-center">
+                    <input type="checkbox" class="btn-check" id="lock-unlock" bind:checked={microLocked} on:change={e => lockUnlock(microLocked)}  >
+                    <label class="btn btn-outline-primary" class:active={microLocked} for="lock-unlock">
+                        <Icon svg={microLocked ? icons['lock'] : icons['unlock']}/> { microLocked ? "View locked" : "View unlocked" } 
+                    </label>
+                </div>
+            {/if}
+
             <div id="map-content" style="position: relative;">
                 <div id="map-container" class="col mx-4"></div>
-                <div id="maplibre-map" class="transparent"></div>
+                <div id="maplibre-map"></div>
             </div>
             <div class="mt-4 d-flex align-items-center justify-content-center">
                 <div class="mx-2">
@@ -2288,10 +2329,6 @@ function getLegendColors(dataColorDef, tab, scale, data) {
     top: 0px;
     left: 1.5rem;
     background-color: white;
-}
-#maplibre-map.transparent {
-    opacity: 0.1;
-    pointer-events: none;
 }
 #country-select{
   opacity: 0;
