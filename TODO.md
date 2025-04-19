@@ -86,6 +86,7 @@
 - [x] Delay optimizing content of <image> at export time (for performance)
 
 - [x] ISE open on click
+- [x] Micro: Store position (lat / lnt / zoom / pitch / bearing)
 - [ ] Micro: Lock / unlock mechanism (allow map drag when on SVG) 
 - [ ] Micro: MapTiler attribution 
 - [x] Micro: Persist currentMode in state

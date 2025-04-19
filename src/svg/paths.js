@@ -45,7 +45,7 @@ export function drawCustomPaths(pathDefs, svg, projection, inlineStyles = {}) {
         appendImageAnimated(imagesElem, pathDef);
     });
     // remove node if no image
-    if (!imagesElem.node().children) imagesElem.html('');
+    if (!imagesElem?.node()?.children) imagesElem.html('');
     else {
         let defs = svg.select('defs');
         if (defs.empty()) defs = svg.append('defs');

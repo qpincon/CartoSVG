@@ -12,6 +12,7 @@ export const interestingBasicV2Layers = [
     "Water",
     "River",
     "Bridge",
+    "Pier",
     "Road network",
     "Path minor",
     "Path",
@@ -46,7 +47,7 @@ export function getRoadStrokeWidth(roadFeature, zoom) {
     return roadMinorStrokeWidth(zoom);
 }
 
-export function drawPrettyMap(maplibreMap, svg, d3PathFunction, inlineStyles) {
+export function drawPrettyMap(maplibreMap, svg, d3PathFunction) {
     const zoom = maplibreMap.getZoom();
     const mapLibreContainer = select('#maplibre-map');
     const geometries = getRenderedFeatures(maplibreMap, { layers: interestingBasicV2Layers });
