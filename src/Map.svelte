@@ -17,6 +17,7 @@ import { splitMultiPolygons } from './util/geojson';
 import { createD3ProjectionFromMapLibre, getGeographicalBounds, getProjection, updateAltitudeRange } from './util/projections';
 import PaletteEditor from "./components/PaletteEditor.svelte";
 
+import Geocoding from './components/Geocoding.svelte';
 import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, getBestFormatter, getColumns } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import * as markers from './svg/markerDefs';
@@ -28,7 +29,7 @@ import DataTable from './components/DataTable.svelte';
 
 import Examples from './components/Examples.svelte';
 import Legend from './components/Legend.svelte';
-import defaultBaseCss from './assets/pagestyle.css?inline';
+import defaultBaseCssMacro from './assets/pagestyleMacro.css?inline';
 import { drawLegend } from './svg/legend';
 import { freeHandDrawPath } from './svg/freeHandPath'
 import Modal from './components/Modal.svelte';
@@ -45,9 +46,10 @@ import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts, applySty
 import { saveState, getState } from './util/save';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
-import {drawPrettyMap} from './detailed'
+import {drawPrettyMap, generateCssFromState, initLayersState, onMicroParamChange, peachPalette, syncLayerStateWithCss} from './detailed'
 import { Map } from 'maplibre-gl';
 import { createDemoPage} from './svg/patternGenerator';
+    import MicroLayerParams from './components/MicroLayerParams.svelte';
 
 const scalesHelp = `
 <div class="inline-tooltip">  
@@ -77,9 +79,7 @@ $: if (params || microParams || currentMode) {
     let prevParams = currentParams;
     currentParams = currentMode === "micro" ? microParams: params;
     if (prevParams !== currentParams) projectAndDraw();
-    console.log('change', currentParams);
 }
-// $: currentParams =  ((params || microParams) && currentMode === 'micro') ? microParams : params;
 
 $: if (true || mainMenuSelection) { tick().then(() => initTooltips()); }
 const iso3DataById = indexBy(iso3Data, 'alpha-3');
@@ -243,9 +243,10 @@ const defaultInlinePropsMicro = {
 }
 
 // ====== State micro ====
+let microLayerDefinitions = initLayersState(peachPalette);
 
 // ====== State macro =======
-let baseCss = defaultBaseCss;
+let baseCss = defaultBaseCssMacro;
 let providedPaths = [];
 let providedShapes = []; // {name, coords, scale, id}
 let chosenCountriesAdm = [];
@@ -311,7 +312,8 @@ let editingPath = false;
 
 // This contains the common CSS that can ben editor with inline-css-editor
 // we also have a special svelte:head element containing all CSS that is not in baseCss (border style, legend colors, etc.)
-let commonStyleSheetElem;
+let commonStyleSheetElemMacro;
+let commonStyleSheetElemMicro;
 let zoomFunc;
 let dragFunc;
 /**
@@ -325,19 +327,33 @@ let maplibreMap;
 let mapLoadedPromise;
 let microLocked = false;
 onMount(async() => {
-    commonStyleSheetElem = document.createElement('style');
-    commonStyleSheetElem.setAttribute('id', 'common-style-sheet-elem');
-    document.head.appendChild(commonStyleSheetElem);
-    commonStyleSheetElem.innerHTML = baseCss;
-    console.log('mounting');
+    commonStyleSheetElemMacro = document.createElement('style');
+    commonStyleSheetElemMacro.setAttribute('id', 'common-style-sheet-elem-macro');
+    document.head.appendChild(commonStyleSheetElemMacro);
+    commonStyleSheetElemMacro.innerHTML = baseCss;
+
+    
     await layerPromises;
     restoreState();
     createMaplibreMap();
+
+    const microCss = generateCssFromState(microLayerDefinitions);
+    commonStyleSheetElemMicro = document.createElement('style');
+    commonStyleSheetElemMicro.setAttribute('id', 'common-style-sheet-elem-micro');
+    document.head.appendChild(commonStyleSheetElemMicro);
+    commonStyleSheetElemMicro.innerHTML = microCss;
+
+    console.log(commonStyleSheetElemMicro);
+    console.log(document.styleSheets)
     await mapLoadedPromise;
     
     projectAndDraw();
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
+            if( currentMode === "micro") {
+                const layerDefChanged = syncLayerStateWithCss(eventType, cssProp, value, microLayerDefinitions);
+                if (layerDefChanged) microLayerDefinitions = microLayerDefinitions;
+            }
             /** 
              * Due to a Firefox bug (the :hover selector is not applied when we move the DOM node when hovering a polygon)
              * we need to apply the :hover style to a custom class selector .hovered, that will be applied programatically
@@ -410,6 +426,8 @@ onMount(async() => {
             if (cssSelector.includes('.hovered')) return false;
             if (cssSelector.includes('ssc-')) return false;
             if (cssSelector.includes('#micro > path')) return false;
+            if (cssSelector.includes('#micro .poly')) return false;
+            if (cssSelector.includes('#micro .line')) return false;
             return true;
         },
         inlineDeletable: () => (false)
@@ -437,7 +455,7 @@ function lockUnlock(isLocked) {
     }
 }
 
-const drawDebounced = debounce(draw, 500);
+const drawDebounced = debounce(draw, 700);
 function createMaplibreMap() {
     maplibreMap = new Map({
         container: "maplibre-map", 
@@ -451,7 +469,6 @@ function createMaplibreMap() {
 
     maplibreMap.on('moveend', (event) => {
         if (currentMode !== "micro") return;
-        console.log('moveend');
         const center = maplibreMap.getCenter().toArray();
         if (center[0] !== 0 && center[1] !== 0) {
             inlinePropsMicro = {
@@ -486,6 +503,11 @@ function createMaplibreMap() {
     mapLoadedPromise = maplibreMap.once('load');
 }
 
+function handleMicroParamChange(layer, prop, value) {
+    const shouldRedraw = onMicroParamChange(layer, prop, value);
+    if (shouldRedraw) draw();
+}
+
 function handleInlineStyleChange(elemId, target, cssProp, value) {
     if (elemId.includes('label')) {
         lastUsedLabelProps[cssProp] = value;
@@ -510,6 +532,7 @@ function switchMode(newMode) {
     const mapLibreContainer = d3.select('#maplibre-map');
     if (currentMode === 'micro') {
         mapLibreContainer.style('display', 'block');
+        mainMenuSelection = "general"
         draw();
     } else {
         projectAndDraw();
@@ -920,7 +943,7 @@ async function drawMicro() {
     await mapLoadedPromise;
     projection = createD3ProjectionFromMapLibre(maplibreMap);
     path = d3.geoPath(projection);
-    drawPrettyMap(maplibreMap, svg, path);
+    drawPrettyMap(maplibreMap, svg, path, microLayerDefinitions, applyInlineStyles);
     applyInlineStyles();
 }
 
@@ -971,8 +994,8 @@ function save() {
 function resetState() {
     params = JSON.parse(JSON.stringify(defaultParams));
     microParams = JSON.parse(JSON.stringify(microDefaultParams));
-    baseCss = defaultBaseCss;
-    commonStyleSheetElem.innerHTML = baseCss;
+    baseCss = defaultBaseCssMacro;
+    commonStyleSheetElemMacro.innerHTML = baseCss;
     providedPaths = [];
     providedShapes = [];
     chosenCountriesAdm = [];
@@ -1030,8 +1053,8 @@ function restoreState(givenState) {
         console.log(inlinePropsMicro);
         if (maplibreMap) maplibreMap.jumpTo(inlinePropsMicro);
     }, 500);
-    if (!baseCss) baseCss = defaultBaseCss;
-    commonStyleSheetElem.innerHTML = baseCss;
+    if (!baseCss) baseCss = defaultBaseCssMacro;
+    commonStyleSheetElemMacro.innerHTML = baseCss;
     const tabsWoLand = orderedTabs.filter(x => x !== 'land');
     if (tabsWoLand.length) onTabChanged(tabsWoLand[0]);
     getZonesDataFormatters();
@@ -1881,43 +1904,24 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                             General
                         </a>
                 </li>
-                <li class="nav-item d-flex align-items-center mx-1">
-                    <a href="javascript:;" class="nav-link d-flex align-items-center position-relative fs-5"
-                        on:click={() => mainMenuSelection = "layers"}
-                        class:active={mainMenuSelection === "layers"}>
-                            Layers
+                {#if currentMode === "macro"} 
+                    <li class="nav-item d-flex align-items-center mx-1">
+                        <a href="javascript:;" class="nav-link d-flex align-items-center position-relative fs-5"
+                            on:click={() => mainMenuSelection = "layers"}
+                            class:active={mainMenuSelection === "layers"}>
+                                Layers
                         </a>
                     </li>
+                {/if}
 
                 </ul>
             </div>
-                <!-- <div class="btn-group" role="group">
-                    <input
-                        type="radio"
-                        class="btn-check"
-                        name="paramsSwitch"
-                        id="switchGeneral"
-                        bind:group={mainMenuSelection}
-                        value='general'
-                        autocomplete="off"
-                    />
-                    <label class="btn btn-outline-primary" for="switchGeneral">General</label>
-                    
-                    <input
-                    type="radio"
-                    class="btn-check"
-                    name="paramsSwitch"
-                    id="switchLayers"
-                    autocomplete="off"
-                    bind:group={mainMenuSelection}
-                    value='layers'
-                    />
-                    <label class="btn btn-outline-primary" for="switchLayers">Layers</label>
-                </div> -->
-            <!-- </div> -->
             <div id="main-menu" class="mt-4">
                 {#if mainMenuSelection === 'general'}
                     <Accordions sections={currentParams} {paramDefs} {helpParams} otherParams={accordionVisiblityParams}  on:change={handleChangeProp} ></Accordions>
+                    {#if currentMode === "micro"}
+                        <MicroLayerParams layerDefinitions={microLayerDefinitions} onUpdate={handleMicroParamChange}></MicroLayerParams>
+                    {/if}
                 {:else if mainMenuSelection === 'layers'}
                 <div class="border border-primary rounded">
                     <div class="p-2">
@@ -2124,10 +2128,6 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                         {/if}
                     </div> 
                 </div>
-                {:else if mainMenuSelection === 'micro'}
-                <div class="border border-primary rounded">
-                    COUCOU
-                </div>
                 {/if}
             </div>
         </div>
@@ -2145,11 +2145,14 @@ function getLegendColors(dataColorDef, tab, scale, data) {
         </Navbar>
         <div class="d-flex flex-column justify-content-center align-items-center h-100">
             {#if currentMode === "micro"}
-                <div class="mb-4 d-flex align-items-center justify-content-center">
-                    <input type="checkbox" class="btn-check" id="lock-unlock" bind:checked={microLocked} on:change={e => lockUnlock(microLocked)}  >
-                    <label class="btn btn-outline-primary" class:active={microLocked} for="lock-unlock">
-                        <Icon svg={microLocked ? icons['lock'] : icons['unlock']}/> { microLocked ? "View locked" : "View unlocked" } 
-                    </label>
+                <div class="micro-top mb-4 mx-auto d-flex align-items-center justify-content-between">
+                    <Geocoding maplibreMap={maplibreMap}></Geocoding> 
+                    <div class="d-flex mx-2 align-items-center justify-content-center">
+                        <input type="checkbox" class="btn-check" id="lock-unlock" bind:checked={microLocked} on:change={e => lockUnlock(microLocked)}  >
+                        <label class="btn btn-outline-primary" class:active={microLocked} for="lock-unlock">
+                            <Icon svg={microLocked ? icons['lock'] : icons['unlock']}/> { microLocked ? "View locked" : "View unlocked" } 
+                        </label>
+                    </div>
                 </div>
             {/if}
 
@@ -2307,6 +2310,9 @@ function getLegendColors(dataColorDef, tab, scale, data) {
     }
 }
 
+.micro-top {
+    width: 40rem;
+}
 
 
 #country-select:hover ~ span {

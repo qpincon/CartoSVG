@@ -406,7 +406,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
         }
       }
     }
-    console.log('stitchGroups=', stitchGroups);
+    // console.log('stitchGroups=', stitchGroups);
 
     // merge groups that have intersection
     const finalStichGroups = mergeSets(stitchGroups);

@@ -187,61 +187,9 @@ aside .nav-link.active {
     width: 90%;
 }
 .popup.popup_right {
-    left: -30px !important;
+    left: 30px !important;
 }
 
 .hidden, .hidden-after {
     display: none;
-}
-
-#micro > path {
-    fill: none;
-    // stroke: black !important;
-    // stroke-width: 1px !important;
-}
-#micro > .building {
-    fill: #d0c9ad;
-} 
-
-#micro > .road-network {
-    stroke: #ffffff;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-} 
-
-#micro > .path-minor {
-    stroke: #ffffff;
-    stroke-dasharray: 5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-} 
-
-#micro > .path {
-    stroke: #ffffff;
-    stroke-dasharray: 5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-} 
-
-#micro > .grass {
-    fill: #cedfb9;
-} 
-#micro > .forest {
-    fill: #b4d296;
-} 
-#micro > .wood {
-    fill: #bcd5a2;
-} 
-#micro > .water {
-    fill: #94c1e1;
-}
-#micro > .river {
-    stroke: #94c1e1;
-}
-#micro > .sand {
-    fill: #e8e2a4;
-}
-
-#micro > .tileExtent {
-    stroke: red !important;
 }

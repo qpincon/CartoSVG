@@ -62,6 +62,7 @@ function findStyleSheet(selectorToFind) {
             }
         }
     }
+    return [null, null]
 }
 
 function exportStyleSheet(selectorToFind) {

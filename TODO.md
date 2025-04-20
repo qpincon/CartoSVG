@@ -87,14 +87,15 @@
 
 - [x] ISE open on click
 - [x] Micro: Store position (lat / lnt / zoom / pitch / bearing)
-- [ ] Micro: Lock / unlock mechanism (allow map drag when on SVG) 
+- [x] Micro: Lock / unlock mechanism (allow map drag when on SVG) 
 - [ ] Micro: MapTiler attribution 
 - [x] Micro: Persist currentMode in state
 - [x] Micro: remove forward element on hover
-- [ ] Micro: Order building layer elements by height
-- [ ] Micro: Building: Add 3 classes at random
+- [x] Micro: Order building layer elements by height
+- [x] Micro: Building: Add 3 classes at random
 - [x] Micro: Allow write labels / add points
-- [ ] Micro: Add nominatim search
+- [x] Micro: Add nominatim search
+- [ ] Micro: Save changed CSS
 - [ ] Micro: CSS themes as separate .css files
     - [ ] Color + lighter color on hover
 - [ ] Micro: Toggle layers 
@@ -109,5 +110,6 @@
 - [ ] Micro: Export (CSS + font, no tooltip mechanism)
 - [ ] Micro: Bonus: cut geometries outside of border when high border radius
 - [ ] Micro: Bonus: Freehand drawing: https://github.com/steveruizok/perfect-freehand?tab=readme-ov-file
+- [ ] Micro: Bonus: Stitch / polygon merge in web workers
 
 

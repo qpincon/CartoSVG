@@ -1,8 +1,9 @@
 import { scaleLinear } from "d3-scale";
-import {select} from "d3-selection";
+import { select } from "d3-selection";
 import { getRenderedFeatures } from "./util/geometryStitch";
-import { kebabCase } from "lodash-es";
-
+import { has, kebabCase, last, random, set } from "lodash-es";
+import { color, hsl } from "d3-color";
+import { findStyleSheet } from "./util/dom";
 export const interestingBasicV2Layers = [
     "Residential",
     "Forest",
@@ -10,11 +11,11 @@ export const interestingBasicV2Layers = [
     "Grass",
     "Wood",
     "Water",
-    "River",
-    "Bridge",
+    // "River",
+    // "Bridge",
     "Pier",
     "Road network",
-    "Path minor",
+    // "Path minor",
     "Path",
     "Building",
 ];
@@ -23,6 +24,9 @@ export function orderFeaturesByLayer(features) {
     features.sort((a, b) => {
         const layerIdA = interestingBasicV2Layers.indexOf(a.properties.mapLayerId);
         const layerIdB = interestingBasicV2Layers.indexOf(b.properties.mapLayerId);
+        const renderHeightA = a.properties['render_height'];
+        const renderHeightB = b.properties['render_height'];
+        if (renderHeightA != null && renderHeightB != null) return renderHeightA > renderHeightB ? - 1 : 1;
         if (layerIdA < layerIdB) return -1;
         return 1;
     })
@@ -47,10 +51,15 @@ export function getRoadStrokeWidth(roadFeature, zoom) {
     return roadMinorStrokeWidth(zoom);
 }
 
-export function drawPrettyMap(maplibreMap, svg, d3PathFunction) {
+export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions) {
+    console.log('layerDefinitions=', layerDefinitions);
     const zoom = maplibreMap.getZoom();
     const mapLibreContainer = select('#maplibre-map');
-    const geometries = getRenderedFeatures(maplibreMap, { layers: interestingBasicV2Layers });
+    const layersToQuery = interestingBasicV2Layers.filter(layer => {
+        return layerDefinitions[kebabCase(layer)]?.active === true;
+    }); 
+    console.log(layersToQuery);
+    const geometries = getRenderedFeatures(maplibreMap, { layers: layersToQuery });
     orderFeaturesByLayer(geometries);
     console.log('geometries', geometries);
     svg.style("background-color", "#e8e8da");
@@ -61,13 +70,128 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction) {
         .enter()
         .append("path")
         .attr("d", (d) => d3PathFunction(d.geometry))
-        // .attr("class", d => kebabCase(d.properties.mapLayerId))
-        .attr("class", d => d.properties.tileExtent ? 'tileExtent' : kebabCase(d.properties.mapLayerId))
+        .attr("class", d => {
+            const layerIdKebab = kebabCase(d.properties.mapLayerId);
+            const classes = [layerIdKebab];
+            classes.push(d.geometry.type.includes("Line") ? 'line' : 'poly');
+            const state = layerDefinitions[layerIdKebab];
+            if (state?.fills) {
+                classes.push(`${layerIdKebab}-${random(0, state.fills.length - 1)}`);
+            }
+            return classes.join(' ');
+        })
         .attr("stroke-width", d => getRoadStrokeWidth(d, zoom))
         .attr("computed-id", d => d.properties.computedId)
         .attr("id", d => d.properties.uuid);
-        // .attr("id", d => d.id);
     svg.append('g').attr('id', 'points-labels');
     svg.style("pointer-events", "none");
     mapLibreContainer.style('opacity', 0);
+}
+
+export const peachPalette = {
+    background: { fill: "#F2F4CB", disabled: true, active:true},
+    other: { fill: "#F2F4CB", stroke: "#2F3737", disabled: true, active:true },
+    building: { fills: ["#C5283D", "#E9724C", "#FFC857"], stroke: "#2F3737", active: true },
+    water: { fill: "#a1e3ff", stroke: "#85c9e6", active: true },
+    grass: { fill: "#D0F1BF", stroke: "#2F3737", active: true },
+    wood: { fill: "#64B96A", stroke: "#2F3737", active: true },
+    "road-network": { stroke: "#2F3737", active: true },
+};
+
+export function initLayersState(providedPalette) {
+    const palette = { ...providedPalette };
+    if (!palette['forest']) palette['forest'] = { ...palette['wood'], active: false };
+    if (!palette['path']) palette['path'] = { ...palette['road-network'], active: false };
+    // if (!palette['path-minor']) palette['path-minor'] = { ...palette['road-network'], active: false };
+    Object.values(palette).forEach( state => {
+        state.menuOpened = state.active;
+    });
+    // if (!palette['building1']) {
+    //     const strokeRef = palette['building0'].stroke;
+    //     const fillRef = hsl(color(palette['building0'].fill));
+    //     console.log(fillRef);
+    //     const lighter1 = fillRef.brighter(0.2).formatHex();
+    //     const lighter2 = fillRef.brighter(0.4).formatHex();
+    //     palette['building1'] = { stroke: strokeRef, fill: lighter1 };
+    //     palette['building2'] = { stroke: strokeRef, fill: lighter2 };
+    // }
+    return palette;
+}
+export function generateCssFromState(state) {
+
+    const otherStroke = state['other'].stroke;
+    const otherFill = state['other'].fill;
+
+    // "other" default color definitions wil be overriden by mode specific '>' selector
+    let css = `
+    #micro .line { 
+        fill: none; 
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke: ${otherStroke};
+    }
+    #micro .poly { 
+        stroke-linejoin: round;
+        fill: ${otherFill};
+    }
+    `;
+    for (const [layer, layerDef] of Object.entries(state)) {
+        if (layer === "other") continue;
+        let ruleContent = '';
+        if (layerDef.stroke) {
+            ruleContent += `stroke: ${layerDef.stroke};`;
+            if (!layer.includes('road') && !layer.includes('path'))  {
+                ruleContent += `stroke-width: 1px;`;
+            }
+            if (layer.includes('path')) {
+                ruleContent += `stroke-dasharray: 5;`;
+            }
+        }
+        if (layerDef.fill) ruleContent += `fill: ${layerDef.fill};`;
+        if (ruleContent.length) {
+            css += `#micro > .${layer} { ${ruleContent} }`;
+        }
+        if (layerDef.fills) {
+            layerDef.fills.forEach((fill, i) => {
+                css += `#micro > .${layer}-${i} { fill: ${fill}; }`;
+            });
+        }
+    }
+
+    return css;
+}
+
+// Returns true if we should redraw (layer deactivated for instance)
+export function onMicroParamChange(layer, prop, value) {
+    console.log(layer, prop, value);
+    if (prop === "active") {
+        return true;
+    }
+    let ruleTxt = `#micro > .${layer}`;
+    // Change "building-0" for instance
+    if (Array.isArray(prop)) ruleTxt = `#micro > .${layer}-${last(prop)}`;
+    const [sheet, rule] = findStyleSheet(ruleTxt);
+    if (!rule) return;
+    if (Array.isArray(prop) && prop[0] === "fills") {
+        rule.style.setProperty("fill", value);
+    } else {
+        rule.style.setProperty(prop, value);
+    }
+    return false;
+}
+
+// Called when CSS is update with inline style editor
+export function syncLayerStateWithCss(eventType, cssProp, value, layerState) {
+    const cssSelector = eventType.selectorText;
+    if (!cssSelector.includes('#micro >')) return false;
+    const layer = cssSelector.match(/#micro > \.(.*)/)[1];
+    let path = [layer, cssProp];
+    if (layer.includes('-') && cssProp === "fill") {
+        path = layer.split('-');
+        console.log('path=', path);
+        path.splice(1, 0, 'fills');
+    }
+    if (!has(layerState, path)) return false;
+    set(layerState, path, value);
+    return true;
 }
