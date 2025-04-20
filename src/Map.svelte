@@ -49,7 +49,7 @@ import { addTooltipListener} from './tooltip';
 import {drawPrettyMap, generateCssFromState, initLayersState, onMicroParamChange, peachPalette, syncLayerStateWithCss} from './detailed'
 import { Map } from 'maplibre-gl';
 import { createDemoPage} from './svg/patternGenerator';
-    import MicroLayerParams from './components/MicroLayerParams.svelte';
+import MicroLayerParams from './components/MicroLayerParams.svelte';
 
 const scalesHelp = `
 <div class="inline-tooltip">  
@@ -353,6 +353,11 @@ onMount(async() => {
             if( currentMode === "micro") {
                 const layerDefChanged = syncLayerStateWithCss(eventType, cssProp, value, microLayerDefinitions);
                 if (layerDefChanged) microLayerDefinitions = microLayerDefinitions;
+                if (eventType === 'inline' && target.hasAttribute('id')) {
+                    handleInlineStyleChange(elemId, target, cssProp, value);
+                }
+                save();
+                return;
             }
             /** 
              * Due to a Firefox bug (the :hover selector is not applied when we move the DOM node when hovering a polygon)
@@ -504,7 +509,7 @@ function createMaplibreMap() {
 }
 
 function handleMicroParamChange(layer, prop, value) {
-    const shouldRedraw = onMicroParamChange(layer, prop, value);
+    const shouldRedraw = onMicroParamChange(layer, prop, value, microLayerDefinitions);
     if (shouldRedraw) draw();
 }
 

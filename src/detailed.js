@@ -1,7 +1,7 @@
 import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
 import { getRenderedFeatures } from "./util/geometryStitch";
-import { has, kebabCase, last, random, set } from "lodash-es";
+import { debounce, has, kebabCase, last, random, set } from "lodash-es";
 import { color, hsl } from "d3-color";
 import { findStyleSheet } from "./util/dom";
 export const interestingBasicV2Layers = [
@@ -117,6 +117,11 @@ export function initLayersState(providedPalette) {
     // }
     return palette;
 }
+
+function lighten(c, quantity = 0.2) {
+    return hsl(color(c)).brighter(quantity).formatHex();
+}
+
 export function generateCssFromState(state) {
 
     const otherStroke = state['other'].stroke;
@@ -138,6 +143,7 @@ export function generateCssFromState(state) {
     for (const [layer, layerDef] of Object.entries(state)) {
         if (layer === "other") continue;
         let ruleContent = '';
+        let ruleHoverContent = '';
         if (layerDef.stroke) {
             ruleContent += `stroke: ${layerDef.stroke};`;
             if (!layer.includes('road') && !layer.includes('path'))  {
@@ -146,24 +152,30 @@ export function generateCssFromState(state) {
             if (layer.includes('path')) {
                 ruleContent += `stroke-dasharray: 5;`;
             }
+            const lighter = lighten(layerDef.stroke);
+            ruleHoverContent += `stroke: ${lighter};`;
         }
-        if (layerDef.fill) ruleContent += `fill: ${layerDef.fill};`;
+        if (layerDef.fill) {
+            ruleContent += `fill: ${layerDef.fill};`;
+            const lighter = lighten(layerDef.fill);
+            ruleHoverContent += `fill: ${lighter};`;
+        }
         if (ruleContent.length) {
             css += `#micro > .${layer} { ${ruleContent} }`;
+            css += `#micro > .${layer}:hover { ${ruleHoverContent} }`;
         }
         if (layerDef.fills) {
             layerDef.fills.forEach((fill, i) => {
                 css += `#micro > .${layer}-${i} { fill: ${fill}; }`;
+                css += `#micro > .${layer}-${i}:hover { fill: ${lighten(fill)}; }`;
             });
         }
     }
-
     return css;
 }
 
 // Returns true if we should redraw (layer deactivated for instance)
-export function onMicroParamChange(layer, prop, value) {
-    console.log(layer, prop, value);
+export function onMicroParamChange(layer, prop, value, layerState) {
     if (prop === "active") {
         return true;
     }
@@ -171,13 +183,15 @@ export function onMicroParamChange(layer, prop, value) {
     // Change "building-0" for instance
     if (Array.isArray(prop)) ruleTxt = `#micro > .${layer}-${last(prop)}`;
     const [sheet, rule] = findStyleSheet(ruleTxt);
-    if (!rule) return;
+    if (!rule) return false;
     if (Array.isArray(prop) && prop[0] === "fills") {
         rule.style.setProperty("fill", value);
     } else {
         rule.style.setProperty(prop, value);
     }
+    replaceCssSheetContent(layerState);
     return false;
+
 }
 
 // Called when CSS is update with inline style editor
@@ -188,10 +202,16 @@ export function syncLayerStateWithCss(eventType, cssProp, value, layerState) {
     let path = [layer, cssProp];
     if (layer.includes('-') && cssProp === "fill") {
         path = layer.split('-');
-        console.log('path=', path);
         path.splice(1, 0, 'fills');
     }
     if (!has(layerState, path)) return false;
     set(layerState, path, value);
+    replaceCssSheetContent(layerState);
     return true;
 }
+
+const replaceCssSheetContent = debounce((layerState) => {
+    const styleSheet = document.getElementById('common-style-sheet-elem-micro');
+    const microCss = generateCssFromState(layerState);
+    styleSheet.innerHTML = microCss;
+}, 500);
