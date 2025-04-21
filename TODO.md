@@ -96,20 +96,22 @@
 - [x] Micro: Allow write labels / add points
 - [x] Micro: Add nominatim search
 - [ ] Micro: Save changed CSS
-- [ ] Micro: CSS themes as separate .css files
-    - [ ] Color + lighter color on hover
-- [ ] Micro: Toggle layers 
-- [ ] Micro: Layers parametrization
-    - [ ] SVG pattern: density + color + width + pattern (/o\*...)
-    - [ ] Stroke color + fill color
-    - [ ] 3 colors for buildings (3 classes)
-    - [ ] Bind style change from ISE to layer stroke / fill color 
+- [x] Micro: CSS themes as separate .css files
+    - [x] Color + lighter color on hover
+- [x] Micro: Toggle layers 
+- [x] Micro: Layers parametrization
+    - [x] SVG pattern: density + color + width + pattern (/o\*...)
+    - [x] Stroke color + fill color
+    - [x] 3 colors for buildings (3 classes)
+    - [x] Bind style change from ISE to layer stroke / fill color 
     - [ ] Noise?
+- [ ] Micro: Make "other" layer work
 - [ ] Micro: Background colors customization (as non-disableable layer )
 - [ ] Micro: Animation on visible 
 - [ ] Micro: Export (CSS + font, no tooltip mechanism)
 - [ ] Micro: Bonus: cut geometries outside of border when high border radius
 - [ ] Micro: Bonus: Freehand drawing: https://github.com/steveruizok/perfect-freehand?tab=readme-ov-file
 - [ ] Micro: Bonus: Stitch / polygon merge in web workers
+- [ ] Micro: Bonus: Stroke width far from camera when pitch thinner
 
 

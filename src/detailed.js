@@ -4,6 +4,8 @@ import { getRenderedFeatures } from "./util/geometryStitch";
 import { debounce, has, kebabCase, last, random, set } from "lodash-es";
 import { color, hsl } from "d3-color";
 import { findStyleSheet } from "./util/dom";
+import { HatchPatternGenerator } from "./svg/patternGenerator";
+import { MercatorCoordinate } from "maplibre-gl";
 export const interestingBasicV2Layers = [
     "Residential",
     "Forest",
@@ -20,6 +22,7 @@ export const interestingBasicV2Layers = [
     "Building",
 ];
 
+const patternGenerator = new HatchPatternGenerator();
 export function orderFeaturesByLayer(features) {
     features.sort((a, b) => {
         const layerIdA = interestingBasicV2Layers.indexOf(a.properties.mapLayerId);
@@ -40,8 +43,9 @@ const roadTertiaryStrokeWidth = scaleLinear([14, 18], [3, 10]).clamp(true);
 const roadMinorStrokeWidth = scaleLinear([14, 18], [2, 6]).clamp(true);
 const scaleLowZoom = scaleLinear([4, 14], [0.5, 2.5]).clamp(true);
 
-export function getRoadStrokeWidth(roadFeature, zoom) {
+export function getRoadStrokeWidth(roadFeature, maplibreMap) {
     if (roadFeature.properties.sourceLayer !== "transportation") return null;
+    const zoom = maplibreMap.getZoom();
     if (zoom <= 14) return scaleLowZoom(zoom);
     const computedId = roadFeature.properties.computedId;
     if (computedId.includes('path')) return pathStrokeWidth(zoom);
@@ -53,12 +57,11 @@ export function getRoadStrokeWidth(roadFeature, zoom) {
 
 export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions) {
     console.log('layerDefinitions=', layerDefinitions);
-    const zoom = maplibreMap.getZoom();
     const mapLibreContainer = select('#maplibre-map');
     const layersToQuery = interestingBasicV2Layers.filter(layer => {
         return layerDefinitions[kebabCase(layer)]?.active === true;
-    }); 
-    console.log(layersToQuery);
+    });
+    updateSvgPatterns(svg.node(), layerDefinitions);
     const geometries = getRenderedFeatures(maplibreMap, { layers: layersToQuery });
     orderFeaturesByLayer(geometries);
     console.log('geometries', geometries);
@@ -80,7 +83,7 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
             }
             return classes.join(' ');
         })
-        .attr("stroke-width", d => getRoadStrokeWidth(d, zoom))
+        .attr("stroke-width", d => getRoadStrokeWidth(d, maplibreMap))
         .attr("computed-id", d => d.properties.computedId)
         .attr("id", d => d.properties.uuid);
     svg.append('g').attr('id', 'points-labels');
@@ -89,10 +92,14 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
 }
 
 export const peachPalette = {
-    background: { fill: "#F2F4CB", disabled: true, active:true},
-    other: { fill: "#F2F4CB", stroke: "#2F3737", disabled: true, active:true },
+    background: { fill: "#F2F4CB", disabled: true, active: true },
+    other: { fill: "#F2F4CB", stroke: "#2F3737", disabled: true, active: true },
     building: { fills: ["#C5283D", "#E9724C", "#FFC857"], stroke: "#2F3737", active: true },
-    water: { fill: "#a1e3ff", stroke: "#85c9e6", active: true },
+    water: {
+        fill: "#a1e3ff", stroke: "#85c9e6", active: true,
+        pattern: { hatch: 'O', color: '#85c9e6' }
+    },
+    sand: { fill: "#f4eace", stroke: "#a8a8a8", active: true },
     grass: { fill: "#D0F1BF", stroke: "#2F3737", active: true },
     wood: { fill: "#64B96A", stroke: "#2F3737", active: true },
     "road-network": { stroke: "#2F3737", active: true },
@@ -103,8 +110,21 @@ export function initLayersState(providedPalette) {
     if (!palette['forest']) palette['forest'] = { ...palette['wood'], active: false };
     if (!palette['path']) palette['path'] = { ...palette['road-network'], active: false };
     // if (!palette['path-minor']) palette['path-minor'] = { ...palette['road-network'], active: false };
-    Object.values(palette).forEach( state => {
-        state.menuOpened = state.active;
+    Object.entries(palette).forEach(([layer, state]) => {
+        if (state.menuOpened == null) state.menuOpened = false;
+        let pattern = state.pattern;
+        if (!pattern && state.fill) {
+            state.pattern = pattern = { hatch: 'o', active: false};
+        } else if (pattern) {
+            pattern.active = true;
+        }
+        if (!pattern) return;
+        if (pattern.menuOpened == null) pattern.menuOpened = pattern.active;
+        if (!pattern.id) pattern.id = `pattern-${layer}`;
+        if (!pattern.color) pattern.color = darken(state.fill);
+        if (!pattern.color) pattern.color = darken(state.fill);
+        if (!pattern.strokeWidth) pattern.strokeWidth = 1;
+        if (!pattern.size) pattern.size = 10;
     });
     // if (!palette['building1']) {
     //     const strokeRef = palette['building0'].stroke;
@@ -120,6 +140,10 @@ export function initLayersState(providedPalette) {
 
 function lighten(c, quantity = 0.2) {
     return hsl(color(c)).brighter(quantity).formatHex();
+}
+
+function darken(c, quantity = 0.4) {
+    return hsl(color(c)).darker(quantity).formatHex();
 }
 
 export function generateCssFromState(state) {
@@ -146,7 +170,7 @@ export function generateCssFromState(state) {
         let ruleHoverContent = '';
         if (layerDef.stroke) {
             ruleContent += `stroke: ${layerDef.stroke};`;
-            if (!layer.includes('road') && !layer.includes('path'))  {
+            if (!layer.includes('road') && !layer.includes('path')) {
                 ruleContent += `stroke-width: 1px;`;
             }
             if (layer.includes('path')) {
@@ -155,7 +179,10 @@ export function generateCssFromState(state) {
             const lighter = lighten(layerDef.stroke);
             ruleHoverContent += `stroke: ${lighter};`;
         }
-        if (layerDef.fill) {
+        if (layerDef.pattern?.active) {
+            ruleContent += `fill: url(#${layerDef.pattern.id});`;
+        }
+        else if (layerDef.fill) {
             ruleContent += `fill: ${layerDef.fill};`;
             const lighter = lighten(layerDef.fill);
             ruleHoverContent += `fill: ${lighter};`;
@@ -176,15 +203,20 @@ export function generateCssFromState(state) {
 
 // Returns true if we should redraw (layer deactivated for instance)
 export function onMicroParamChange(layer, prop, value, layerState) {
-    if (prop === "active") {
+    if (prop.includes("pattern")) {
+        updateSvgPatterns(document.getElementById('static-svg-map'), layerState);
+        replaceCssSheetContent(layerState);
+        return false;
+    }
+    if (prop.includes("active")) {
         return true;
     }
     let ruleTxt = `#micro > .${layer}`;
     // Change "building-0" for instance
-    if (Array.isArray(prop)) ruleTxt = `#micro > .${layer}-${last(prop)}`;
+    if (prop[0] === "fills") ruleTxt = `#micro > .${layer}-${last(prop)}`;
     const [sheet, rule] = findStyleSheet(ruleTxt);
     if (!rule) return false;
-    if (Array.isArray(prop) && prop[0] === "fills") {
+    if (prop[0] === "fills") {
         rule.style.setProperty("fill", value);
     } else {
         rule.style.setProperty(prop, value);
@@ -194,10 +226,13 @@ export function onMicroParamChange(layer, prop, value, layerState) {
 
 }
 
-// Called when CSS is update with inline style editor
+// Called when CSS is updated with inline style editor
 export function syncLayerStateWithCss(eventType, cssProp, value, layerState) {
     const cssSelector = eventType.selectorText;
     if (!cssSelector.includes('#micro >')) return false;
+    if (cssProp === "fill") {
+        updateSvgPatterns(document.getElementById('static-svg-map'), layerState);
+    }
     const layer = cssSelector.match(/#micro > \.(.*)/)[1];
     let path = [layer, cssProp];
     if (layer.includes('-') && cssProp === "fill") {
@@ -215,3 +250,15 @@ const replaceCssSheetContent = debounce((layerState) => {
     const microCss = generateCssFromState(layerState);
     styleSheet.innerHTML = microCss;
 }, 500);
+
+function updateSvgPatterns(svgNode, layerState) {
+    if (!svgNode) return;
+    const patterns = Object.values(layerState).map((def) => {
+        return {
+            ...def.pattern,
+            backgroundColor: def.fill
+        }
+    }).filter(pattern => pattern?.active === true);
+    console.log("patterns", patterns);
+    patternGenerator.addOrUpdatePatternsForSVG(svgNode.querySelector('defs'), patterns);
+}

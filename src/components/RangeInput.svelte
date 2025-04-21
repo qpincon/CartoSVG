@@ -9,6 +9,7 @@
     export let onChange = (newVal) => {};
     export let id = "rangeinputid";
     export let helpText;
+    export let labelAbove = false;
 
     // props are passed as strings most of the time
     $: _step = parseFloat(step);
@@ -36,8 +37,8 @@
     };
 </script>
 
-<div class="row align-items-center w-100">
-    <label for={id} class="d-flex col-4 col-form-label align-items-center">
+<div class="{labelAbove ? 'd-flex flex-column justify-content-center': 'row align-items-center'}  w-100">
+    <label for={id} class="d-flex col-4 col-form-label align-items-center {labelAbove ? 'p-0' : ''}">
         {title}
         {#if helpText}
             <span

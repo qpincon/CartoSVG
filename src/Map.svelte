@@ -48,7 +48,6 @@ import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
 import {drawPrettyMap, generateCssFromState, initLayersState, onMicroParamChange, peachPalette, syncLayerStateWithCss} from './detailed'
 import { Map } from 'maplibre-gl';
-import { createDemoPage} from './svg/patternGenerator';
 import MicroLayerParams from './components/MicroLayerParams.svelte';
 
 const scalesHelp = `
@@ -443,7 +442,6 @@ onMount(async() => {
     contextualMenu.opened = false;
     attachListeners();
     // maplibreMap.showTileBoundaries = true;
-    // createDemoPage();
 });
 
 function lockUnlock(isLocked) {
@@ -542,6 +540,7 @@ function switchMode(newMode) {
     } else {
         projectAndDraw();
     }
+    setTimeout(() => initTooltips(), 0);
 }
 
 
