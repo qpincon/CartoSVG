@@ -225,8 +225,8 @@ const defaultInlineProps = {
 };
 
 const defaultInlinePropsMicro = {
-    center: [0, 0],
-    zoom: 10,
+    center: [2.3468, 48.8548],
+    zoom: 13.8,
     pitch: 0,
     bearing:0,
 }
@@ -1006,6 +1006,9 @@ function resetState() {
     currentTab = 'countries';
     inlineProps = JSON.parse(JSON.stringify(defaultInlineProps));
     inlinePropsMicro = JSON.parse(JSON.stringify(defaultInlinePropsMicro));
+    setTimeout(() => {
+        if (maplibreMap) maplibreMap.jumpTo(inlinePropsMicro);
+    }, 500);
     microLayerDefinitions = initLayersState(peachPalette);
     providedFonts = [];
     shapeCount = 0;
@@ -1044,7 +1047,7 @@ function restoreState(givenState) {
     }
     else state = getState();
     if (!state) return resetState();
-    console.log(state);
+    // console.log(state);
     ({  params, inlineProps, baseCss, providedFonts,
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
@@ -1055,7 +1058,6 @@ function restoreState(givenState) {
     if (state.microLayerDefinitions) microLayerDefinitions = state.microLayerDefinitions;
     inlinePropsMicro = state.inlinePropsMicro ?? defaultInlinePropsMicro;
     setTimeout(() => {
-        console.log(inlinePropsMicro);
         if (maplibreMap) maplibreMap.jumpTo(inlinePropsMicro);
     }, 500);
     if (!baseCss) baseCss = defaultBaseCssMacro;

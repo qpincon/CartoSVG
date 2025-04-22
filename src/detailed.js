@@ -1,7 +1,7 @@
 import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
 import { getRenderedFeatures } from "./util/geometryStitch";
-import { debounce, has, kebabCase, last, random, set, size } from "lodash-es";
+import { cloneDeep, debounce, kebabCase, last, random, set, size } from "lodash-es";
 import { color, hsl } from "d3-color";
 import { findStyleSheet, updateStyleSheetOrGenerateCss } from "./util/dom";
 import { HatchPatternGenerator } from "./svg/patternGenerator";
@@ -156,7 +156,7 @@ export const peachPalette = {
 };
 
 export function initLayersState(providedPalette) {
-    const palette = { ...providedPalette };
+    const palette = cloneDeep(providedPalette);
     if (!palette['forest']) palette['forest'] = { ...palette['wood'], active: false };
     if (!palette['path']) palette['path'] = { ...palette['road-network'], active: false };
     // if (!palette['path-minor']) palette['path-minor'] = { ...palette['road-network'], active: false };
@@ -168,6 +168,7 @@ export function initLayersState(providedPalette) {
         } else if (pattern) {
             pattern.active = true;
         }
+        console.log(layer, pattern?.active);
         if (!pattern) return;
         if (pattern.menuOpened == null) pattern.menuOpened = pattern.active;
         if (!pattern.id) pattern.id = `pattern-${layer}`;
@@ -184,7 +185,7 @@ export function initLayersState(providedPalette) {
     //     palette['building1'] = { stroke: strokeRef, fill: lighter1 };
     //     palette['building2'] = { stroke: strokeRef, fill: lighter2 };
     // }
-    console.log(palette);
+    console.log(JSON.parse(JSON.stringify(palette)));
     return palette;
 }
 
@@ -250,8 +251,8 @@ export function generateCssFromState(state) {
             });
         }
     }
-    console.log('sheet', sheet);
-    console.log('css', css);
+    // console.log('sheet', sheet);
+    // console.log('css', css);
     if (sheet) return null;
     return css;
 }
@@ -288,6 +289,7 @@ export function onMicroParamChange(layer, prop, value, layerState) {
 
 // Called when CSS is updated with inline style editor. Returns true if we actually updated layer definition
 export function syncLayerStateWithCss(eventType, cssProp, value, layerState) {
+    console.log('syncLayerStateWithCss');
     if (eventType === "inline") return;
     const cssSelector = eventType.selectorText;
     if (!cssSelector.includes('#micro')) return false;

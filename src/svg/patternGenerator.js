@@ -198,7 +198,6 @@ export class HatchPatternGenerator {
 
 
   addOrUpdatePatternsForSVG(defs, patternDefs) {
-    console.log(defs, patternDefs);
     for (const def of patternDefs) {
       const pattern = this.updateOrCreatePattern(def);
       defs.appendChild(pattern);

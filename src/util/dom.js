@@ -95,7 +95,6 @@ function applyStyles(inlineStyles, countryFilteredImages = null) {
 }
 
 function updateStyleSheetOrGenerateCss(stylesheet, cssSelector, styleDict) {
-    console.log('updateStyleSheetOrGenerateCss', stylesheet, cssSelector, styleDict);
     if (stylesheet) {
         let rule = null;
         for (const r of stylesheet.cssRules) {
