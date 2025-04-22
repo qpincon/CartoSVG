@@ -53,3 +53,9 @@
         />
     </div>
 </div>
+
+<style>
+    input {
+        max-width: 8rem;
+    }
+</style>

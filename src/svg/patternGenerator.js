@@ -73,7 +73,7 @@ export class HatchPatternGenerator {
           break;
 
         case '.': // Dots
-          this._addDot(pattern, size, color);
+          this._addDot(pattern, size, color, strokeWidth);
           break;
 
         case 'o': // Circles
@@ -88,7 +88,7 @@ export class HatchPatternGenerator {
           break;
 
         case 'O': // Larger circles
-          this._addCircle(pattern, size, color, strokeWidth, 0.4);
+          this._addCircle(pattern, size, color, strokeWidth, 0.3);
           break;
       }
     }
@@ -164,28 +164,50 @@ export class HatchPatternGenerator {
   /**
    * Add a dot to the pattern
    */
-  _addDot(pattern, size, color) {
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', size / 2);
-    circle.setAttribute('cy', size / 2);
-    circle.setAttribute('r', size / 10);
-    circle.setAttribute('fill', color);
-    pattern.appendChild(circle);
+  _addDot(pattern, size, color, strokeWidth) {
+    this._addCirclePattern(pattern, size, strokeWidth, color);
+    // pattern.appendChild(this._createCircle(size/2, size/2, strokeWidth, color));
+    // pattern.appendChild(this._createCircle(0 , 0, strokeWidth, color));
+    // pattern.appendChild(this._createCircle(0 , size, strokeWidth, color));
+    // pattern.appendChild(this._createCircle(size, 0, strokeWidth, color));
+    // pattern.appendChild(this._createCircle(size, size, strokeWidth, color));
   }
 
   /**
    * Add a circle to the pattern
    */
-  _addCircle(pattern, size, color, strokeWidth, scale = 0.25) {
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', size / 2);
-    circle.setAttribute('cy', size / 2);
-    circle.setAttribute('r', size * scale);
-    circle.setAttribute('stroke', color);
-    circle.setAttribute('stroke-width', strokeWidth);
-    circle.setAttribute('fill', color);
-    pattern.appendChild(circle);
+  _addCircle(pattern, size, color, strokeWidth, scale = 0.18) {
+    this._addCirclePattern(pattern, size, size * scale, 'none', color, strokeWidth);
+    // const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    // circle.setAttribute('cx', size / 2);
+    // circle.setAttribute('cy', size / 2);
+    // circle.setAttribute('r', size * scale);
+    // circle.setAttribute('stroke', color);
+    // circle.setAttribute('stroke-width', strokeWidth);
+    // circle.setAttribute('fill', 'none');
+    // pattern.appendChild(circle);
   }
+
+  _addCirclePattern(pattern, size, radius, fillColor, strokeColor, strokeWidth) {
+    pattern.appendChild(this._createCircle(size/2, size/2, radius, fillColor, strokeColor, strokeWidth));
+    pattern.appendChild(this._createCircle(0 , 0, radius, fillColor, strokeColor, strokeWidth));
+    pattern.appendChild(this._createCircle(0 , size, radius, fillColor, strokeColor, strokeWidth));
+    pattern.appendChild(this._createCircle(size, 0, radius, fillColor, strokeColor, strokeWidth));
+    pattern.appendChild(this._createCircle(size, size, radius, fillColor, strokeColor, strokeWidth));
+  }
+
+  _createCircle(cx, cy, radius, fillColor, strokeColor, strokeWidth) {
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', cx);
+    circle.setAttribute('cy', cy);
+    circle.setAttribute('r', radius);
+    if (fillColor) circle.setAttribute('fill', fillColor);
+    if (strokeColor) circle.setAttribute('stroke', strokeColor);
+    if (strokeWidth) circle.setAttribute('stroke-width', strokeWidth);
+    return circle;
+  }
+
+  
 
 
   addOrUpdatePatternsForSVG(defs, patternDefs) {

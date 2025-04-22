@@ -9,7 +9,7 @@ import 'bootstrap/js/dist/dropdown';
 import { debounce, throttle} from 'lodash-es';
 import dataExplanation from './assets/dataColor.svg';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
-import { transitionCss } from './svg/transition';
+import { transitionCssMacro } from './svg/transition';
 import PathEditor from './svg/pathEditor';
 import { paramDefs, defaultParams, helpParams, noSatelliteParams, microDefaultParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
@@ -18,7 +18,7 @@ import { createD3ProjectionFromMapLibre, getGeographicalBounds, getProjection, u
 import PaletteEditor from "./components/PaletteEditor.svelte";
 
 import Geocoding from './components/Geocoding.svelte';
-import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, getBestFormatter, getColumns } from './util/common';
+import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, getBestFormatter, getColumns, findProp } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import * as markers from './svg/markerDefs';
 import { setTransformScale, closestDistance, duplicateContourCleanFirst } from './svg/svg';
@@ -46,7 +46,7 @@ import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts, applySty
 import { saveState, getState } from './util/save';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
-import {drawPrettyMap, generateCssFromState, initLayersState, onMicroParamChange, peachPalette, syncLayerStateWithCss} from './detailed'
+import {drawMicroFrame, drawPrettyMap, generateCssFromState, initLayersState, onMicroParamChange, peachPalette, syncLayerStateWithCss} from './detailed'
 import { Map } from 'maplibre-gl';
 import MicroLayerParams from './components/MicroLayerParams.svelte';
 
@@ -111,16 +111,6 @@ const availableFormatLocales = formatLocaleResolve.keys().map(file => {
 function resolveAdm(name) {
     if (name.includes('ADM1')) return countriesAdm1Resolve(availableCountriesAdm1[name]);
     return countriesAdm2Resolve(availableCountriesAdm2[name]);
-}
-
-function findProp(propName, obj) {
-    if (propName in obj) return obj[propName];
-    for (let v of Object.values(obj)) {
-        if (typeof v === 'object') {
-            const found = findProp(propName, v);
-            if (found !== undefined) return found;
-        }
-    }
 }
 
 String.prototype.formatUnicorn = String.prototype.formatUnicorn || function () {
@@ -349,12 +339,13 @@ onMount(async() => {
     projectAndDraw();
     styleEditor = new InlineStyleEditor({
         onStyleChanged: (target, eventType, cssProp, value) => {
+            const elemId = target.getAttribute('id');
             if( currentMode === "micro") {
-                const layerDefChanged = syncLayerStateWithCss(eventType, cssProp, value, microLayerDefinitions);
-                if (layerDefChanged) microLayerDefinitions = microLayerDefinitions;
                 if (eventType === 'inline' && target.hasAttribute('id')) {
                     handleInlineStyleChange(elemId, target, cssProp, value);
                 }
+                const layerDefChanged = syncLayerStateWithCss(eventType, cssProp, value, microLayerDefinitions);
+                if (layerDefChanged) microLayerDefinitions = microLayerDefinitions;
                 save();
                 return;
             }
@@ -369,7 +360,7 @@ onMount(async() => {
                     rule.style.setProperty(propName, eventType.style[propName]);
                 }
             }
-            const elemId = target.getAttribute('id');
+            
             if (legendSample && legendSample.contains(target) && cssProp !== 'fill') {
                 legendDefs[currentTab].sampleHtml = legendSample.outerHTML;
                 colorizeAndLegend();
@@ -736,8 +727,6 @@ async function draw(simplified = false, _) {
     console.log('draw!!!')
     console.log('currentParams=', currentParams);
     const width = p('width'), height = p('height');
-    const borderWidth = p('borderWidth');
-    const borderRadius = p('borderRadius');
     const container = d3.select('#map-container');
     const mapLibreContainer = d3.select('#maplibre-map');
     const animated = p('animate');
@@ -836,38 +825,8 @@ async function draw(simplified = false, _) {
         colorizeAndLegend();
     }
     computeCss();
-    const rx = Math.max(width, height) * (borderRadius / 100);
-    const frame = svg.append('rect')
-        .attr('x', borderWidth / 2)
-        .attr('y', borderWidth / 2)
-        .attr('id', 'frame')
-        .attr('pathLength', 1)
-        .attr('width', width - borderWidth) 
-        .attr('height', height - borderWidth)
-        .attr('rx', rx);
-
-    if(animated) {
-        frame.on("animationend", (e) => {
-            setTimeout(() => {
-                svg.classed('animate', false);
-                svg.selectAll('path[pathLength]').attr('pathLength', null);
-                const landElem = svg.select('#land');
-                const landGroupDef = groupData.find(x => x.type === 'landImg');
-                const countryGroupDefs = groupData.filter(x => x.type === 'filterImg');
-                if (!landElem.empty() && landGroupDef) {
-                    appendLandImageNew.call(landElem.node(), landGroupDef.showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, p(zonesFilter['land']), false);
-                }
-                countryGroupDefs.forEach(def => {
-                    appendCountryImageNew.call(svg.select(`[id='${def.name}']`).node(), def.countryData, def.filter, applyInlineStyles, path, inlineStyles, false);
-                });
-                duplicateContourCleanFirst(svg.node());
-                setTimeout(() => {
-                    svg.selectAll('g[image-class]').classed('hidden-after', true);
-                    svg.classed('animate-transition', false);
-                }, 1500);
-            }, 200);
-        });
-    }
+    if (currentMode === "macro") drawMacroFrame(groupData);
+    if (currentMode === "micro") drawMicroFrame(svg, width, height, p('borderWidth'), p('borderRadius'), p('borderPadding'), p('borderColor'), animated);
 
     drawAndSetupShapes();
     const map = document.getElementById('static-svg-map');
@@ -942,12 +901,53 @@ function drawMacro(graticule, groupData) {
     groups.each(drawPaths);
 }
 
+function drawMacroFrame(groupData) {
+    const animated = p('animate');
+    const borderWidth = p('borderWidth');
+    const borderRadius = p('borderRadius');
+    const width = p('width'), height = p('height');
+    const rx = Math.max(width, height) * (borderRadius / 100);
+    const frame = svg.append('rect')
+        .attr('x', borderWidth / 2)
+        .attr('y', borderWidth / 2)
+        .attr('id', 'frame')
+        .attr('pathLength', 1)
+        .attr('stroke', p('borderColor'))
+        .attr('stroke-width', borderWidth)
+        .attr('fill', 'none')
+        .attr('width', width - borderWidth) 
+        .attr('height', height - borderWidth)
+        .attr('rx', rx);
+
+    if(animated) {
+        frame.on("animationend", (e) => {
+            setTimeout(() => {
+                svg.classed('animate', false);
+                svg.selectAll('path[pathLength]').attr('pathLength', null);
+                const landElem = svg.select('#land');
+                const landGroupDef = groupData.find(x => x.type === 'landImg');
+                const countryGroupDefs = groupData.filter(x => x.type === 'filterImg');
+                if (!landElem.empty() && landGroupDef) {
+                    appendLandImageNew.call(landElem.node(), landGroupDef.showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, p(zonesFilter['land']), false);
+                }
+                countryGroupDefs.forEach(def => {
+                    appendCountryImageNew.call(svg.select(`[id='${def.name}']`).node(), def.countryData, def.filter, applyInlineStyles, path, inlineStyles, false);
+                });
+                duplicateContourCleanFirst(svg.node());
+                setTimeout(() => {
+                    svg.selectAll('g[image-class]').classed('hidden-after', true);
+                    svg.classed('animate-transition', false);
+                }, 1500);
+            }, 200);
+        });
+    }
+}
 async function drawMicro() {
     if (!maplibreMap) return;
     await mapLoadedPromise;
     projection = createD3ProjectionFromMapLibre(maplibreMap);
     path = d3.geoPath(projection);
-    drawPrettyMap(maplibreMap, svg, path, microLayerDefinitions, applyInlineStyles);
+    drawPrettyMap(maplibreMap, svg, path, microLayerDefinitions, currentParams);
     applyInlineStyles();
 }
 
@@ -965,20 +965,18 @@ function computeCss() {
     const wantedRadiusInPx = Math.max(width, height) * (borderRadius / 100);
     const radiusX = Math.round(Math.min((wantedRadiusInPx * 100) / width, 50));
     const radiusY = Math.round(Math.min((wantedRadiusInPx * 100) / height, 50));
-    const borderCss = `
+    let borderCss = `
     #static-svg-map {
         ${p('frameShadow') ? 'filter: drop-shadow(2px 2px 8px rgba(0,0,0,.2));': ''}
-    }
-    #static-svg-map, #static-svg-map > svg {
-        border-radius: ${radiusX}%/${radiusY}%;
-    }
-    #frame {
-        fill: none;
-        stroke: ${p('borderColor')};
-        stroke-width:${p('borderWidth')}px;
     }`;
+    
+    if (currentMode === "macro") {
+        borderCss += `#static-svg-map, #static-svg-map > svg {
+            border-radius: ${radiusX}%/${radiusY}%;
+        }`;
+    }
     commonCss = finalColorsCss + borderCss;
-    if (p('animate')) commonCss += transitionCss;
+    if (p('animate')) commonCss += transitionCssMacro;
     totalCommonCss = exportStyleSheet('#paths > path') + commonCss;
 }
 

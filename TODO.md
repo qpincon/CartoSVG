@@ -105,8 +105,10 @@
     - [x] 3 colors for buildings (3 classes)
     - [x] Bind style change from ISE to layer stroke / fill color 
     - [ ] Noise?
-- [ ] Micro: Make "other" layer work
-- [ ] Micro: Background colors customization (as non-disableable layer )
+- [x] Micro: Make "other" layer work
+- [ ] Micro: Preset palette selection
+- [x] Micro: Background colors customization (as non-disableable layer )
+- [x] Micro: Background contour padding
 - [ ] Micro: Animation on visible 
 - [ ] Micro: Export (CSS + font, no tooltip mechanism)
 - [ ] Micro: Bonus: cut geometries outside of border when high border radius

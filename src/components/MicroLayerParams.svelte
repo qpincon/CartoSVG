@@ -4,6 +4,7 @@
     import ColorPickerPreview from "./ColorPickerPreview.svelte";
     import RangeInput from "./RangeInput.svelte";
     import { onMount } from "svelte";
+    import { initTooltips } from "../util/common";
 
     export let layerDefinitions = {};
     export let onUpdate = () => {};
@@ -18,6 +19,7 @@
             layerDefinitions[layer].pattern.menuOpened =
                 layerDefinitions[layer].pattern.active;
         }
+        initTooltips();
     }
 
     function readable(txt) {
@@ -28,12 +30,14 @@
         layerDefinitions[layer].menuOpened =
             !layerDefinitions[layer].menuOpened;
         layerDefinitions = layerDefinitions;
+        setTimeout(() => initTooltips(), 0);
     }
 
     function collapseLayerPattern(layer) {
         layerDefinitions[layer].pattern.menuOpened =
             !layerDefinitions[layer].pattern.menuOpened;
         layerDefinitions = layerDefinitions;
+        setTimeout(() => initTooltips(), 0);
     }
 
     onMount(() => {
@@ -42,7 +46,7 @@
 </script>
 
 <h2 class="text-center">Layers</h2>
-<div class="py-2 pe-2 border border-primary rounded-1">
+<div class="py-2 mb-4 pe-2 border border-primary rounded-1">
     {#each Object.entries(layerDefinitions) as [title, def], i (title)}
         <div class="d-flex align-items-center">
             <div class="mx-2 form-check form-switch">
@@ -119,7 +123,7 @@
 
                 <!-- SVG PATTERN -->
                 {#if def.pattern}
-                    <div class="mt-2 d-flex align-items-center">
+                    <div class="d-flex align-items-center">
                         <div class="mx-2 form-check form-switch">
                             <input
                                 type="checkbox"
@@ -202,7 +206,7 @@
                                 id={`${def.pattern.id}-strokeWidth`}
                                 bind:value={def.pattern.strokeWidth}
                                 min="0.2"
-                                max="5"
+                                max="10"
                                 step="0.2"
                                 onChange={(val) => {
                                     def.pattern.strokeWidth = val;
@@ -220,7 +224,7 @@
                                 id={`${def.pattern.id}-size`}
                                 bind:value={def.pattern.size}
                                 min="1"
-                                max="20"
+                                max="40"
                                 step="1"
                                 onChange={(val) => {
                                     def.pattern.size = val;

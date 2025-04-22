@@ -133,7 +133,7 @@ export function getRenderedFeatures(map, options) {
   //     return getTileBounds(x, y, zoom);
   // });
 
-  // console.log('renderedFeatures=', renderedFeatures);
+  // console.log('renderedFeatures=', JSON.parse(JSON.stringify(renderedFeatures)));
   // return renderedFeatures
 
   // Get bounds by calling map.unproject() on each corner of the viewport
@@ -245,7 +245,7 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
 function explodeGeometry(geometries, type = 'LineString') {
   const multiType = `Multi${type}`;
   const exploded = [];
-
+  
   geometries.forEach(feature => {
     if (feature.layer) feature.properties.mapLayerId = feature.layer.id;
     if (feature.geometry.type === type) {

@@ -5,7 +5,8 @@ import { debounce, has, kebabCase, last, random, set } from "lodash-es";
 import { color, hsl } from "d3-color";
 import { findStyleSheet } from "./util/dom";
 import { HatchPatternGenerator } from "./svg/patternGenerator";
-import { MercatorCoordinate } from "maplibre-gl";
+import { appendClip } from "./svg/svgDefs";
+import { findProp } from "./util/common";
 export const interestingBasicV2Layers = [
     "Residential",
     "Forest",
@@ -55,19 +56,37 @@ export function getRoadStrokeWidth(roadFeature, maplibreMap) {
     return roadMinorStrokeWidth(zoom);
 }
 
-export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions) {
+export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions, generalParams) {
     console.log('layerDefinitions=', layerDefinitions);
     const mapLibreContainer = select('#maplibre-map');
     const layersToQuery = interestingBasicV2Layers.filter(layer => {
-        return layerDefinitions[kebabCase(layer)]?.active === true;
+        return layerDefinitions[kebabCase(layer)]?.active !== false;
     });
     updateSvgPatterns(svg.node(), layerDefinitions);
     const geometries = getRenderedFeatures(maplibreMap, { layers: layersToQuery });
     orderFeaturesByLayer(geometries);
     console.log('geometries', geometries);
-    svg.style("background-color", "#e8e8da");
+
+    const width = findProp('width', generalParams);
+    const height = findProp('height', generalParams);
+    const borderPadding = findProp('borderPadding', generalParams);
+    const borderRadius = findProp('borderRadius', generalParams);
+    
+    const outerFrameWidth = width - borderPadding;
+    const outerFrameHeight = height - borderPadding;
+    const outerFrameRx = (borderRadius / 100) * Math.min(outerFrameWidth, outerFrameHeight);
+     // Background layer
+    svg.append('rect')
+        .attr('id', 'micro-background')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('width', width)
+        .attr('height', height)
+        .attr('rx', outerFrameRx);
+
     svg.append('g')
         .attr('id', 'micro')
+        .attr("clip-path", "url(#clipMapBorder)")
         .selectAll('path')
         .data(geometries)
         .enter()
@@ -76,8 +95,10 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
         .attr("class", d => {
             const layerIdKebab = kebabCase(d.properties.mapLayerId);
             const classes = [layerIdKebab];
-            classes.push(d.geometry.type.includes("Line") ? 'line' : 'poly');
+            if (layerIdKebab.includes('path') || layerIdKebab.includes('road')) classes.push('line');
+            else classes.push(d.geometry.type.includes("Line") ? 'line' : 'poly');
             const state = layerDefinitions[layerIdKebab];
+            if (!state) classes.push('other');
             if (state?.fills) {
                 classes.push(`${layerIdKebab}-${random(0, state.fills.length - 1)}`);
             }
@@ -91,13 +112,42 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
     mapLibreContainer.style('opacity', 0);
 }
 
+export function drawMicroFrame(svg, width, height, borderWidth, borderRadius, borderPadding, borderColor, animated) {
+    // Calculate positions and dimensions
+  // For the outer frame (border padding)
+  const outerFrameHalfWidth = borderPadding / 2;
+  const outerFrameX = outerFrameHalfWidth;
+  const outerFrameY = outerFrameHalfWidth;
+  const outerFrameWidth = width - borderPadding;
+  const outerFrameHeight = height - borderPadding;
+  
+  // For the inner frame (border width)
+  const innerFrameX = outerFrameX + outerFrameHalfWidth;
+  const innerFrameY = outerFrameY + outerFrameHalfWidth;
+  const innerFrameWidth = outerFrameWidth - borderPadding;
+  const innerFrameHeight = outerFrameHeight - borderPadding;
+  const innerFrameRx = (borderRadius / 100) * (Math.min(innerFrameWidth, innerFrameHeight) - (borderPadding));
+  
+  // Draw the inner frame (border width)
+  svg.append('rect')
+    .attr('x', innerFrameX)
+    .attr('y', innerFrameY)
+    .attr('width', innerFrameWidth)
+    .attr('height', innerFrameHeight)
+    .attr('rx', innerFrameRx)
+    .attr('fill', 'none')
+    .attr('stroke', borderColor)
+    .attr('stroke-width', borderWidth);
+    appendClip(svg, innerFrameWidth, innerFrameHeight, innerFrameRx, innerFrameX, innerFrameY)
+}
+
 export const peachPalette = {
     background: { fill: "#F2F4CB", disabled: true, active: true },
     other: { fill: "#F2F4CB", stroke: "#2F3737", disabled: true, active: true },
     building: { fills: ["#C5283D", "#E9724C", "#FFC857"], stroke: "#2F3737", active: true },
     water: {
         fill: "#a1e3ff", stroke: "#85c9e6", active: true,
-        pattern: { hatch: 'O', color: '#85c9e6' }
+        pattern: { hatch: '.', color: '#85c9e6', strokeWidth: 3, size: 13 }
     },
     sand: { fill: "#f4eace", stroke: "#a8a8a8", active: true },
     grass: { fill: "#D0F1BF", stroke: "#2F3737", active: true },
@@ -114,7 +164,7 @@ export function initLayersState(providedPalette) {
         if (state.menuOpened == null) state.menuOpened = false;
         let pattern = state.pattern;
         if (!pattern && state.fill) {
-            state.pattern = pattern = { hatch: 'o', active: false};
+            state.pattern = pattern = { hatch: '.', active: false };
         } else if (pattern) {
             pattern.active = true;
         }
@@ -122,9 +172,8 @@ export function initLayersState(providedPalette) {
         if (pattern.menuOpened == null) pattern.menuOpened = pattern.active;
         if (!pattern.id) pattern.id = `pattern-${layer}`;
         if (!pattern.color) pattern.color = darken(state.fill);
-        if (!pattern.color) pattern.color = darken(state.fill);
-        if (!pattern.strokeWidth) pattern.strokeWidth = 1;
-        if (!pattern.size) pattern.size = 10;
+        if (!pattern.strokeWidth) pattern.strokeWidth = 3;
+        if (!pattern.size) pattern.size = 13;
     });
     // if (!palette['building1']) {
     //     const strokeRef = palette['building0'].stroke;
@@ -135,6 +184,7 @@ export function initLayersState(providedPalette) {
     //     palette['building1'] = { stroke: strokeRef, fill: lighter1 };
     //     palette['building2'] = { stroke: strokeRef, fill: lighter2 };
     // }
+    console.log(palette);
     return palette;
 }
 
@@ -147,25 +197,18 @@ function darken(c, quantity = 0.4) {
 }
 
 export function generateCssFromState(state) {
-
-    const otherStroke = state['other'].stroke;
-    const otherFill = state['other'].fill;
-
     // "other" default color definitions wil be overriden by mode specific '>' selector
     let css = `
     #micro .line { 
         fill: none; 
         stroke-linecap: round;
         stroke-linejoin: round;
-        stroke: ${otherStroke};
     }
     #micro .poly { 
         stroke-linejoin: round;
-        fill: ${otherFill};
     }
     `;
     for (const [layer, layerDef] of Object.entries(state)) {
-        if (layer === "other") continue;
         let ruleContent = '';
         let ruleHoverContent = '';
         if (layerDef.stroke) {
@@ -188,8 +231,12 @@ export function generateCssFromState(state) {
             ruleHoverContent += `fill: ${lighter};`;
         }
         if (ruleContent.length) {
-            css += `#micro > .${layer} { ${ruleContent} }`;
-            css += `#micro > .${layer}:hover { ${ruleHoverContent} }`;
+            if (layer === "background") {
+                css += `#micro-background { ${ruleContent} }`;
+            } else {
+                css += `#micro > .${layer} { ${ruleContent} }`;
+                css += `#micro > .${layer}:hover { ${ruleHoverContent} }`;
+            }
         }
         if (layerDef.fills) {
             layerDef.fills.forEach((fill, i) => {
@@ -212,6 +259,7 @@ export function onMicroParamChange(layer, prop, value, layerState) {
         return true;
     }
     let ruleTxt = `#micro > .${layer}`;
+    if (layer === "background") ruleTxt = "#micro-background";
     // Change "building-0" for instance
     if (prop[0] === "fills") ruleTxt = `#micro > .${layer}-${last(prop)}`;
     const [sheet, rule] = findStyleSheet(ruleTxt);
@@ -219,21 +267,26 @@ export function onMicroParamChange(layer, prop, value, layerState) {
     if (prop[0] === "fills") {
         rule.style.setProperty("fill", value);
     } else {
-        rule.style.setProperty(prop, value);
+        if (layerState[layer].pattern?.active) {
+            updateSvgPatterns(document.getElementById('static-svg-map'), layerState);
+        } else {
+            rule.style.setProperty(prop, value);
+        }
     }
     replaceCssSheetContent(layerState);
     return false;
 
 }
 
-// Called when CSS is updated with inline style editor
+// Called when CSS is updated with inline style editor. Returns true if we actually updated layer definition
 export function syncLayerStateWithCss(eventType, cssProp, value, layerState) {
+    if (eventType === "inline") return;
     const cssSelector = eventType.selectorText;
-    if (!cssSelector.includes('#micro >')) return false;
+    if (!cssSelector.includes('#micro')) return false;
     if (cssProp === "fill") {
         updateSvgPatterns(document.getElementById('static-svg-map'), layerState);
     }
-    const layer = cssSelector.match(/#micro > \.(.*)/)[1];
+    const layer = cssSelector.match(/#micro > \.(.*)/)?.[1] ?? 'background';
     let path = [layer, cssProp];
     if (layer.includes('-') && cssProp === "fill") {
         path = layer.split('-');

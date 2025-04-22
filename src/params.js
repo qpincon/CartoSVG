@@ -45,6 +45,7 @@ const microDefaultParams = {
     },
     Border: {
         borderRadius: 1.5,
+        borderPadding: 15,
         borderWidth: 1,
         borderColor: "#b8b8b8",
         frameShadow: true,
@@ -61,6 +62,7 @@ const paramDefs = {
     graticuleStep:  {type: 'range', min: 0.1, max: 20, step: 0.1},
     borderRadius:   {type: 'range', min: 0, max: 50, step: 0.5},
     borderWidth:    {type: 'range', min: 0, max: 10},
+    borderPadding:  {type: 'range', min: 0, max: 30},
     filter:         {type: 'select', choices: ['none', 'firstGlow', 'secondGlow']},
     projection:     {type: 'select', choices: ['satellite', 'mercator', 'equalEarth', 'geoNaturalEarth', 'geoAlbersUsa', 'geoBaker']}
 };
