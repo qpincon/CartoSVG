@@ -500,6 +500,7 @@ function createMaplibreMap() {
 function handleMicroParamChange(layer, prop, value) {
     const shouldRedraw = onMicroParamChange(layer, prop, value, microLayerDefinitions);
     if (shouldRedraw) draw();
+    save();
 }
 
 function handleInlineStyleChange(elemId, target, cssProp, value) {
@@ -989,7 +990,7 @@ function save() {
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
         tooltipDefs, contourParams, colorDataDefs, legendDefs, customCategoricalPalette,
-        currentMode,
+        currentMode, microLayerDefinitions
     });
 }
 
@@ -1005,6 +1006,7 @@ function resetState() {
     currentTab = 'countries';
     inlineProps = JSON.parse(JSON.stringify(defaultInlineProps));
     inlinePropsMicro = JSON.parse(JSON.stringify(defaultInlinePropsMicro));
+    microLayerDefinitions = initLayersState(peachPalette);
     providedFonts = [];
     shapeCount = 0;
     inlineStyles = {};
@@ -1043,13 +1045,14 @@ function restoreState(givenState) {
     else state = getState();
     if (!state) return resetState();
     console.log(state);
-    ({  params, inlineProps, baseCss, providedFonts, 
+    ({  params, inlineProps, baseCss, providedFonts,
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
-        tooltipDefs, contourParams, colorDataDefs, legendDefs, customCategoricalPalette
+        tooltipDefs, contourParams, colorDataDefs, legendDefs, 
     } = JSON.parse(JSON.stringify(state)));
     if (state.microParams) microParams = state.microParams;
     if (state.currentMode) switchMode(state.currentMode);
+    if (state.microLayerDefinitions) microLayerDefinitions = state.microLayerDefinitions;
     inlinePropsMicro = state.inlinePropsMicro ?? defaultInlinePropsMicro;
     setTimeout(() => {
         console.log(inlinePropsMicro);

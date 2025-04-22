@@ -166,11 +166,6 @@ export class HatchPatternGenerator {
    */
   _addDot(pattern, size, color, strokeWidth) {
     this._addCirclePattern(pattern, size, strokeWidth, color);
-    // pattern.appendChild(this._createCircle(size/2, size/2, strokeWidth, color));
-    // pattern.appendChild(this._createCircle(0 , 0, strokeWidth, color));
-    // pattern.appendChild(this._createCircle(0 , size, strokeWidth, color));
-    // pattern.appendChild(this._createCircle(size, 0, strokeWidth, color));
-    // pattern.appendChild(this._createCircle(size, size, strokeWidth, color));
   }
 
   /**
@@ -178,14 +173,6 @@ export class HatchPatternGenerator {
    */
   _addCircle(pattern, size, color, strokeWidth, scale = 0.18) {
     this._addCirclePattern(pattern, size, size * scale, 'none', color, strokeWidth);
-    // const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    // circle.setAttribute('cx', size / 2);
-    // circle.setAttribute('cy', size / 2);
-    // circle.setAttribute('r', size * scale);
-    // circle.setAttribute('stroke', color);
-    // circle.setAttribute('stroke-width', strokeWidth);
-    // circle.setAttribute('fill', 'none');
-    // pattern.appendChild(circle);
   }
 
   _addCirclePattern(pattern, size, radius, fillColor, strokeColor, strokeWidth) {
@@ -214,7 +201,6 @@ export class HatchPatternGenerator {
     console.log(defs, patternDefs);
     for (const def of patternDefs) {
       const pattern = this.updateOrCreatePattern(def);
-      console.log("appending", pattern);
       defs.appendChild(pattern);
     }
   }

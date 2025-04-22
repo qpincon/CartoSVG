@@ -94,5 +94,38 @@ function applyStyles(inlineStyles, countryFilteredImages = null) {
     }));
 }
 
+function updateStyleSheetOrGenerateCss(stylesheet, cssSelector, styleDict) {
+    console.log('updateStyleSheetOrGenerateCss', stylesheet, cssSelector, styleDict);
+    if (stylesheet) {
+        let rule = null;
+        for (const r of stylesheet.cssRules) {
+            if (r.selectorText === cssSelector) {
+                rule = r;
+                break;
+            }
+        }
+        if (rule) {
+            Object.entries(styleDict).forEach(([propName, propValue]) => {
+                rule.style.setProperty(propName, propValue);
+            });
+        } else {
+            const ruleToInsert = `${cssSelector} { ${styleDictToCssRulesStr(styleDict)} }`;
+            console.log('ruleToInsert=',ruleToInsert );
+            stylesheet.insert(ruleToInsert)
+        }
+        return '';
+    }
+    return `${cssSelector} { ${styleDictToCssRulesStr(styleDict)} }`;
+}
 
-export { reportStyle, reportStyleElem, fontsToCss, exportStyleSheet, getUsedInlineFonts, findStyleSheet, applyStyles };
+function styleDictToCssRulesStr(styleDict) {
+    let cssString='';
+    Object.entries(styleDict).forEach(([propName, propValue]) => {
+        cssString += `${propName}: ${propValue};`;
+    }); 
+    return cssString;
+
+}
+
+
+export { reportStyle, reportStyleElem, fontsToCss, exportStyleSheet, getUsedInlineFonts, findStyleSheet, applyStyles, updateStyleSheetOrGenerateCss };

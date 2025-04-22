@@ -1,9 +1,9 @@
 import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
 import { getRenderedFeatures } from "./util/geometryStitch";
-import { debounce, has, kebabCase, last, random, set } from "lodash-es";
+import { debounce, has, kebabCase, last, random, set, size } from "lodash-es";
 import { color, hsl } from "d3-color";
-import { findStyleSheet } from "./util/dom";
+import { findStyleSheet, updateStyleSheetOrGenerateCss } from "./util/dom";
 import { HatchPatternGenerator } from "./svg/patternGenerator";
 import { appendClip } from "./svg/svgDefs";
 import { findProp } from "./util/common";
@@ -196,7 +196,10 @@ function darken(c, quantity = 0.4) {
     return hsl(color(c)).darker(quantity).formatHex();
 }
 
+const CSS_PROPS = ['stroke', 'stroke-width', 'fill', 'stroke-dasharray', 'stroke-linejoin', 'stroke-linecap'];
+
 export function generateCssFromState(state) {
+    const [sheet, _] = findStyleSheet("#micro .line");
     // "other" default color definitions wil be overriden by mode specific '>' selector
     let css = `
     #micro .line { 
@@ -209,42 +212,47 @@ export function generateCssFromState(state) {
     }
     `;
     for (const [layer, layerDef] of Object.entries(state)) {
-        let ruleContent = '';
-        let ruleHoverContent = '';
+        let ruleContent = {};
+        let ruleHoverContent = {};
         if (layerDef.stroke) {
-            ruleContent += `stroke: ${layerDef.stroke};`;
+            ruleContent['stroke'] = layerDef.stroke;
             if (!layer.includes('road') && !layer.includes('path')) {
-                ruleContent += `stroke-width: 1px;`;
+                ruleContent['stroke-width'] = layerDef['stroke-width'] ?? '1px';
             }
-            if (layer.includes('path')) {
-                ruleContent += `stroke-dasharray: 5;`;
+            if (layer.includes('path') && !layerDef['stroke-dasharray']) {
+                ruleContent['stroke-dasharray'] = 5;
             }
+            const dashArray = layerDef['stroke-dasharray'];
+            if (dashArray) ruleContent['stroke-dasharray'] = dashArray;
             const lighter = lighten(layerDef.stroke);
-            ruleHoverContent += `stroke: ${lighter};`;
+            ruleHoverContent['stroke'] = lighter;
         }
         if (layerDef.pattern?.active) {
-            ruleContent += `fill: url(#${layerDef.pattern.id});`;
+            ruleContent['fill'] = `url(#${layerDef.pattern.id})`;
         }
         else if (layerDef.fill) {
-            ruleContent += `fill: ${layerDef.fill};`;
+            ruleContent['fill'] = layerDef.fill;
             const lighter = lighten(layerDef.fill);
-            ruleHoverContent += `fill: ${lighter};`;
+            ruleHoverContent['fill'] = lighter;
         }
-        if (ruleContent.length) {
+        if (size(ruleContent) > 0) {
             if (layer === "background") {
-                css += `#micro-background { ${ruleContent} }`;
+                css += updateStyleSheetOrGenerateCss(sheet, '#micro-background', ruleContent);
             } else {
-                css += `#micro > .${layer} { ${ruleContent} }`;
-                css += `#micro > .${layer}:hover { ${ruleHoverContent} }`;
+                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}`, ruleContent);
+                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}:hover`, ruleHoverContent);
             }
         }
         if (layerDef.fills) {
             layerDef.fills.forEach((fill, i) => {
-                css += `#micro > .${layer}-${i} { fill: ${fill}; }`;
-                css += `#micro > .${layer}-${i}:hover { fill: ${lighten(fill)}; }`;
+                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}-${i}`, {'fill': fill});
+                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}-${i}:hover`, {'fill': lighten(fill)});
             });
         }
     }
+    console.log('sheet', sheet);
+    console.log('css', css);
+    if (sheet) return null;
     return css;
 }
 
@@ -288,20 +296,23 @@ export function syncLayerStateWithCss(eventType, cssProp, value, layerState) {
     }
     const layer = cssSelector.match(/#micro > \.(.*)/)?.[1] ?? 'background';
     let path = [layer, cssProp];
+    let isFills = false;
     if (layer.includes('-') && cssProp === "fill") {
+        isFills = true;
         path = layer.split('-');
         path.splice(1, 0, 'fills');
     }
-    if (!has(layerState, path)) return false;
+    if (!isFills && !CSS_PROPS.includes(last(path))) return false;
     set(layerState, path, value);
     replaceCssSheetContent(layerState);
     return true;
 }
 
 const replaceCssSheetContent = debounce((layerState) => {
+    console.log('replaceCssSheetContent', layerState);
     const styleSheet = document.getElementById('common-style-sheet-elem-micro');
     const microCss = generateCssFromState(layerState);
-    styleSheet.innerHTML = microCss;
+    if (microCss) styleSheet.innerHTML = microCss;
 }, 500);
 
 function updateSvgPatterns(svgNode, layerState) {
@@ -312,6 +323,5 @@ function updateSvgPatterns(svgNode, layerState) {
             backgroundColor: def.fill
         }
     }).filter(pattern => pattern?.active === true);
-    console.log("patterns", patterns);
     patternGenerator.addOrUpdatePatternsForSVG(svgNode.querySelector('defs'), patterns);
 }
