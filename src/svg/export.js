@@ -8,7 +8,7 @@ import { reportStyle, reportStyleElem, fontsToCss, getUsedInlineFonts } from '..
 
 const domParser = new DOMParser();
 
-const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`
+export const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`
 // regular function
 function isHexColor (hex) {
     return (hex.length === 6 || hex.length === 3 || hex.length === 8) && !isNaN(Number('0x' + hex))
@@ -44,7 +44,7 @@ const anchorToAnchor = {
     right: 'right'
 };
 
-const additionnalCssExport = '#points-labels {pointer-events:none}';
+export const additionnalCssExport = '#points-labels {pointer-events:none}';
 const cssFontProps = ['font-family', 'font-size', 'font-weight', 'color'];
 function getTextElems(svgElem) {
     const texts = Array.from(svgElem.querySelectorAll('text')).concat(Array.from(svgElem.querySelectorAll('tspan')));
@@ -108,7 +108,7 @@ function getTextPosition(textElem, defaultStyles) {
     return {x, y};
 }
 
-async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
+export async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
     let nbFontChars = 0;
     let nbPathChars = 0;
     const transformedTexts = {};
@@ -160,7 +160,7 @@ async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
 }
 
 const urlUsingAttributes = ['marker-start', 'marker-mid', 'marker-end', 'clip-path', 'fill', 'filter', '*|href'];
-function changeIdAndReferences(exportedMapElem, newMapId) {
+export function changeIdAndReferences(exportedMapElem, newMapId) {
     // change SVG definitions IDs
     exportedMapElem.querySelectorAll('defs > [id], #paths > [id]').forEach(elem => {
         const existingId = elem.getAttribute('id');
@@ -205,40 +205,50 @@ function changeIdAndReferences(exportedMapElem, newMapId) {
 }
 
 // to insert at the end to have mapElement object defined
-const intersectionObservingPart = `
-const observerOptions = {
-    root: null,
-    rootMargin: "0px",
-    threshold: 0.3,
-  };
-mapElement.style['visibility'] = 'hidden';
-let rendered = false;
-function intersectionCallback(entries) {
-    if (rendered || !entries[0].isIntersecting) return;
-    rendered = true;
-    // add some delay to ensure the map is in the viewport
-    setTimeout(() => {
-        mapElement.style['visibility'] = 'visible';
-        mapElement.classList.add('animate');
-        mapElement.querySelectorAll('path').forEach(pathElem => {
-            pathElem.setAttribute('pathLength', 1);
-        });
-        setTimeout(() => {
-            mapElement.classList.add('animate-transition');
-        }, 1000);
-        mapElement.querySelector('#frame').addEventListener('animationend', () => {
-            mapElement.classList.remove('animate');
-            gElemsToImages(true);
-            mapElement.querySelectorAll('path[pathLength]').forEach(el => {el.removeAttribute('pathLength')});
+
+export function getIntersectionObservingPart(isMacro) {
+    const intersectionObservingPart = `
+        const observerOptions = {
+            root: null,
+            rootMargin: "0px",
+            threshold: 0.3,
+        };
+        mapElement.style['visibility'] = 'hidden';
+        let rendered = false;
+        function intersectionCallback(entries) {
+            if (rendered || !entries[0].isIntersecting) return;
+            rendered = true;
+            // add some delay to ensure the map is in the viewport
             setTimeout(() => {
-                mapElement.classList.remove('animate-transition');
-            }, 1000);
-        });
-    }, 500);
+                mapElement.style['visibility'] = 'visible';
+                mapElement.classList.add('animate');
+                mapElement.querySelectorAll('path').forEach(pathElem => {
+                    pathElem.setAttribute('pathLength', 1);
+                });
+                setTimeout(() => {
+                    mapElement.classList.add('animate-transition');
+                }, 1000);
+                mapElement.querySelector('#frame').addEventListener('animationend', () => {
+                    mapElement.classList.remove('animate');
+                    ${isMacro ? 'gElemsToImages(true);' : ''}
+                    mapElement.querySelectorAll('path[pathLength]').forEach(el => {el.removeAttribute('pathLength')});
+                    setTimeout(() => {
+                        mapElement.classList.remove('animate-transition');
+                    }, 1000);
+                });
+            }, 500);
+        }
+        const observer = new IntersectionObserver(intersectionCallback, observerOptions);
+        observer.observe(mapElement);
+    `;
+    if (isMacro) return intersectionObservingPart;
+    return `
+    const allScripts = document.getElementsByTagName('script');
+    const scriptTag = allScripts[allScripts.length - 1];
+    const mapElement = scriptTag.parentNode;
+    ${intersectionObservingPart}
+    `
 }
-const observer = new IntersectionObserver(intersectionCallback, observerOptions);
-observer.observe(mapElement);
-`;
 async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, providedFonts, downloadExport = true, commonCss,
     animated, { exportFonts = exportFontChoices.convertToPath, hideOnResize = false, minifyJs = false })
 {
@@ -475,7 +485,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
         ${onResize}
         ${tooltipCode}
         ${onMouseEvents}
-        ${animated ? intersectionObservingPart : 'gElemsToImages()'}
+        ${animated ? getIntersectionObservingPart(true) : 'gElemsToImages()'}
     })()
         `;
 

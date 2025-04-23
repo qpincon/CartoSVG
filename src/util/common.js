@@ -186,7 +186,11 @@ function discriminateCssForExport(cssToTransform) {
         if (group.includes('@keyframes') || group.includes('from {') || group.includes('to {')) return group;
         return `#${id} ${group}`;
     }
-    const transformed = cssToTransform.replaceAll(cssSelectorRegex, replacer);
+    let transformed = cssToTransform.replaceAll(cssSelectorRegex, replacer);
+    /** Transform url(#...) styles */
+    transformed = transformed.replaceAll(/url\("?#(.*?)"?\)/g, (g, capture1) => {
+        return `url(#${id}-${capture1})`
+    });
     return {mapId: id, finalCss: transformed };
 }
 

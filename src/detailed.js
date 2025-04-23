@@ -1,12 +1,13 @@
-import { scaleLinear } from "d3-scale";
+import svgoConfig from './svgoExport.config';
 import { select } from "d3-selection";
 import { getRenderedFeatures } from "./util/geometryStitch";
 import { cloneDeep, debounce, kebabCase, last, random, set, size } from "lodash-es";
 import { color, hsl } from "d3-color";
-import { findStyleSheet, updateStyleSheetOrGenerateCss } from "./util/dom";
+import { findStyleSheet, fontsToCss, getUsedInlineFonts, updateStyleSheetOrGenerateCss } from "./util/dom";
 import { HatchPatternGenerator } from "./svg/patternGenerator";
 import { appendClip } from "./svg/svgDefs";
-import { findProp } from "./util/common";
+import { discriminateCssForExport, download, findProp } from "./util/common";
+import { additionnalCssExport, changeIdAndReferences, exportFontChoices, getIntersectionObservingPart, inlineFontVsPath, rgb2hex } from "./svg/export";
 export const interestingBasicV2Layers = [
     "Residential",
     "Forest",
@@ -18,6 +19,7 @@ export const interestingBasicV2Layers = [
     // "Bridge",
     "Pier",
     "Road network",
+    "Railway",
     // "Path minor",
     "Path",
     "Building",
@@ -30,31 +32,31 @@ export function orderFeaturesByLayer(features) {
         const layerIdB = interestingBasicV2Layers.indexOf(b.properties.mapLayerId);
         const renderHeightA = a.properties['render_height'];
         const renderHeightB = b.properties['render_height'];
-        if (renderHeightA != null && renderHeightB != null) return renderHeightA > renderHeightB ? - 1 : 1;
+        if (renderHeightA != null && renderHeightB != null) return renderHeightA < renderHeightB ? - 1 : 1;
         if (layerIdA < layerIdB) return -1;
         return 1;
     })
 
 }
 
-const pathStrokeWidth = scaleLinear([15, 22], [0.5, 4]).clamp(true);
-const roadPrimaryStrokeWidth = scaleLinear([14, 18], [5, 14]).clamp(true);
-const roadSecondaryStrokeWidth = scaleLinear([14, 18], [4, 12]).clamp(true);
-const roadTertiaryStrokeWidth = scaleLinear([14, 18], [3, 10]).clamp(true);
-const roadMinorStrokeWidth = scaleLinear([14, 18], [2, 6]).clamp(true);
-const scaleLowZoom = scaleLinear([4, 14], [0.5, 2.5]).clamp(true);
+// const pathStrokeWidth = scaleLinear([15, 22], [0.5, 4]).clamp(true);
+// const roadPrimaryStrokeWidth = scaleLinear([14, 18], [5, 14]).clamp(true);
+// const roadSecondaryStrokeWidth = scaleLinear([14, 18], [4, 12]).clamp(true);
+// const roadTertiaryStrokeWidth = scaleLinear([14, 18], [3, 10]).clamp(true);
+// const roadMinorStrokeWidth = scaleLinear([14, 18], [2, 6]).clamp(true);
+// const scaleLowZoom = scaleLinear([4, 14], [0.5, 2.5]).clamp(true);
 
-export function getRoadStrokeWidth(roadFeature, maplibreMap) {
-    if (roadFeature.properties.sourceLayer !== "transportation") return null;
-    const zoom = maplibreMap.getZoom();
-    if (zoom <= 14) return scaleLowZoom(zoom);
-    const computedId = roadFeature.properties.computedId;
-    if (computedId.includes('path')) return pathStrokeWidth(zoom);
-    if (computedId.includes('primary') || computedId.includes('motorway') || computedId.includes('trunk')) return roadPrimaryStrokeWidth(zoom);
-    if (computedId.includes('secondary')) return roadSecondaryStrokeWidth(zoom);
-    if (computedId.includes('tertiary')) return roadTertiaryStrokeWidth(zoom);
-    return roadMinorStrokeWidth(zoom);
-}
+// export function getRoadStrokeWidth(roadFeature, maplibreMap) {
+//     if (roadFeature.properties.sourceLayer !== "transportation") return null;
+//     const zoom = maplibreMap.getZoom();
+//     if (zoom <= 14) return scaleLowZoom(zoom);
+//     const computedId = roadFeature.properties.computedId;
+//     if (computedId.includes('path')) return pathStrokeWidth(zoom);
+//     if (computedId.includes('primary') || computedId.includes('motorway') || computedId.includes('trunk')) return roadPrimaryStrokeWidth(zoom);
+//     if (computedId.includes('secondary')) return roadSecondaryStrokeWidth(zoom);
+//     if (computedId.includes('tertiary')) return roadTertiaryStrokeWidth(zoom);
+//     return roadMinorStrokeWidth(zoom);
+// }
 
 export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions, generalParams) {
     console.log('layerDefinitions=', layerDefinitions);
@@ -71,15 +73,16 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
     const height = findProp('height', generalParams);
     const borderPadding = findProp('borderPadding', generalParams);
     const borderRadius = findProp('borderRadius', generalParams);
-    
+
     const outerFrameWidth = width - borderPadding;
     const outerFrameHeight = height - borderPadding;
     const outerFrameRx = (borderRadius / 100) * Math.min(outerFrameWidth, outerFrameHeight);
-     // Background layer
+    // Background layer
     svg.append('rect')
         .attr('id', 'micro-background')
         .attr('x', 0)
         .attr('y', 0)
+        .attr('pathLength', 1)
         .attr('width', width)
         .attr('height', height)
         .attr('rx', outerFrameRx);
@@ -91,6 +94,7 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
         .data(geometries)
         .enter()
         .append("path")
+        .attr('pathLength', 1)
         .attr("d", (d) => d3PathFunction(d.geometry))
         .attr("class", d => {
             const layerIdKebab = kebabCase(d.properties.mapLayerId);
@@ -104,8 +108,8 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
             }
             return classes.join(' ');
         })
-        .attr("stroke-width", d => getRoadStrokeWidth(d, maplibreMap))
-        .attr("computed-id", d => d.properties.computedId)
+        .attr("stroke-width", d => d.properties.paint['line-width'] ?? null)
+        // .attr("computed-id", d => d.properties.computedId)
         .attr("id", d => d.properties.uuid);
     svg.append('g').attr('id', 'points-labels');
     svg.style("pointer-events", "none");
@@ -114,31 +118,34 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
 
 export function drawMicroFrame(svg, width, height, borderWidth, borderRadius, borderPadding, borderColor, animated) {
     // Calculate positions and dimensions
-  // For the outer frame (border padding)
-  const outerFrameHalfWidth = borderPadding / 2;
-  const outerFrameX = outerFrameHalfWidth;
-  const outerFrameY = outerFrameHalfWidth;
-  const outerFrameWidth = width - borderPadding;
-  const outerFrameHeight = height - borderPadding;
-  
-  // For the inner frame (border width)
-  const innerFrameX = outerFrameX + outerFrameHalfWidth;
-  const innerFrameY = outerFrameY + outerFrameHalfWidth;
-  const innerFrameWidth = outerFrameWidth - borderPadding;
-  const innerFrameHeight = outerFrameHeight - borderPadding;
-  const innerFrameRx = (borderRadius / 100) * (Math.min(innerFrameWidth, innerFrameHeight) - (borderPadding));
-  
-  // Draw the inner frame (border width)
-  svg.append('rect')
-    .attr('x', innerFrameX)
-    .attr('y', innerFrameY)
-    .attr('width', innerFrameWidth)
-    .attr('height', innerFrameHeight)
-    .attr('rx', innerFrameRx)
-    .attr('fill', 'none')
-    .attr('stroke', borderColor)
-    .attr('stroke-width', borderWidth);
+    // For the outer frame (border padding)
+    const outerFrameHalfWidth = borderPadding / 2;
+    const outerFrameX = outerFrameHalfWidth;
+    const outerFrameY = outerFrameHalfWidth;
+    const outerFrameWidth = width - borderPadding;
+    const outerFrameHeight = height - borderPadding;
+
+    // For the inner frame (border width)
+    const innerFrameX = outerFrameX + outerFrameHalfWidth;
+    const innerFrameY = outerFrameY + outerFrameHalfWidth;
+    const innerFrameWidth = outerFrameWidth - borderPadding;
+    const innerFrameHeight = outerFrameHeight - borderPadding;
+    const innerFrameRx = (borderRadius / 100) * (Math.min(innerFrameWidth, innerFrameHeight) - (borderPadding));
+
+    // Draw the inner frame (border width)
+    const frame = svg.append('rect')
+        .attr('x', innerFrameX)
+        .attr('y', innerFrameY)
+        .attr('id', 'frame')
+        .attr('pathLength', 1)
+        .attr('width', innerFrameWidth)
+        .attr('height', innerFrameHeight)
+        .attr('rx', innerFrameRx)
+        .attr('fill', 'none')
+        .attr('stroke', borderColor)
+        .attr('stroke-width', borderWidth);
     appendClip(svg, innerFrameWidth, innerFrameHeight, innerFrameRx, innerFrameX, innerFrameY)
+    return frame;
 }
 
 export const peachPalette = {
@@ -153,6 +160,7 @@ export const peachPalette = {
     grass: { fill: "#D0F1BF", stroke: "#2F3737", active: true },
     wood: { fill: "#64B96A", stroke: "#2F3737", active: true },
     "road-network": { stroke: "#2F3737", active: true },
+    railway: { stroke: "#2a3737", active: true },
 };
 
 export function initLayersState(providedPalette) {
@@ -203,12 +211,12 @@ export function generateCssFromState(state) {
     const [sheet, _] = findStyleSheet("#micro .line");
     // "other" default color definitions wil be overriden by mode specific '>' selector
     let css = `
-    #micro .line { 
+    #micro > .line { 
         fill: none; 
         stroke-linecap: round;
         stroke-linejoin: round;
     }
-    #micro .poly { 
+    #micro > .poly { 
         stroke-linejoin: round;
     }
     `;
@@ -217,7 +225,7 @@ export function generateCssFromState(state) {
         let ruleHoverContent = {};
         if (layerDef.stroke) {
             ruleContent['stroke'] = layerDef.stroke;
-            if (!layer.includes('road') && !layer.includes('path')) {
+            if (!layer.includes('road') && !layer.includes('path') && !layer.includes('rail')) {
                 ruleContent['stroke-width'] = layerDef['stroke-width'] ?? '1px';
             }
             if (layer.includes('path') && !layerDef['stroke-dasharray']) {
@@ -246,13 +254,13 @@ export function generateCssFromState(state) {
         }
         if (layerDef.fills) {
             layerDef.fills.forEach((fill, i) => {
-                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}-${i}`, {'fill': fill});
-                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}-${i}:hover`, {'fill': lighten(fill)});
+                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}-${i}`, { 'fill': fill });
+                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}-${i}:hover`, { 'fill': lighten(fill) });
             });
         }
     }
     // console.log('sheet', sheet);
-    // console.log('css', css);
+    console.log('css', css);
     if (sheet) return null;
     return css;
 }
@@ -327,3 +335,49 @@ function updateSvgPatterns(svgNode, layerState) {
     }).filter(pattern => pattern?.active === true);
     patternGenerator.addOrUpdatePatternsForSVG(svgNode.querySelector('defs'), patterns);
 }
+
+const domParser = new DOMParser();
+export async function exportMicro(svg, providedFonts, commonCss, animated, { exportFonts = exportFontChoices.convertToPath}) {
+        
+    const svgNode = svg.node();
+    svgNode.removeAttribute('style');
+    const usedFonts = getUsedInlineFonts(svgNode);
+    const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
+    const SVGO = await import('svgo/browser');
+
+    const defs = svgNode.querySelector('defs').cloneNode(true);
+    svgNode.querySelectorAll('#micro > path').forEach(el => el.removeAttribute('id'));
+    // Optimize whole SVG
+    const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig).data;
+    const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
+    let pathIsBetter = false;
+    if (exportFonts == exportFontChoices.smallest || exportFonts == exportFontChoices.convertToPath) {
+        pathIsBetter = await inlineFontVsPath(optimizedSVG.firstChild, providedFonts);
+    }
+    else if (exportFonts == exportFontChoices.noExport) {
+        pathIsBetter = true;
+    }
+    const js = animated ? getIntersectionObservingPart(false) : null;
+
+    // Styling
+    const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
+    const renderedCss = commonCss.replaceAll(/rgb\(.*?\)/g, rgb2hex) + additionnalCssExport;
+    const {mapId, finalCss } = discriminateCssForExport(renderedCss);
+    optimizedSVG.firstChild.setAttribute('id', mapId);
+    optimizedSVG.firstChild.querySelector('defs').remove();
+    optimizedSVG.firstChild.append(defs);
+    changeIdAndReferences(optimizedSVG.firstChild, mapId);
+
+    styleElem.innerHTML = pathIsBetter ? finalCss : finalCss + fontsToCss(usedProvidedFonts);
+    optimizedSVG.firstChild.append(styleElem);
+    optimizedSVG.firstChild.classList.remove('animate-transition');
+    optimizedSVG.firstChild.classList.add('cartosvg');
+    if (js) {
+        const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
+        const scriptContent = document.createTextNode(js);
+        scriptElem.appendChild(scriptContent);
+        optimizedSVG.firstChild.append(scriptElem);
+    }
+    download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'cartosvg-export.svg');
+
+} 

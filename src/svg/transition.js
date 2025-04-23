@@ -43,7 +43,7 @@ export const transitionCssMicro = `
     transition-timing-function: ease;
 }
 
-.animate path, .animate rect, .animate circle {
+.animate #micro > path, .animate #frame {
     stroke-dasharray: 1 !important;
     fill-opacity: 0 !important;
     stroke-dashoffset: 1;
@@ -52,10 +52,13 @@ export const transitionCssMicro = `
     opacity: 0 !important;
 }
 .animate #frame{
-    animation: dash 3s ease 0s forwards;
+    animation: dash 3.5s ease 0s forwards;
 }
-.animate #micro path, .animate #paths path {
-    animation: dash 3s ease 0.5s forwards;
+.animate #micro > .poly {
+    animation: dash 2.5s ease 0.5s forwards;
+}
+.animate #micro > .line, .animate #paths path {
+    animation: dash 2s ease 1.5s forwards;
 }
 
 @keyframes dash {

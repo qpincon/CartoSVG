@@ -9,7 +9,7 @@ import 'bootstrap/js/dist/dropdown';
 import { debounce, throttle} from 'lodash-es';
 import dataExplanation from './assets/dataColor.svg';
 import { drawCustomPaths, parseAndUnprojectPath } from './svg/paths';
-import { transitionCssMacro } from './svg/transition';
+import { transitionCssMacro, transitionCssMicro } from './svg/transition';
 import PathEditor from './svg/pathEditor';
 import { paramDefs, defaultParams, helpParams, noSatelliteParams, microDefaultParams } from './params';
 import { appendBgPattern, appendGlow } from './svg/svgDefs';
@@ -46,7 +46,7 @@ import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts, applySty
 import { saveState, getState } from './util/save';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
-import {drawMicroFrame, drawPrettyMap, generateCssFromState, initLayersState, onMicroParamChange, peachPalette, syncLayerStateWithCss} from './detailed'
+import {drawMicroFrame, drawPrettyMap, exportMicro, generateCssFromState, initLayersState, onMicroParamChange, peachPalette, syncLayerStateWithCss} from './detailed'
 import { Map } from 'maplibre-gl';
 import MicroLayerParams from './components/MicroLayerParams.svelte';
 
@@ -332,8 +332,6 @@ onMount(async() => {
     document.head.appendChild(commonStyleSheetElemMicro);
     commonStyleSheetElemMicro.innerHTML = microCss;
 
-    console.log(commonStyleSheetElemMicro);
-    console.log(document.styleSheets)
     await mapLoadedPromise;
     
     projectAndDraw();
@@ -436,7 +434,6 @@ onMount(async() => {
 });
 
 function lockUnlock(isLocked) {
-    console.log("lockUnlock", isLocked);
     microLocked = isLocked;
     
     const mapLibreContainer = d3.select('#maplibre-map');
@@ -521,7 +518,6 @@ function handleInlineStyleChange(elemId, target, cssProp, value) {
 
 
 function switchMode(newMode) {
-    console.log("swithing to", newMode)
     if (currentMode === newMode) return;
     currentMode = newMode;
     const mapLibreContainer = d3.select('#maplibre-map');
@@ -542,7 +538,6 @@ function attachListeners() {
         .filter((e) => currentMode === "macro" && !e.button)   // Remove ctrlKey
         .on("drag", dragged)
         .on('start', () => {
-            console.log('dragstart');
             if (menuStates.addingLabel) validateLabel();
             styleEditor.close();
             closeMenu();
@@ -725,13 +720,10 @@ let firstDraw = true;
 // without 'countries' if unchecked
 let computedOrderedTabs = [];
 async function draw(simplified = false, _) {
-    console.log('draw!!!')
-    console.log('currentParams=', currentParams);
     const width = p('width'), height = p('height');
     const container = d3.select('#map-container');
     const mapLibreContainer = d3.select('#maplibre-map');
     const animated = p('animate');
-    console.log('draw, currentMode=', currentMode);
     
     countryFilteredImages.clear();
     computeCurrentTab();
@@ -762,7 +754,7 @@ async function draw(simplified = false, _) {
         .attr('id', 'static-svg-map');
 
     svg.classed('animate-transition', true)
-        .classed('animate', params['General'].animate);
+        .classed('animate', animated);
 
     if (p('useViewBox')) {
         svg.attr('viewBox', `0 0 ${width} ${height}`);
@@ -778,7 +770,6 @@ async function draw(simplified = false, _) {
     svg.html('');
     svg.append('defs');
     svg.on('contextmenu', function(e) {
-        console.log('svg contextmenu', e);
         if (editingPath) return;
         e.preventDefault();
         closeMenu();
@@ -803,7 +794,7 @@ async function draw(simplified = false, _) {
     svg.on("click", function(e) {
         if (contextualMenu.opened) closeMenu();
         else if (styleEditor.isOpened()) styleEditor.close();
-        else openEditor(e);
+        else if (!editingPath) openEditor(e);
     });
 
     const groupData = [];
@@ -820,14 +811,39 @@ async function draw(simplified = false, _) {
     else if (currentMode === "micro") await drawMicro();
     drawCustomPaths(providedPaths, svg, projection, inlineStyles);
     
-    
     if (currentMode === "macro") { 
         d3.select('#outline').style('fill', "url(#noise)");
         colorizeAndLegend();
     }
     computeCss();
-    if (currentMode === "macro") drawMacroFrame(groupData);
-    if (currentMode === "micro") drawMicroFrame(svg, width, height, p('borderWidth'), p('borderRadius'), p('borderPadding'), p('borderColor'), animated);
+    let frame;
+    if (currentMode === "macro") frame = drawMacroFrame(groupData);
+    if (currentMode === "micro") frame = drawMicroFrame(svg, width, height, p('borderWidth'), p('borderRadius'), p('borderPadding'), p('borderColor'), animated);
+
+    if(animated) {
+        frame.on("animationend", (e) => {
+            setTimeout(() => {
+                svg.classed('animate', false);
+                svg.selectAll('path[pathLength]').attr('pathLength', null);
+                if (currentMode === "macro") {
+                    const landElem = svg.select('#land');
+                    const landGroupDef = groupData.find(x => x.type === 'landImg');
+                    const countryGroupDefs = groupData.filter(x => x.type === 'filterImg');
+                    if (!landElem.empty() && landGroupDef) {
+                        appendLandImageNew.call(landElem.node(), landGroupDef.showSource, zonesFilter, width, height, p('borderWidth'), contourParams, land, pathLarger, p(zonesFilter['land']), false);
+                    }
+                    countryGroupDefs.forEach(def => {
+                        appendCountryImageNew.call(svg.select(`[id='${def.name}']`).node(), def.countryData, def.filter, applyInlineStyles, path, inlineStyles, false);
+                    });
+                    duplicateContourCleanFirst(svg.node());
+                }
+                setTimeout(() => {
+                    svg.selectAll('g[image-class]').classed('hidden-after', true);
+                    svg.classed('animate-transition', false);
+                }, 1500);
+            }, 200);
+        });
+    }
 
     drawAndSetupShapes();
     const map = document.getElementById('static-svg-map');
@@ -903,7 +919,6 @@ function drawMacro(graticule, groupData) {
 }
 
 function drawMacroFrame(groupData) {
-    const animated = p('animate');
     const borderWidth = p('borderWidth');
     const borderRadius = p('borderRadius');
     const width = p('width'), height = p('height');
@@ -919,29 +934,8 @@ function drawMacroFrame(groupData) {
         .attr('width', width - borderWidth) 
         .attr('height', height - borderWidth)
         .attr('rx', rx);
+    return frame;
 
-    if(animated) {
-        frame.on("animationend", (e) => {
-            setTimeout(() => {
-                svg.classed('animate', false);
-                svg.selectAll('path[pathLength]').attr('pathLength', null);
-                const landElem = svg.select('#land');
-                const landGroupDef = groupData.find(x => x.type === 'landImg');
-                const countryGroupDefs = groupData.filter(x => x.type === 'filterImg');
-                if (!landElem.empty() && landGroupDef) {
-                    appendLandImageNew.call(landElem.node(), landGroupDef.showSource, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, p(zonesFilter['land']), false);
-                }
-                countryGroupDefs.forEach(def => {
-                    appendCountryImageNew.call(svg.select(`[id='${def.name}']`).node(), def.countryData, def.filter, applyInlineStyles, path, inlineStyles, false);
-                });
-                duplicateContourCleanFirst(svg.node());
-                setTimeout(() => {
-                    svg.selectAll('g[image-class]').classed('hidden-after', true);
-                    svg.classed('animate-transition', false);
-                }, 1500);
-            }, 200);
-        });
-    }
 }
 async function drawMicro() {
     if (!maplibreMap) return;
@@ -959,10 +953,26 @@ function projectAndDraw(simplified = false) {
 
 let totalCommonCss;
 function computeCss() {
-    const finalColorsCss = Object.values(colorsCss).reduce((acc, cur) => {acc += cur; return acc;}, '');
+    if (currentMode === "micro") {
+        let css = `
+        #paths > path {
+            stroke: #7c490ea0;
+            stroke-dasharray: 5px;
+            stroke-width: 2;
+            fill: none;
+        }
+        #static-svg-map {
+            ${p('frameShadow') ? 'filter: drop-shadow(2px 2px 8px rgba(0,0,0,.2));': ''}
+        }`;
+        if (p('animate')) css += transitionCssMicro;
+        commonCss = css;
+        totalCommonCss = exportStyleSheet('#micro > .poly') + commonCss; 
+        return;
+    }
     const width = p('width');
     const height = p('height');
     const borderRadius = p('borderRadius');
+    const finalColorsCss = Object.values(colorsCss).reduce((acc, cur) => {acc += cur; return acc;}, '');
     const wantedRadiusInPx = Math.max(width, height) * (borderRadius / 100);
     const radiusX = Math.round(Math.min((wantedRadiusInPx * 100) / width, 50));
     const radiusY = Math.round(Math.min((wantedRadiusInPx * 100) / height, 50));
@@ -978,14 +988,13 @@ function computeCss() {
     }
     commonCss = finalColorsCss + borderCss;
     if (p('animate')) commonCss += transitionCssMacro;
-    totalCommonCss = exportStyleSheet('#paths > path') + commonCss;
+    totalCommonCss = exportStyleSheet('#outline') + commonCss;
 }
 
 
 
 function save() {
-    console.log('saving', inlinePropsMicro);
-    baseCss = exportStyleSheet('#paths > path');
+    baseCss = exportStyleSheet('#outline');
     saveState({params, microParams, inlineProps, inlinePropsMicro, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
@@ -1047,7 +1056,6 @@ function restoreState(givenState) {
     }
     else state = getState();
     if (!state) return resetState();
-    // console.log(state);
     ({  params, inlineProps, baseCss, providedFonts,
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
@@ -1070,7 +1078,7 @@ function restoreState(givenState) {
 }
 
 function saveProject() {
-    baseCss = exportStyleSheet('#paths > path'); 
+    baseCss = exportStyleSheet('#outline'); 
     const state = {params, microParams, inlineProps, baseCss, providedFonts, 
         providedShapes, providedPaths, chosenCountriesAdm, orderedTabs,
         inlineStyles, shapeCount, zonesData, zonesFilter, lastUsedLabelProps,
@@ -1386,7 +1394,6 @@ async function addShape(shapeName) {
     closeMenu();
     await tick();
     setTimeout(() => {
-        console.log(providedShapes);
         const lastShape = document.getElementById(providedShapes[providedShapes.length -1].id);
         styleEditor.open(lastShape, openContextMenuInfo.event.pageX, openContextMenuInfo.event.pageY);
     }, 0);
@@ -1599,9 +1606,14 @@ function dragstart(event, i, prevent = false) {
 
 function validateExport() {
     const formData = Object.fromEntries(new FormData(exportForm).entries());
-    exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, true, totalCommonCss, p('animate'), formData);
+    if (currentMode === "macro") {
+        exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, true, totalCommonCss, p('animate'), formData);
+        fetch('/exportSvgMacro');
+    } else {
+        exportMicro(svg, providedFonts, totalCommonCss, p('animate'), formData);
+        fetch('/exportSvgMicro');
+    }
     showExportConfirm = false;
-    fetch('/exportSvg');
 }
 
 // === Export as PNG behaviour ===
@@ -1618,6 +1630,10 @@ function validateExport() {
 
 let inlineFontUsed = false;
 function onExportSvgClicked() {
+    if (currentMode === "micro" && !inlineFontUsed) {
+        validateExport();
+        return;
+    }
     showExportConfirm = true;
     const usedFonts = getUsedInlineFonts(svg.node());
     const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
@@ -2167,6 +2183,13 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                 <div id="map-container" class="col mx-4"></div>
                 <div id="maplibre-map"></div>
             </div>
+            {#if currentMode === "micro"}
+                <div class="ms-auto me-4 mt-2">
+                    Map data:
+                    <a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a>
+                    <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>
+                </div>
+            {/if}
             <div class="mt-4 d-flex align-items-center justify-content-center">
                 <div class="mx-2">
                     <label for="fontinput" class="m-2 d-flex align-items-center btn btn-outline-primary"> <Icon svg={icons['font']}/> Add font</label>
@@ -2239,6 +2262,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                 </label>
             </div>
         {/if}
+        {#if currentMode === "macro"}
         <h3 class="fs-4"> Resize </h3>
         <div class="form-check form-switch">
             <input class="form-check-input" name="hideOnResize" type="checkbox" role="switch" id="hideOnResize" checked>
@@ -2247,14 +2271,15 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                 <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="On some browsers, resizing the window triggers a re-render, which can cause a slowdown. If activated, the SVG will be hidden while the window is being resized, thus reducing the computing load.">?</span>
             </label>
         </div>
-        <h3 class="fs-4"> Javascript </h3>
-        <div class="form-check form-switch">
-            <input class="form-check-input" name="minifyJs" type="checkbox" role="switch" id="minifyJs" checked>
-            <label class="form-check-label" for="minifyJs">
-                Minify javascript
-                <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Some JS is included in the SVG (for the tooltip for instance). Minifying it will make the file smaller, but more difficult to edit.">?</span>
-            </label>
-        </div>
+            <h3 class="fs-4"> Javascript </h3>
+            <div class="form-check form-switch">
+                <input class="form-check-input" name="minifyJs" type="checkbox" role="switch" id="minifyJs" checked>
+                <label class="form-check-label" for="minifyJs">
+                    Minify javascript
+                    <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title="Some JS is included in the SVG (for the tooltip for instance). Minifying it will make the file smaller, but more difficult to edit.">?</span>
+                </label>
+            </div>
+        {/if}
     </form>
     <div slot="footer" class="d-flex justify-content-end">
         <button type="button" class="btn btn-success"

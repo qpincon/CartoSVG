@@ -86,16 +86,22 @@
 - [x] Delay optimizing content of <image> at export time (for performance)
 
 - [x] ISE open on click
+- [ ] Check export endpoint hit
 - [x] Micro: Store position (lat / lnt / zoom / pitch / bearing)
 - [x] Micro: Lock / unlock mechanism (allow map drag when on SVG) 
-- [ ] Micro: MapTiler attribution 
+- [ ] Micro: Layers in "layers" tab
+- [-] Micro: Building with same id = same color 
+- [x] Micro: Check building order with height (merge with same height?)
+- [x] Micro: Railway layer 
+- [x] Micro: MapTiler + OSM attribution 
+- [ ] Micro: OSM attribution on exported file 
 - [x] Micro: Persist currentMode in state
 - [x] Micro: remove forward element on hover
 - [x] Micro: Order building layer elements by height
 - [x] Micro: Building: Add 3 classes at random
 - [x] Micro: Allow write labels / add points
 - [x] Micro: Add nominatim search
-- [ ] Micro: Save changed CSS
+- [x] Micro: Save changed CSS
 - [x] Micro: CSS themes as separate .css files
     - [x] Color + lighter color on hover
 - [x] Micro: Toggle layers 
@@ -109,11 +115,12 @@
 - [ ] Micro: Preset palette selection
 - [x] Micro: Background colors customization (as non-disableable layer )
 - [x] Micro: Background contour padding
-- [ ] Micro: Animation on visible 
-- [ ] Micro: Export (CSS + font, no tooltip mechanism)
+- [x] Micro: Animation on visible 
+- [x] Micro: Export (CSS + font, no tooltip mechanism)
 - [ ] Micro: Bonus: cut geometries outside of border when high border radius
 - [ ] Micro: Bonus: Freehand drawing: https://github.com/steveruizok/perfect-freehand?tab=readme-ov-file
 - [ ] Micro: Bonus: Stitch / polygon merge in web workers
 - [ ] Micro: Bonus: Stroke width far from camera when pitch thinner
+- [ ] Micro: New front page
 
 

@@ -247,7 +247,10 @@ function explodeGeometry(geometries, type = 'LineString') {
   const exploded = [];
   
   geometries.forEach(feature => {
-    if (feature.layer) feature.properties.mapLayerId = feature.layer.id;
+    if (feature.layer) {
+      feature.properties.mapLayerId = feature.layer.id;
+      feature.properties.paint = feature.layer.paint;
+    }
     if (feature.geometry.type === type) {
       exploded.push(feature);
     } else if (feature.geometry.type === multiType) {

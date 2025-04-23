@@ -57,7 +57,7 @@ function findStyleSheet(selectorToFind) {
         const rules = sheets[i].cssRules;
         for (let r in rules) {
             const selectorText = rules[r].selectorText;
-            if (selectorText?.includes(selectorToFind)) {
+            if (selectorText === selectorToFind) {
                 return [sheets[i], rules[r]];
             }
         }
