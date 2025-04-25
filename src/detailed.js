@@ -126,7 +126,7 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
         const roundedRect = createRoundedRectangleGeoJSON(innerFrameWidth, innerFrameHeight, innerFrameRadius, innerFrameWidth / 2 + borderPadding, innerFrameHeight / 2 + borderPadding);
        
         const toRemove = [];
-        document.querySelectorAll('#static-svg-map path, #static-svg-map text').forEach(el => {
+        document.querySelectorAll('#static-svg-map g path, #static-svg-map g text').forEach(el => {
             const bbox = el.getBBox();
             const bboxRect = [bbox.x, height-bbox.y, bbox.x + bbox.width, height-bbox.y - bbox.height];
             const bboxPoly = bboxPolygon(bboxRect);
@@ -209,7 +209,6 @@ export function initLayersState(providedPalette) {
         } else if (pattern) {
             pattern.active = true;
         }
-        console.log(layer, pattern?.active);
         if (!pattern) return;
         if (pattern.menuOpened == null) pattern.menuOpened = pattern.active;
         if (!pattern.id) pattern.id = `pattern-${layer}`;
@@ -226,7 +225,6 @@ export function initLayersState(providedPalette) {
     //     palette['building1'] = { stroke: strokeRef, fill: lighter1 };
     //     palette['building2'] = { stroke: strokeRef, fill: lighter2 };
     // }
-    console.log(JSON.parse(JSON.stringify(palette)));
     return palette;
 }
 
@@ -292,8 +290,6 @@ export function generateCssFromState(state) {
             });
         }
     }
-    // console.log('sheet', sheet);
-    console.log('css', css);
     if (sheet) return null;
     return css;
 }

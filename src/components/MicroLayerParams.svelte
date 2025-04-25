@@ -166,19 +166,17 @@
                                     <span
                                         class="help-tooltip fs-6"
                                         data-bs-toggle="tooltip"
-                                        data-bs-title="One or multiple of \ / | + - * x  . o O"
+                                        data-bs-title="One or multiple of \ / | + - * x  . o O, and more!"
                                         >?</span
                                     ></label
                                 >
                                 <input
                                     type="text"
                                     class="form-control"
-                                    pattern="[\\\/\*\-x\|\+o\.O]+"
                                     id={`${def.pattern.id}-hatch`}
                                     bind:value={def.pattern.hatch}
                                     on:input={(e) => {
                                         let val = e.target.value;
-                                        val = val.replace(/[^\\\/\*\-x\|\+o\.O]+/g, '');
                                         def.pattern.hatch = val;
                                         updated(
                                             title,

@@ -122,7 +122,7 @@
 - [ ] Micro: Bonus: Freehand drawing: https://github.com/steveruizok/perfect-freehand?tab=readme-ov-file
 - [ ] Micro: Bonus: Stitch / polygon merge in web workers
 - [x] Micro: Bonus: Stroke width far from camera when pitch thinner
-- [ ] Micro: Bonus: More patterns!
+- [x] Micro: Bonus: More patterns!
 - [ ] Micro: New front page
 - [x] Micro: Debug right click
 
