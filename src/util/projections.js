@@ -203,21 +203,6 @@ function createD3ProjectionFromMapLibre(map) {
         const lngLat = map.unproject(point);
         return [lngLat.lng, lngLat.lat];
     };
-
-
-    // const projection = geoTransform({
-    //     point: function (x, y) {
-    //         const lngLat = new LngLat(x, y);
-    //         const point = map.project(lngLat);
-    //         this.stream.point(point.x, point.y);
-    //     }
-    // });
-
-    // projection.invert = function (pixels) {
-    //     const point = new Point(pixels[0], pixels[1]);
-    //     const lngLat = map.unproject(point);
-    //     return [lngLat.lng, lngLat.lat];
-    // };
     return projection
 }
 

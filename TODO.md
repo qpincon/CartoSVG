@@ -91,7 +91,8 @@
 - [x] Micro: Lock / unlock mechanism (allow map drag when on SVG) 
 - [ ] Micro: Layers in "layers" tab
 - [-] Micro: Building with same id = same color 
-- [x] Micro: Check building order with height (merge with same height?)
+- [x] Micro: Check building order with height
+- [ ] Micro: Check building to merge if below other buidling
 - [x] Micro: Railway layer 
 - [x] Micro: MapTiler + OSM attribution 
 - [ ] Micro: OSM attribution on exported file 
@@ -117,10 +118,12 @@
 - [x] Micro: Background contour padding
 - [x] Micro: Animation on visible 
 - [x] Micro: Export (CSS + font, no tooltip mechanism)
-- [ ] Micro: Bonus: cut geometries outside of border when high border radius
+- [x] Micro: Bonus: cut geometries outside of border when high border radius
 - [ ] Micro: Bonus: Freehand drawing: https://github.com/steveruizok/perfect-freehand?tab=readme-ov-file
 - [ ] Micro: Bonus: Stitch / polygon merge in web workers
-- [ ] Micro: Bonus: Stroke width far from camera when pitch thinner
+- [x] Micro: Bonus: Stroke width far from camera when pitch thinner
+- [ ] Micro: Bonus: More patterns!
 - [ ] Micro: New front page
+- [x] Micro: Debug right click
 
 

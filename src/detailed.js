@@ -8,6 +8,9 @@ import { HatchPatternGenerator } from "./svg/patternGenerator";
 import { appendClip } from "./svg/svgDefs";
 import { discriminateCssForExport, download, findProp } from "./util/common";
 import { additionnalCssExport, changeIdAndReferences, exportFontChoices, getIntersectionObservingPart, inlineFontVsPath, rgb2hex } from "./svg/export";
+import { createRoundedRectangleGeoJSON } from './util/geometry';
+import bboxPolygon from '@turf/bbox-polygon';
+import booleanDisjoint from '@turf/boolean-disjoint';
 export const interestingBasicV2Layers = [
     "Residential",
     "Forest",
@@ -114,6 +117,36 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
     svg.append('g').attr('id', 'points-labels');
     svg.style("pointer-events", "none");
     mapLibreContainer.style('opacity', 0);
+
+    // Post-clipping - can't get it to work with d3 postclip and custom stream
+    setTimeout(() => {
+        const innerFrameWidth = outerFrameWidth - borderPadding;
+        const innerFrameHeight = outerFrameHeight - borderPadding;
+        const innerFrameRadius = (borderRadius / 100) * (Math.min(innerFrameWidth, innerFrameHeight) - (borderPadding));
+        const roundedRect = createRoundedRectangleGeoJSON(innerFrameWidth, innerFrameHeight, innerFrameRadius, innerFrameWidth / 2 + borderPadding, innerFrameHeight / 2 + borderPadding);
+       
+        const toRemove = [];
+        document.querySelectorAll('#static-svg-map path, #static-svg-map text').forEach(el => {
+            const bbox = el.getBBox();
+            const bboxRect = [bbox.x, height-bbox.y, bbox.x + bbox.width, height-bbox.y - bbox.height];
+            const bboxPoly = bboxPolygon(bboxRect);
+            if (booleanDisjoint(roundedRect, bboxPoly)) {
+                toRemove.push(el);
+            }
+        });
+        console.log('toRemove', toRemove);
+        toRemove.forEach(el => el.remove());
+    }, 100);
+}
+
+function polyToPath(coords, height) {
+    let d = '';
+    for (let i = 0; i < coords.length; i++) {
+        const p = coords[i];
+        if (i === 0) d+= `M${p[0]},${height- p[1]}`;
+        else d+= `L${p[0]},${height- p[1]}`;
+    }
+    return d;
 }
 
 export function drawMicroFrame(svg, width, height, borderWidth, borderRadius, borderPadding, borderColor, animated) {

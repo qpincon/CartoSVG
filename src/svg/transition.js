@@ -48,6 +48,8 @@ export const transitionCssMicro = `
     fill-opacity: 0 !important;
     stroke-dashoffset: 1;
 }
+
+.animate #micro > .line { stroke-opacity: 0; }
 .animate text, .animate #points-labels, .animate #path-images {
     opacity: 0 !important;
 }
@@ -63,10 +65,12 @@ export const transitionCssMicro = `
 
 @keyframes dash {
     from {
-      stroke-dashoffset: 1;
+        stroke-opacity: 1;
+        stroke-dashoffset: 1;
     }
     to {
-      stroke-dashoffset: 0;
+        stroke-opacity: 1;
+        stroke-dashoffset: 0;
     }
 }
 `

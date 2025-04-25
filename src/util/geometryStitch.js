@@ -108,6 +108,20 @@ function computeFeatureUuid(feature) {
   feature.properties.uuid = coordsStr;
 
 }
+
+  // Get bounds by calling map.unproject() on each corner of the viewport
+export function getMapRealBounds(map) {
+  const canvas = map.getCanvas();
+  const w = canvas.width;
+  const h = canvas.height;
+  const cUL = map.unproject([0, 0]).toArray();
+  const cUR = map.unproject([w, 0]).toArray();
+  const cLR = map.unproject([w, h]).toArray();
+  const cLL = map.unproject([0, h]).toArray();
+  // [minX, minY, maxX, maxY]
+  const coordinates = [cUL, cUR, cLR, cLL, cUL];
+  return polygon([coordinates]);
+}
 export function getRenderedFeatures(map, options) {
 
   // const visibleTiles = new Set();
@@ -136,17 +150,7 @@ export function getRenderedFeatures(map, options) {
   // console.log('renderedFeatures=', JSON.parse(JSON.stringify(renderedFeatures)));
   // return renderedFeatures
 
-  // Get bounds by calling map.unproject() on each corner of the viewport
-  const canvas = map.getCanvas();
-  const w = canvas.width;
-  const h = canvas.height;
-  const cUL = map.unproject([0, 0]).toArray();
-  const cUR = map.unproject([w, 0]).toArray();
-  const cLR = map.unproject([w, h]).toArray();
-  const cLL = map.unproject([0, h]).toArray();
-  // [minX, minY, maxX, maxY]
-  const coordinates = [cUL, cUR, cLR, cLL, cUL];
-  const mapBounds = polygon([coordinates]);
+  const mapBounds = getMapRealBounds(map);
   // console.log('mapbounds', mapBounds);
   const zoom = Math.min(Math.floor(map.getZoom()), MAX_ZOOM);
 

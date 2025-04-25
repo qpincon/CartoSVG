@@ -809,7 +809,7 @@ async function draw(simplified = false, _) {
         appendBgPattern(svg, 'noise', p('seaColor'), p('backgroundNoise'));
     }
     else if (currentMode === "micro") await drawMicro();
-    drawCustomPaths(providedPaths, svg, projection, inlineStyles);
+    drawCustomPaths(providedPaths, svg, projection, inlineStyles, path);
     
     if (currentMode === "macro") { 
         d3.select('#outline').style('fill', "url(#noise)");
@@ -940,7 +940,7 @@ function drawMacroFrame(groupData) {
 async function drawMicro() {
     if (!maplibreMap) return;
     await mapLoadedPromise;
-    projection = createD3ProjectionFromMapLibre(maplibreMap);
+    projection = createD3ProjectionFromMapLibre(maplibreMap, p('width'), p('height'), p('borderRadius'));
     path = d3.geoPath(projection);
     drawPrettyMap(maplibreMap, svg, path, microLayerDefinitions, currentParams);
     applyInlineStyles();
@@ -1168,7 +1168,7 @@ function importImagePath(e) {
             providedPaths[selectedPathIndex].width = 20;
             providedPaths[selectedPathIndex].height = 10;
         }
-        drawCustomPaths(providedPaths, svg, projection, inlineStyles);
+        drawCustomPaths(providedPaths, svg, projection, inlineStyles, path);
         applyInlineStyles();
         save();
     });
@@ -1206,7 +1206,7 @@ function deleteImage() {
 }
 
 function drawShapesAndSave() {
-    drawCustomPaths(providedPaths, svg, projection, inlineStyles);
+    drawCustomPaths(providedPaths, svg, projection, inlineStyles, path);
     applyInlineStyles();
     saveDebounced();
 }

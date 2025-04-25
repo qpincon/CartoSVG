@@ -2,7 +2,7 @@ import parsePath from 'parse-svg-path';
 import * as markers from './markerDefs';
 import { RGBAToHexA } from '../util/common';
 
-export function drawCustomPaths(pathDefs, svg, projection, inlineStyles = {}) {
+export function drawCustomPaths(pathDefs, svg, projection, inlineStyles = {}, path) {
     if (!pathDefs) return;
     let elem = svg.select('#paths');
     if (elem.empty()) elem = svg.append('g').attr('id', 'paths');
