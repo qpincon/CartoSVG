@@ -11,8 +11,6 @@ export class HatchPatternGenerator {
     // Add ASCII values map for character-based pattern generation
     this.characterMap = {
       // Basic punctuation patterns
-      "!": this._exclamationPattern.bind(this),
-      "@": this._atSignPattern.bind(this),
       "#": this._hashPattern.bind(this),
       "^": this._caretPattern.bind(this),
       "<": this._anglePattern.bind(this),
@@ -20,8 +18,8 @@ export class HatchPatternGenerator {
       "=": this._equalsPattern.bind(this),
       "~": this._wavyPattern.bind(this),
       "0": this._createDiamondPattern.bind(this),
-      "2": this._createRadialPattern.bind(this),
       "1": this._createCheckerPattern.bind(this),
+      "2": this._createRadialPattern.bind(this),
     };
   }
 
@@ -342,63 +340,6 @@ export class HatchPatternGenerator {
       diamond.setAttribute('fill', 'none');
       pattern.appendChild(diamond);
     }
-  }
-
-  /**
-   * Create pattern for exclamation mark
-   */
-  _exclamationPattern(pattern, size, color, strokeWidth) {
-    // Create vertical lines with gaps
-    for (let i = 0; i < 2; i++) {
-      const x = size * (0.33 + i * 0.33);
-
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', x);
-      line.setAttribute('y1', 0);
-      line.setAttribute('x2', x);
-      line.setAttribute('y2', size * 0.7);
-      line.setAttribute('stroke', color);
-      line.setAttribute('stroke-width', strokeWidth);
-      pattern.appendChild(line);
-
-      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      dot.setAttribute('cx', x);
-      dot.setAttribute('cy', size * 0.85);
-      dot.setAttribute('r', strokeWidth);
-      dot.setAttribute('fill', color);
-      pattern.appendChild(dot);
-    }
-  }
-
-  /**
-   * Create pattern for at sign
-   */
-  _atSignPattern(pattern, size, color, strokeWidth) {
-    const centerX = size / 2;
-    const centerY = size / 2;
-    const radius = size * 0.35;
-
-    // Outer circle
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', centerX);
-    circle.setAttribute('cy', centerY);
-    circle.setAttribute('r', radius);
-    circle.setAttribute('stroke', color);
-    circle.setAttribute('stroke-width', strokeWidth);
-    circle.setAttribute('fill', 'none');
-    pattern.appendChild(circle);
-
-    // Inner swirl
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', `
-      M ${centerX + radius * 0.5}, ${centerY}
-      a ${radius * 0.5},${radius * 0.5} 0 1,1 0,0.01
-      v ${radius * 0.3}
-    `);
-    path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', strokeWidth);
-    path.setAttribute('fill', 'none');
-    pattern.appendChild(path);
   }
 
   /**

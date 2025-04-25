@@ -1,9 +1,8 @@
 <script>
-    import { toLower, upperFirst } from "lodash-es";
 
     import ColorPickerPreview from "./ColorPickerPreview.svelte";
     import RangeInput from "./RangeInput.svelte";
-    import { initTooltips } from "../util/common";
+    import { camelCaseToSentence, initTooltips } from "../util/common";
 
     export let layerDefinitions = {};
     export let onUpdate = () => {};
@@ -26,10 +25,6 @@
 
     function paletteChanged(paletteId) {
         onPaletteChange(paletteId);
-    }
-
-    function readable(txt) {
-        return upperFirst(toLower(txt));
     }
 
     function collapseLayer(layer) {
@@ -60,7 +55,7 @@
         >
             <option selected>Chose a preset palette</option>
             {#each Object.keys(availablePalettes) as paletteId}
-                <option value={paletteId}> {upperFirst(paletteId)} </option>
+                <option value={paletteId}> {camelCaseToSentence(paletteId)} </option>
             {/each}
         </select>
     </div>
@@ -78,7 +73,7 @@
                     on:change={() => updated(title, ["active"], def.active)}
                 />
                 <label for={title} class="form-check-label">
-                    {readable(title)}
+                    {camelCaseToSentence(title)}
                 </label>
             </div>
             {#if def.active}

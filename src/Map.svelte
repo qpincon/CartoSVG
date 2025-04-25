@@ -1641,14 +1641,14 @@ function validateExport() {
 
 let inlineFontUsed = false;
 function onExportSvgClicked() {
+    const usedFonts = getUsedInlineFonts(svg.node());
+    const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
+    inlineFontUsed = usedProvidedFonts.length > 0;
     if (currentMode === "micro" && !inlineFontUsed) {
         validateExport();
         return;
     }
     showExportConfirm = true;
-    const usedFonts = getUsedInlineFonts(svg.node());
-    const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
-    inlineFontUsed = usedProvidedFonts.length > 0;
 }
 // === Colorize by data behaviour ===
 

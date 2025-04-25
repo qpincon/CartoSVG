@@ -142,7 +142,8 @@ export async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption
                         tmpPath.setAttribute('d', path);
                         tmpSvg.append(tmpPath);
                         const optimized = domParser.parseFromString(SVGO.optimize(tmpSvg.outerHTML, svgoConfigText).data, 'image/svg+xml');
-                        path = optimized.querySelector('path').getAttribute('d');
+                        path = optimized.querySelector('path')?.getAttribute('d');
+                        if (!path) return;
                         transformedTexts[name][text] = path;
                         nbPathChars += path.length;
                     }

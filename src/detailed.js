@@ -240,6 +240,7 @@ export function generateCssFromState(state) {
     for (const [layer, layerDef] of Object.entries(state)) {
         let ruleContent = {};
         let ruleHoverContent = {};
+        if (layer === 'water')console.log(layerDef)
         if (layerDef.stroke) {
             ruleContent['stroke'] = layerDef.stroke;
             if (!layer.includes('road') && !layer.includes('path') && !layer.includes('rail')) {
@@ -262,6 +263,7 @@ export function generateCssFromState(state) {
             ruleHoverContent['fill'] = lighter;
         }
         if (size(ruleContent) > 0) {
+            if (layer === 'water')console.log(ruleContent)
             if (layer === "background") {
                 css += updateStyleSheetOrGenerateCss(sheet, '#micro-background', ruleContent);
             } else {
