@@ -126,7 +126,7 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
         const roundedRect = createRoundedRectangleGeoJSON(innerFrameWidth, innerFrameHeight, innerFrameRadius, innerFrameWidth / 2 + borderPadding, innerFrameHeight / 2 + borderPadding);
        
         const toRemove = [];
-        document.querySelectorAll('#static-svg-map g path, #static-svg-map g text').forEach(el => {
+        document.querySelectorAll('#static-svg-map g path').forEach(el => {
             const bbox = el.getBBox();
             const bboxRect = [bbox.x, height-bbox.y, bbox.x + bbox.width, height-bbox.y - bbox.height];
             const bboxPoly = bboxPolygon(bboxRect);
