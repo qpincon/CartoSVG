@@ -46,9 +46,10 @@ import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts, applySty
 import { saveState, getState } from './util/save';
 import { exportSvg, exportFontChoices } from './svg/export';
 import { addTooltipListener} from './tooltip';
-import {drawMicroFrame, drawPrettyMap, exportMicro, generateCssFromState, initLayersState, onMicroParamChange, peachPalette, syncLayerStateWithCss} from './detailed'
+import {drawMicroFrame, drawPrettyMap, exportMicro, generateCssFromState, initLayersState, onMicroParamChange, replaceCssSheetContent, syncLayerStateWithCss, updateSvgPatterns} from './detailed'
 import { Map } from 'maplibre-gl';
 import MicroLayerParams from './components/MicroLayerParams.svelte';
+import * as microPalettes from "./microPalettes";
 
 const scalesHelp = `
 <div class="inline-tooltip">  
@@ -232,7 +233,7 @@ const defaultInlinePropsMicro = {
 }
 
 // ====== State micro ====
-let microLayerDefinitions = initLayersState(peachPalette);
+let microLayerDefinitions = initLayersState(microPalettes['peach']);
 
 // ====== State macro =======
 let baseCss = defaultBaseCssMacro;
@@ -497,6 +498,16 @@ function createMaplibreMap() {
 function handleMicroParamChange(layer, prop, value) {
     const shouldRedraw = onMicroParamChange(layer, prop, value, microLayerDefinitions);
     if (shouldRedraw) draw();
+    save();
+}
+
+function handlePaletteChange(paletteId) {
+    console.log(microPalettes, paletteId);
+    microLayerDefinitions = initLayersState(microPalettes[paletteId]);
+    updateSvgPatterns(document.getElementById('static-svg-map'), microLayerDefinitions);
+    replaceCssSheetContent(microLayerDefinitions);
+    // handleMicroParamChange('other', ['pattern'])
+    draw();
     save();
 }
 
@@ -1018,7 +1029,7 @@ function resetState() {
     setTimeout(() => {
         if (maplibreMap) maplibreMap.jumpTo(inlinePropsMicro);
     }, 500);
-    microLayerDefinitions = initLayersState(peachPalette);
+    microLayerDefinitions = initLayersState(microPalettes['peach']);
     providedFonts = [];
     shapeCount = 0;
     inlineStyles = {};
@@ -2147,7 +2158,10 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                     </div> 
                 </div>
                 {:else if mainMenuSelection === 'layers' && currentMode === "micro"}
-                    <MicroLayerParams layerDefinitions={microLayerDefinitions} onUpdate={handleMicroParamChange}></MicroLayerParams>
+                    <MicroLayerParams layerDefinitions={microLayerDefinitions} 
+                    onUpdate={handleMicroParamChange} 
+                    availablePalettes={microPalettes}
+                    onPaletteChange={handlePaletteChange}></MicroLayerParams>
                 {/if}
             </div>
         </div>

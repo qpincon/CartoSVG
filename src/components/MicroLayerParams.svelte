@@ -3,12 +3,14 @@
 
     import ColorPickerPreview from "./ColorPickerPreview.svelte";
     import RangeInput from "./RangeInput.svelte";
-    import { onMount } from "svelte";
     import { initTooltips } from "../util/common";
 
     export let layerDefinitions = {};
     export let onUpdate = () => {};
+    export let onPaletteChange = () => {};
+    export let availablePalettes = {};
 
+    let selectedPalette;
     function updated(layer, key, value) {
         console.log(layer, key, value);
         onUpdate(layer, key, value);
@@ -20,6 +22,10 @@
                 layerDefinitions[layer].pattern.active;
         }
         initTooltips();
+    }
+
+    function paletteChanged(paletteId) {
+        onPaletteChange(paletteId);
     }
 
     function readable(txt) {
@@ -39,10 +45,26 @@
         layerDefinitions = layerDefinitions;
         setTimeout(() => initTooltips(), 0);
     }
-
 </script>
 
 <div class="py-2 mb-4 pe-2 border border-primary rounded-1">
+    <div class="row my-3 mx-1">
+        <label class="col-4 col-form-label" for="palette-select">
+            Preset palette</label
+        >
+        <select
+            id="palette-select"
+            class="form-select form-select-sm me-4 col"
+            bind:value={selectedPalette}
+            on:change={(e) => paletteChanged(e.target.value)}
+        >
+            <option selected>Chose a preset palette</option>
+            {#each Object.keys(availablePalettes) as paletteId}
+                <option value={paletteId}> {upperFirst(paletteId)} </option>
+            {/each}
+        </select>
+    </div>
+
     {#each Object.entries(layerDefinitions) as [title, def], i (title)}
         <div class="d-flex align-items-center">
             <div class="mx-2 form-check form-switch">

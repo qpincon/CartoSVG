@@ -89,7 +89,7 @@
 - [ ] Check export endpoint hit
 - [x] Micro: Store position (lat / lnt / zoom / pitch / bearing)
 - [x] Micro: Lock / unlock mechanism (allow map drag when on SVG) 
-- [ ] Micro: Layers in "layers" tab
+- [x] Micro: Layers in "layers" tab
 - [-] Micro: Building with same id = same color 
 - [x] Micro: Check building order with height
 - [ ] Micro: Check building to merge if below other buidling

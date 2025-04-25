@@ -181,25 +181,11 @@ export function drawMicroFrame(svg, width, height, borderWidth, borderRadius, bo
     return frame;
 }
 
-export const peachPalette = {
-    background: { fill: "#F2F4CB", disabled: true, active: true },
-    other: { fill: "#F2F4CB", stroke: "#2F3737", disabled: true, active: true },
-    building: { fills: ["#C5283D", "#E9724C", "#FFC857"], stroke: "#2F3737", active: true },
-    water: {
-        fill: "#a1e3ff", stroke: "#85c9e6", active: true,
-        pattern: { hatch: '.', color: '#85c9e6', strokeWidth: 3, size: 13 }
-    },
-    sand: { fill: "#f4eace", stroke: "#a8a8a8", active: true },
-    grass: { fill: "#D0F1BF", stroke: "#2F3737", active: true },
-    wood: { fill: "#64B96A", stroke: "#2F3737", active: true },
-    "road-network": { stroke: "#2F3737", active: true },
-    railway: { stroke: "#2a3737", active: true },
-};
-
 export function initLayersState(providedPalette) {
     const palette = cloneDeep(providedPalette);
     if (!palette['forest']) palette['forest'] = { ...palette['wood'], active: false };
     if (!palette['path']) palette['path'] = { ...palette['road-network'], active: false };
+    if (!palette['railway']) palette['railway'] = { ...palette['railway'], active: false };
     // if (!palette['path-minor']) palette['path-minor'] = { ...palette['road-network'], active: false };
     Object.entries(palette).forEach(([layer, state]) => {
         if (state.menuOpened == null) state.menuOpened = false;
@@ -326,7 +312,6 @@ export function onMicroParamChange(layer, prop, value, layerState) {
 
 // Called when CSS is updated with inline style editor. Returns true if we actually updated layer definition
 export function syncLayerStateWithCss(eventType, cssProp, value, layerState) {
-    console.log('syncLayerStateWithCss');
     if (eventType === "inline") return;
     const cssSelector = eventType.selectorText;
     if (!cssSelector.includes('#micro')) return false;
@@ -347,14 +332,13 @@ export function syncLayerStateWithCss(eventType, cssProp, value, layerState) {
     return true;
 }
 
-const replaceCssSheetContent = debounce((layerState) => {
-    console.log('replaceCssSheetContent', layerState);
+export const replaceCssSheetContent = debounce((layerState) => {
     const styleSheet = document.getElementById('common-style-sheet-elem-micro');
     const microCss = generateCssFromState(layerState);
     if (microCss) styleSheet.innerHTML = microCss;
 }, 500);
 
-function updateSvgPatterns(svgNode, layerState) {
+export function updateSvgPatterns(svgNode, layerState) {
     if (!svgNode) return;
     const patterns = Object.values(layerState).map((def) => {
         return {
@@ -362,6 +346,7 @@ function updateSvgPatterns(svgNode, layerState) {
             backgroundColor: def.fill
         }
     }).filter(pattern => pattern?.active === true);
+    console.log('patterns=', patterns);
     patternGenerator.addOrUpdatePatternsForSVG(svgNode.querySelector('defs'), patterns);
 }
 
