@@ -1927,25 +1927,20 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                             General
                         </a>
                 </li>
-                {#if currentMode === "macro"} 
-                    <li class="nav-item d-flex align-items-center mx-1">
-                        <a href="javascript:;" class="nav-link d-flex align-items-center position-relative fs-5"
-                            on:click={() => mainMenuSelection = "layers"}
-                            class:active={mainMenuSelection === "layers"}>
-                                Layers
-                        </a>
-                    </li>
-                {/if}
+                <li class="nav-item d-flex align-items-center mx-1">
+                    <a href="javascript:;" class="nav-link d-flex align-items-center position-relative fs-5"
+                        on:click={() => mainMenuSelection = "layers"}
+                        class:active={mainMenuSelection === "layers"}>
+                            Layers
+                    </a>
+                </li>
 
                 </ul>
             </div>
             <div id="main-menu" class="mt-4">
                 {#if mainMenuSelection === 'general'}
                     <Accordions sections={currentParams} {paramDefs} {helpParams} otherParams={accordionVisiblityParams}  on:change={handleChangeProp} ></Accordions>
-                    {#if currentMode === "micro"}
-                        <MicroLayerParams layerDefinitions={microLayerDefinitions} onUpdate={handleMicroParamChange}></MicroLayerParams>
-                    {/if}
-                {:else if mainMenuSelection === 'layers'}
+                {:else if mainMenuSelection === 'layers' && currentMode === "macro"}
                 <div class="border border-primary rounded">
                     <div class="p-2">
                         <div class="form-check form-switch">
@@ -2151,6 +2146,8 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                         {/if}
                     </div> 
                 </div>
+                {:else if mainMenuSelection === 'layers' && currentMode === "micro"}
+                    <MicroLayerParams layerDefinitions={microLayerDefinitions} onUpdate={handleMicroParamChange}></MicroLayerParams>
                 {/if}
             </div>
         </div>

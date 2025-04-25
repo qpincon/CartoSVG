@@ -40,12 +40,8 @@
         setTimeout(() => initTooltips(), 0);
     }
 
-    onMount(() => {
-        console.log(layerDefinitions);
-    });
 </script>
 
-<h2 class="text-center">Layers</h2>
 <div class="py-2 mb-4 pe-2 border border-primary rounded-1">
     {#each Object.entries(layerDefinitions) as [title, def], i (title)}
         <div class="d-flex align-items-center">
