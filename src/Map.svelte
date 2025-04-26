@@ -502,7 +502,6 @@ function handleMicroParamChange(layer, prop, value) {
 }
 
 function handleMicroPaletteChange(paletteId) {
-    console.log(microPalettes, paletteId);
     const palette = microPalettes[paletteId];
     if (palette.borderParams) {
         microParams['Border'] = {
@@ -949,6 +948,7 @@ function drawMacroFrame(groupData) {
 
 }
 async function drawMicro() {
+    console.log('drawmicro');
     if (!maplibreMap) return;
     await mapLoadedPromise;
     projection = createD3ProjectionFromMapLibre(maplibreMap, p('width'), p('height'), p('borderRadius'));
@@ -1629,7 +1629,9 @@ function validateExport() {
         exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, true, totalCommonCss, p('animate'), formData);
         fetch('/exportSvgMacro');
     } else {
-        exportMicro(svg, providedFonts, totalCommonCss, p('animate'), formData);
+        const attributionColor = microLayerDefinitions['road-network']['stroke'] ?? '#aaa';
+        console.log('attributionColor=', attributionColor);
+        exportMicro(svg, microParams, providedFonts, totalCommonCss, p('animate'), attributionColor, formData);
         fetch('/exportSvgMicro');
     }
     showExportConfirm = false;

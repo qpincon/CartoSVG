@@ -420,7 +420,6 @@ export class HatchPatternGenerator {
       text.setAttribute('style', `font-size: ${this.size/2 + 1}px;`);
       return text;
     }
-    console.log(this._measureChar(char));
     pattern.appendChild(createText(0, this.size - 3));
     pattern.appendChild(createText(this.size/2, this.size/2));
     this.offsetAccum += this._measureChar(char).width + 3;
@@ -429,7 +428,6 @@ export class HatchPatternGenerator {
 
 
   _createPathPattern(d, pattern, color, strokeWidth) {
-    console.log(d, pattern);
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', d);
     path.setAttribute('stroke', color);

@@ -11,6 +11,7 @@ import { additionnalCssExport, changeIdAndReferences, exportFontChoices, getInte
 import { createRoundedRectangleGeoJSON } from './util/geometry';
 import bboxPolygon from '@turf/bbox-polygon';
 import booleanDisjoint from '@turf/boolean-disjoint';
+
 export const interestingBasicV2Layers = [
     "Residential",
     "Forest",
@@ -70,7 +71,7 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
     updateSvgPatterns(svg.node(), layerDefinitions);
     const geometries = getRenderedFeatures(maplibreMap, { layers: layersToQuery });
     orderFeaturesByLayer(geometries);
-    console.log('geometries', geometries);
+    // console.log('geometries', geometries);
 
     const width = findProp('width', generalParams);
     const height = findProp('height', generalParams);
@@ -120,15 +121,11 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
 
     // Post-clipping - can't get it to work with d3 postclip and custom stream
     setTimeout(() => {
-        const innerFrameWidth = outerFrameWidth - borderPadding;
-        const innerFrameHeight = outerFrameHeight - borderPadding;
-        const innerFrameRadius = (borderRadius / 100) * (Math.min(innerFrameWidth, innerFrameHeight) - (borderPadding));
-        const roundedRect = createRoundedRectangleGeoJSON(innerFrameWidth, innerFrameHeight, innerFrameRadius, innerFrameWidth / 2 + borderPadding, innerFrameHeight / 2 + borderPadding);
-       
+        const roundedRect = roundedRectFromParams(generalParams);
         const toRemove = [];
         document.querySelectorAll('#static-svg-map g path').forEach(el => {
             const bbox = el.getBBox();
-            const bboxRect = [bbox.x, height-bbox.y, bbox.x + bbox.width, height-bbox.y - bbox.height];
+            const bboxRect = [bbox.x, height - bbox.y, bbox.x + bbox.width, height - bbox.y - bbox.height];
             const bboxPoly = bboxPolygon(bboxRect);
             if (booleanDisjoint(roundedRect, bboxPoly)) {
                 toRemove.push(el);
@@ -139,12 +136,25 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
     }, 100);
 }
 
+function roundedRectFromParams(microParams) {
+    const width = findProp('width', microParams);
+    const height = findProp('height', microParams);
+    const borderPadding = findProp('borderPadding', microParams);
+    const borderRadius = findProp('borderRadius', microParams);
+    const outerFrameWidth = width - borderPadding;
+    const outerFrameHeight = height - borderPadding;
+    const innerFrameWidth = outerFrameWidth - borderPadding;
+    const innerFrameHeight = outerFrameHeight - borderPadding;
+    const innerFrameRadius = (borderRadius / 100) * (Math.min(innerFrameWidth, innerFrameHeight) - (borderPadding));
+    return createRoundedRectangleGeoJSON(innerFrameWidth, innerFrameHeight, innerFrameRadius, innerFrameWidth / 2 + borderPadding, innerFrameHeight / 2 + borderPadding);
+}
+
 function polyToPath(coords, height) {
     let d = '';
     for (let i = 0; i < coords.length; i++) {
         const p = coords[i];
-        if (i === 0) d+= `M${p[0]},${height- p[1]}`;
-        else d+= `L${p[0]},${height- p[1]}`;
+        if (i === 0) d += `M${p[0]},${height - p[1]}`;
+        else d += `L${p[0]},${height - p[1]}`;
     }
     return d;
 }
@@ -242,7 +252,6 @@ export function generateCssFromState(state) {
         if (layer === "borderParams") continue;
         let ruleContent = {};
         let ruleHoverContent = {};
-        if (layer === 'water')console.log(layerDef)
         if (layerDef.stroke) {
             ruleContent['stroke'] = layerDef.stroke;
             if (!layer.includes('road') && !layer.includes('path') && !layer.includes('rail')) {
@@ -265,7 +274,6 @@ export function generateCssFromState(state) {
             ruleHoverContent['fill'] = lighter;
         }
         if (size(ruleContent) > 0) {
-            if (layer === 'water')console.log(ruleContent)
             if (layer === "background") {
                 css += updateStyleSheetOrGenerateCss(sheet, '#micro-background', ruleContent);
             } else {
@@ -358,8 +366,12 @@ export function updateSvgPatterns(svgNode, layerState) {
 }
 
 const domParser = new DOMParser();
-export async function exportMicro(svg, providedFonts, commonCss, animated, { exportFonts = exportFontChoices.convertToPath}) {
-        
+export async function exportMicro(svg, generalParams, providedFonts, commonCss, animated, attributionColor,
+    { exportFonts = exportFontChoices.convertToPath }) {
+
+    const width = findProp('width', generalParams);
+    const height = findProp('height', generalParams);
+    const borderPadding = findProp('borderPadding', generalParams);
     const svgNode = svg.node();
     svgNode.removeAttribute('style');
     const usedFonts = getUsedInlineFonts(svgNode);
@@ -383,7 +395,7 @@ export async function exportMicro(svg, providedFonts, commonCss, animated, { exp
     // Styling
     const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
     const renderedCss = commonCss.replaceAll(/rgb\(.*?\)/g, rgb2hex) + additionnalCssExport;
-    const {mapId, finalCss } = discriminateCssForExport(renderedCss);
+    const { mapId, finalCss } = discriminateCssForExport(renderedCss);
     optimizedSVG.firstChild.setAttribute('id', mapId);
     optimizedSVG.firstChild.querySelector('defs').remove();
     optimizedSVG.firstChild.append(defs);
@@ -399,6 +411,37 @@ export async function exportMicro(svg, providedFonts, commonCss, animated, { exp
         scriptElem.appendChild(scriptContent);
         optimizedSVG.firstChild.append(scriptElem);
     }
+
+    /** Add attribution */
+    // const roundedRectPoints = explode(roundedRectFromParams(generalParams));
+    optimizedSVG.firstChild.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    const createAnchor = (text, href, x, y) => {
+        // const nearest = nearestPoint([x, height - y], roundedRectPoints);
+        // const attrPos = nearest.geometry.coordinates;
+        // attrPos[1] = height - attrPos[1];
+
+        const a = document.createElementNS('http://www.w3.org/2000/svg', 'a');
+        a.setAttribute('xlink:href', href);
+        a.setAttribute('target', '_blank');
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        t.setAttribute("x", x);
+        t.setAttribute("y", y);
+        t.setAttribute("text-anchor", "end");
+        t.setAttribute("fill", attributionColor);
+        t.setAttribute("font-size", 8);
+        t.setAttribute("style", "font-family: 'trebuchet ms',sans-serif;");
+        // t.setAttribute("style", "mix-blend-mode: difference; font-family: 'trebuchet ms',sans-serif;");
+        t.textContent = text;
+        a.append(t);
+        optimizedSVG.firstChild.append(a);
+    }
+    // const xOffset = borderPadding + borderRadius;
+    // createAnchor('data © OpenStreetMap', 'https://www.openstreetmap.org/copyright', width - borderPadding - 10, height - borderPadding - 20);
+    // createAnchor('CartoSVG', 'https://cartosvg.com', width - borderPadding - 10, height - borderPadding - 10);
+    createAnchor('data © OpenStreetMap', 'https://www.openstreetmap.org/copyright', width - borderPadding * 2, height - borderPadding - 16);
+    createAnchor('CartoSVG', 'https://cartosvg.com', width - borderPadding * 2, height - borderPadding - 8);
+
+
     download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'cartosvg-export.svg');
 
 } 

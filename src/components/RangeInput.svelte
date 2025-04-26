@@ -8,7 +8,7 @@
     export let step = 1;
     export let onChange = (newVal) => {};
     export let id = "rangeinputid";
-    export let helpText;
+    export let helpText = null;
     export let labelAbove = false;
 
     // props are passed as strings most of the time

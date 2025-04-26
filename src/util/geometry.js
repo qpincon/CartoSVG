@@ -8,7 +8,7 @@
  * @param {number} [segments=8] - Number of segments to use for each rounded corner (default: 8)
  * @returns {Object} GeoJSON polygon object
  */
-export function createRoundedRectangleGeoJSON(width, height, cornerRadius, center_x = width / 2, center_y = height / 2, segments = 8) {
+export function createRoundedRectangleGeoJSON(width, height, cornerRadius, center_x = width / 2, center_y = height / 2, segments = 16) {
     // Validate inputs
     if (width <= 0 || height <= 0) {
         throw new Error('Width and height must be positive numbers');

@@ -1,4 +1,4 @@
-export const peach = {
+export const playful = {
     borderParams : {
         borderColor: "#aaa", borderWidth: 3, borderRadius: 7, borderPadding: 20,
     },
@@ -286,5 +286,57 @@ export const classicAtlas = {
     railway: { stroke: "#5A5E64", active: true },
     borderParams: {
         borderColor: "#3C444D", borderWidth: 2.5, borderRadius: 7, borderPadding: 20,
+    }
+};
+
+
+export const peach = {
+    background: {
+        fill: "#FFF1E6", disabled: true, active: true,
+        pattern: { hatch: '.', color: "#FFE0D1", strokeWidth: 2.4, scale: 1.5 }
+    },
+    other: { fill: "#FFF1E6", stroke: "#6D4C41", disabled: true, active: true },
+    building: { fills: ["#FFCDB2", "#FFB4A2", "#E5989B"], stroke: "#6D4C41", active: true },
+    water: {
+        fill: "#B5E2FA", stroke: "#91C9E8", active: true,
+        pattern: { hatch: '~', color: "#91C9E8", strokeWidth: 0.8, scale: 1.0 }
+    },
+    sand: { fill: "#FFDAB9", stroke: "#EECBA7", active: true },
+    grass: {
+        fill: "#DCEDC8", stroke: "#6D4C41", active: true,
+        pattern: { hatch: 'o', color: "#C5D6B5", strokeWidth: 0.7, scale: 1.1 }
+    },
+    wood: { fill: "#B5C9A1", stroke: "#6D4C41", active: true },
+    "road-network": { stroke: "#6D4C41", active: true },
+    railway: { stroke: "#9E8079", active: true },
+    borderParams: {
+        borderColor: "#FFB4A2", borderWidth: 3, borderRadius: 10, borderPadding: 20,
+    }
+};
+
+export const citrus = {
+    background: {
+        fill: "#F9F7F3", disabled: true, active: true,
+        pattern: { hatch: 'o', color: "#ECEAE6", strokeWidth: 0.7, scale: 1.0 }
+    },
+    other: { fill: "#F9F7F3", stroke: "#315E48", disabled: true, active: true },
+    building: { fills: ["#FFA62B", "#F16A30", "#F4E285"], stroke: "#315E48", active: true },
+    water: {
+        fill: "#73C2FB", stroke: "#5BA3D9", active: true,
+        pattern: { hatch: '~', color: "#5BA3D9", strokeWidth: 0.9, scale: 1.1 }
+    },
+    sand: { fill: "#F6E3BA", stroke: "#E4D3AD", active: true },
+    grass: {
+        fill: "#B4D6A4", stroke: "#315E48", active: true,
+        pattern: { hatch: 'v', color: "#9BC28B", strokeWidth: 0.6, scale: 0.9 }
+    },
+    wood: {
+        fill: "#539F53", stroke: "#315E48", active: true,
+        pattern: { hatch: '+', color: "#468046", strokeWidth: 0.5, scale: 0.8 }
+    },
+    "road-network": { stroke: "#315E48", active: true },
+    railway: { stroke: "#5B7B6E", active: true },
+    borderParams: {
+        borderColor: "#F16A30", borderWidth: 2.5, borderRadius: 10, borderPadding: 18,
     }
 };
