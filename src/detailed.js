@@ -188,6 +188,7 @@ export function initLayersState(providedPalette) {
     if (!palette['railway']) palette['railway'] = { ...palette['railway'], active: false };
     // if (!palette['path-minor']) palette['path-minor'] = { ...palette['road-network'], active: false };
     Object.entries(palette).forEach(([layer, state]) => {
+        if (layer === "borderParams") return;
         if (state.menuOpened == null) state.menuOpened = false;
         let pattern = state.pattern;
         if (!pattern && state.fill) {
@@ -200,7 +201,7 @@ export function initLayersState(providedPalette) {
         if (!pattern.id) pattern.id = `pattern-${layer}`;
         if (!pattern.color) pattern.color = darken(state.fill);
         if (!pattern.strokeWidth) pattern.strokeWidth = 3;
-        if (!pattern.size) pattern.size = 13;
+        if (!pattern.scale) pattern.scale = 1.3;
     });
     // if (!palette['building1']) {
     //     const strokeRef = palette['building0'].stroke;
@@ -238,6 +239,7 @@ export function generateCssFromState(state) {
     }
     `;
     for (const [layer, layerDef] of Object.entries(state)) {
+        if (layer === "borderParams") continue;
         let ruleContent = {};
         let ruleHoverContent = {};
         if (layer === 'water')console.log(layerDef)
@@ -314,6 +316,9 @@ export function onMicroParamChange(layer, prop, value, layerState) {
 
 // Called when CSS is updated with inline style editor. Returns true if we actually updated layer definition
 export function syncLayerStateWithCss(eventType, cssProp, value, layerState) {
+    console.log(eventType, cssProp, value, layerState);
+    // Prevent removing value
+    if (value === null) return;
     if (eventType === "inline") return;
     const cssSelector = eventType.selectorText;
     if (!cssSelector.includes('#micro')) return false;

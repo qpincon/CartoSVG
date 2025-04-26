@@ -38,8 +38,8 @@ const defaultParams = {
 
 const microDefaultParams = {
     General: {
-        width: 600,
-        height: 670,
+        width: 700,
+        height: 700,
         useViewBox: false,
         animate: false,
     },

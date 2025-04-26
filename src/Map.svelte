@@ -501,9 +501,16 @@ function handleMicroParamChange(layer, prop, value) {
     save();
 }
 
-function handlePaletteChange(paletteId) {
+function handleMicroPaletteChange(paletteId) {
     console.log(microPalettes, paletteId);
-    microLayerDefinitions = initLayersState(microPalettes[paletteId]);
+    const palette = microPalettes[paletteId];
+    if (palette.borderParams) {
+        microParams['Border'] = {
+            ...microParams['Border'],
+            ...palette.borderParams
+        };
+    }
+    microLayerDefinitions = initLayersState(palette);
     updateSvgPatterns(document.getElementById('static-svg-map'), microLayerDefinitions);
     replaceCssSheetContent(microLayerDefinitions);
     // handleMicroParamChange('other', ['pattern'])
@@ -568,13 +575,6 @@ function detachListeners() {
     const container = d3.select('#map-container');
     container.on(".drag", null);
     container.on(".zoom", null);
-}
-
-function mapLibreFitBounds() {
-    if (!maplibreMap) return;
-    maplibreMap.resize();
-    const bounds = getGeographicalBounds(projection, p('width'), p('height'));
-    maplibreMap.fitBounds(bounds, {animate: false});
 }
 
 const redrawThrottle = throttle(redraw, 50);
@@ -1026,10 +1026,14 @@ function resetState() {
     currentTab = 'countries';
     inlineProps = JSON.parse(JSON.stringify(defaultInlineProps));
     inlinePropsMicro = JSON.parse(JSON.stringify(defaultInlinePropsMicro));
+    microLayerDefinitions = initLayersState(microPalettes['peach']);
+    if (currentMode === "micro") {
+        updateSvgPatterns(document.getElementById('static-svg-map'), microLayerDefinitions);
+        replaceCssSheetContent(microLayerDefinitions);
+    }
     setTimeout(() => {
         if (maplibreMap) maplibreMap.jumpTo(inlinePropsMicro);
     }, 500);
-    microLayerDefinitions = initLayersState(microPalettes['peach']);
     providedFonts = [];
     shapeCount = 0;
     inlineStyles = {};
@@ -1076,6 +1080,10 @@ function restoreState(givenState) {
     if (state.currentMode) switchMode(state.currentMode);
     if (state.microLayerDefinitions) microLayerDefinitions = state.microLayerDefinitions;
     inlinePropsMicro = state.inlinePropsMicro ?? defaultInlinePropsMicro;
+    if (currentMode === "micro") {
+        updateSvgPatterns(document.getElementById('static-svg-map'), microLayerDefinitions);
+        replaceCssSheetContent(microLayerDefinitions);
+    }
     setTimeout(() => {
         if (maplibreMap) maplibreMap.jumpTo(inlinePropsMicro);
     }, 500);
@@ -2161,7 +2169,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
                     <MicroLayerParams layerDefinitions={microLayerDefinitions} 
                     onUpdate={handleMicroParamChange} 
                     availablePalettes={microPalettes}
-                    onPaletteChange={handlePaletteChange}></MicroLayerParams>
+                    onPaletteChange={handleMicroPaletteChange}></MicroLayerParams>
                 {/if}
             </div>
         </div>

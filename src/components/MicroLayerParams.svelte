@@ -9,6 +9,7 @@
     export let onPaletteChange = () => {};
     export let availablePalettes = {};
 
+    $: layers = Object.entries(layerDefinitions).filter(([layerId, _]) => layerId !== "borderParams");
     let selectedPalette;
     function updated(layer, key, value) {
         console.log(layer, key, value);
@@ -53,14 +54,14 @@
             bind:value={selectedPalette}
             on:change={(e) => paletteChanged(e.target.value)}
         >
-            <option selected>Chose a preset palette</option>
+            <option hidden selected>Chose a preset palette</option>
             {#each Object.keys(availablePalettes) as paletteId}
                 <option value={paletteId}> {camelCaseToSentence(paletteId)} </option>
             {/each}
         </select>
     </div>
 
-    {#each Object.entries(layerDefinitions) as [title, def], i (title)}
+    {#each layers as [title, def], i (title)}
         <div class="d-flex align-items-center">
             <div class="mx-2 form-check form-switch">
                 <input
@@ -217,7 +218,7 @@
                                 id={`${def.pattern.id}-strokeWidth`}
                                 bind:value={def.pattern.strokeWidth}
                                 min="0.2"
-                                max="10"
+                                max="5"
                                 step="0.2"
                                 onChange={(val) => {
                                     def.pattern.strokeWidth = val;
@@ -230,16 +231,16 @@
                             />
                             <RangeInput
                                 labelAbove={true}
-                                title="Size"
+                                title="Scale"
                                 helpText="Controls the density of the pattern"
-                                id={`${def.pattern.id}-size`}
-                                bind:value={def.pattern.size}
-                                min="1"
-                                max="40"
-                                step="1"
+                                id={`${def.pattern.id}-scale`}
+                                bind:value={def.pattern.scale}
+                                min="0.1"
+                                max="3"
+                                step="0.1"
                                 onChange={(val) => {
-                                    def.pattern.size = val;
-                                    updated(title, ["pattern", "size"], val);
+                                    def.pattern.scale = val;
+                                    updated(title, ["pattern", "scale"], val);
                                 }}
                             />
                         </div>

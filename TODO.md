@@ -125,5 +125,6 @@
 - [x] Micro: Bonus: More patterns!
 - [ ] Micro: New front page
 - [x] Micro: Debug right click
+- [ ] Micro: Stop computations when moving
 
 
