@@ -62,7 +62,7 @@ export function orderFeaturesByLayer(features) {
 //     return roadMinorStrokeWidth(zoom);
 // }
 
-export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions, generalParams) {
+export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions, generalParams, isLocked) {
     console.log('layerDefinitions=', layerDefinitions);
     const mapLibreContainer = select('#maplibre-map');
     const layersToQuery = interestingBasicV2Layers.filter(layer => {
@@ -116,7 +116,7 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
         // .attr("computed-id", d => d.properties.computedId)
         .attr("id", d => d.properties.uuid);
     svg.append('g').attr('id', 'points-labels');
-    svg.style("pointer-events", "none");
+    svg.style("pointer-events", isLocked ? "auto" : "none");
     mapLibreContainer.style('opacity', 0);
 
     // Post-clipping - can't get it to work with d3 postclip and custom stream
@@ -239,12 +239,12 @@ export function generateCssFromState(state) {
     const [sheet, _] = findStyleSheet("#micro .line");
     // "other" default color definitions wil be overriden by mode specific '>' selector
     let css = `
-    #micro > .line { 
+    #micro .line { 
         fill: none; 
         stroke-linecap: round;
         stroke-linejoin: round;
     }
-    #micro > .poly { 
+    #micro .poly { 
         stroke-linejoin: round;
     }
     `;
@@ -267,6 +267,7 @@ export function generateCssFromState(state) {
         }
         if (layerDef.pattern?.active) {
             ruleContent['fill'] = `url(#${layerDef.pattern.id})`;
+            ruleHoverContent['fill'] = `url(#${layerDef.pattern.id}-light)`;
         }
         else if (layerDef.fill) {
             ruleContent['fill'] = layerDef.fill;
@@ -277,14 +278,14 @@ export function generateCssFromState(state) {
             if (layer === "background") {
                 css += updateStyleSheetOrGenerateCss(sheet, '#micro-background', ruleContent);
             } else {
-                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}`, ruleContent);
-                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}:hover`, ruleHoverContent);
+                css += updateStyleSheetOrGenerateCss(sheet, `#micro .${layer}`, ruleContent);
+                css += updateStyleSheetOrGenerateCss(sheet, `#micro .${layer}:hover`, ruleHoverContent);
             }
         }
         if (layerDef.fills) {
             layerDef.fills.forEach((fill, i) => {
-                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}-${i}`, { 'fill': fill });
-                css += updateStyleSheetOrGenerateCss(sheet, `#micro > .${layer}-${i}:hover`, { 'fill': lighten(fill) });
+                css += updateStyleSheetOrGenerateCss(sheet, `#micro .${layer}-${i}`, { 'fill': fill });
+                css += updateStyleSheetOrGenerateCss(sheet, `#micro .${layer}-${i}:hover`, { 'fill': lighten(fill) });
             });
         }
     }
@@ -302,10 +303,10 @@ export function onMicroParamChange(layer, prop, value, layerState) {
     if (prop.includes("active")) {
         return true;
     }
-    let ruleTxt = `#micro > .${layer}`;
+    let ruleTxt = `#micro .${layer}`;
     if (layer === "background") ruleTxt = "#micro-background";
     // Change "building-0" for instance
-    if (prop[0] === "fills") ruleTxt = `#micro > .${layer}-${last(prop)}`;
+    if (prop[0] === "fills") ruleTxt = `#micro .${layer}-${last(prop)}`;
     const [sheet, rule] = findStyleSheet(ruleTxt);
     if (!rule) return false;
     if (prop[0] === "fills") {
@@ -333,7 +334,7 @@ export function syncLayerStateWithCss(eventType, cssProp, value, layerState) {
     if (cssProp === "fill") {
         updateSvgPatterns(document.getElementById('static-svg-map'), layerState);
     }
-    const layer = cssSelector.match(/#micro > \.(.*)/)?.[1] ?? 'background';
+    const layer = cssSelector.match(/#micro \.(.*)/)?.[1] ?? 'background';
     let path = [layer, cssProp];
     let isFills = false;
     if (layer.includes('-') && cssProp === "fill") {
@@ -361,7 +362,16 @@ export function updateSvgPatterns(svgNode, layerState) {
             backgroundColor: def.fill
         }
     }).filter(pattern => pattern?.active === true);
-    console.log('patterns=', patterns);
+
+    /** Add lighter variations to patterns for hovering */
+    for (const pattern of [...patterns]) {
+        if (pattern.id.includes('background')) continue;
+        patterns.push({
+            ...pattern,
+            backgroundColor: lighten(pattern.backgroundColor),
+            id: `${pattern.id}-light`
+        })
+    }
     patternGenerator.addOrUpdatePatternsForSVG(svgNode.querySelector('defs'), patterns);
 }
 
@@ -379,7 +389,7 @@ export async function exportMicro(svg, generalParams, providedFonts, commonCss, 
     const SVGO = await import('svgo/browser');
 
     const defs = svgNode.querySelector('defs').cloneNode(true);
-    svgNode.querySelectorAll('#micro > path').forEach(el => el.removeAttribute('id'));
+    svgNode.querySelectorAll('#micro path').forEach(el => el.removeAttribute('id'));
     // Optimize whole SVG
     const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig).data;
     const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');

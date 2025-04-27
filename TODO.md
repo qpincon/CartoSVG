@@ -125,8 +125,11 @@
 - [x] Micro: Bonus: More patterns!
 - [ ] Micro: New front page
 - [x] Micro: Debug right click
+- [x] Micro: Fill pattern hover
 - [ ] Micro: Stop computations when moving
+- [ ] Remove labels off canvas
 - [ ] Freehand: style group with ISE (add custom CSS rule on the fly on <g> parent)
 - [ ] Freehand: Allow drag drawing
-
+- [ ] Freehand: Allow deletion
+- [ ] Double click text edit prevent ISE
 

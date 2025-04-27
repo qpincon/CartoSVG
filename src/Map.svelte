@@ -425,7 +425,7 @@ onMount(async() => {
         cssRuleFilter: (el, cssSelector) => {
             if (cssSelector.includes('.hovered')) return false;
             if (cssSelector.includes('ssc-')) return false;
-            if (cssSelector.includes('#micro > path')) return false;
+            if (cssSelector.includes('#micro path')) return false;
             if (cssSelector.includes('#micro .poly')) return false;
             if (cssSelector.includes('#micro .line')) return false;
             return true;
@@ -792,6 +792,7 @@ async function draw(simplified = false, _) {
     svg.html('');
     svg.append('defs');
     svg.on('contextmenu', function(e) {
+        console.log('contextmenu!', e);
         if (editingPath) return;
         stopDrawFreeHand();
         e.preventDefault();
@@ -966,7 +967,7 @@ async function drawMicro() {
     await mapLoadedPromise;
     projection = createD3ProjectionFromMapLibre(maplibreMap, p('width'), p('height'), p('borderRadius'));
     path = d3.geoPath(projection);
-    drawPrettyMap(maplibreMap, svg, path, microLayerDefinitions, currentParams);
+    drawPrettyMap(maplibreMap, svg, path, microLayerDefinitions, currentParams, microLocked);
     freeHandDrawings.forEach(drawingGroup => {
         const gDrawing = svg.append('g');
         for (const drawing of drawingGroup) {
@@ -997,7 +998,7 @@ function computeCss() {
         }`;
         if (p('animate')) css += transitionCssMicro;
         commonCss = css;
-        totalCommonCss = exportStyleSheet('#micro > .poly') + commonCss; 
+        totalCommonCss = exportStyleSheet('#micro .poly') + commonCss; 
         return;
     }
     const width = p('width');
