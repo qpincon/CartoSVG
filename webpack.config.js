@@ -3,6 +3,7 @@ const sveltePreprocess = require('svelte-preprocess');
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const fs = require('fs');
+const CopyPlugin = require("copy-webpack-plugin");
 
 const examplesMeta = JSON.parse(fs.readFileSync('./examples.json'));
 const mode = process.argv.find(x => x.includes('--mode'));
@@ -94,6 +95,11 @@ const config = {
     },
     plugins: [
         new NodePolyfillPlugin(),
+        new CopyPlugin({
+            patterns: [
+              { from: "ele", to: "ele" },
+            ],
+          }),
         new HtmlWebpackPlugin({
             template: './src/index.ejs',
             title: 'CartoSVG - Design gorgeous interactive maps',
