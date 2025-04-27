@@ -21,7 +21,7 @@ import Geocoding from './components/Geocoding.svelte';
 import { download, sortBy, indexBy, htmlToElement, getNumericCols, initTooltips, getBestFormatter, getColumns, findProp } from './util/common';
 import * as shapes from './svg/shapeDefs';
 import * as markers from './svg/markerDefs';
-import { setTransformScale, closestDistance, duplicateContourCleanFirst } from './svg/svg';
+import { setTransformScale, closestDistance, duplicateContourCleanFirst, pathStringFromParsed } from './svg/svg';
 import { appendLandImageNew,  appendCountryImageNew } from './svg/contourMethods';
 import { drawShapes } from './svg/shape';
 import iso3Data from './assets/data/iso3_filtered.json';
@@ -50,6 +50,7 @@ import {drawMicroFrame, drawPrettyMap, exportMicro, generateCssFromState, initLa
 import { Map } from 'maplibre-gl';
 import MicroLayerParams from './components/MicroLayerParams.svelte';
 import * as microPalettes from "./microPalettes";
+import { FreehandDrawer} from './svg/freeHandDraw'
 
 const scalesHelp = `
 <div class="inline-tooltip">  
@@ -299,7 +300,9 @@ let currentMode = 'macro';
 $: if (true || mainMenuSelection) { tick().then(() => initTooltips()); }
 // $: if (true || currentMode) { switchMode() }
 let editingPath = false;
-
+let isDrawingFreeHand = false;
+let isDrawingPath = false;
+$: iseOnClickEnabled = !editingPath && !isDrawingFreeHand && !isDrawingPath;
 // This contains the common CSS that can ben editor with inline-css-editor
 // we also have a special svelte:head element containing all CSS that is not in baseCss (border style, legend colors, etc.)
 let commonStyleSheetElemMacro;
@@ -385,6 +388,9 @@ onMount(async() => {
             save();
         },
         getElems: (el) => {
+            if (el.classList.contains('freehand')) {
+                return [[el.parentElement, 'Clicked']];
+            }
             if (el.classList.contains('adm')) {
                 const parentCountry = el.parentNode.getAttribute('id').replace(/ ADM(1|2)/, '')
                 const parentCountryIso3 = iso3Data.find(row => row.name === parentCountry)['name'];
@@ -432,6 +438,11 @@ onMount(async() => {
     contextualMenu.opened = false;
     attachListeners();
     // maplibreMap.showTileBoundaries = true;
+    window.addEventListener('keydown', e => {
+        if (e.code === "Escape") {
+            stopDrawFreeHand();
+        } 
+    });
 });
 
 function lockUnlock(isLocked) {
@@ -726,6 +737,7 @@ async function initializeAdms(simplified) {
     }
 }
 const countryFilteredImages = new Set();
+const freeHandDrawer = new FreehandDrawer();
 let firstDraw = true;
 // without 'countries' if unchecked
 let computedOrderedTabs = [];
@@ -781,6 +793,7 @@ async function draw(simplified = false, _) {
     svg.append('defs');
     svg.on('contextmenu', function(e) {
         if (editingPath) return;
+        stopDrawFreeHand();
         e.preventDefault();
         closeMenu();
         let target = null;
@@ -804,7 +817,7 @@ async function draw(simplified = false, _) {
     svg.on("click", function(e) {
         if (contextualMenu.opened) closeMenu();
         else if (styleEditor.isOpened()) styleEditor.close();
-        else if (!editingPath) openEditor(e);
+        else if (iseOnClickEnabled) openEditor(e);
     });
 
     const groupData = [];
@@ -954,6 +967,13 @@ async function drawMicro() {
     projection = createD3ProjectionFromMapLibre(maplibreMap, p('width'), p('height'), p('borderRadius'));
     path = d3.geoPath(projection);
     drawPrettyMap(maplibreMap, svg, path, microLayerDefinitions, currentParams);
+    freeHandDrawings.forEach(drawingGroup => {
+        const gDrawing = svg.append('g');
+        for (const drawing of drawingGroup) {
+            const pathElem = gDrawing.append('path').attr('pathLength', 1).classed('freehand', true);
+            pathElem.attr('d', pathStringFromParsed(drawing, projection));
+        }
+    });
     applyInlineStyles();
 }
 
@@ -1288,7 +1308,9 @@ function handleInputFont(e) {
 function addPath() {
     closeMenu();
     detachListeners();
+    isDrawingPath = true;
     freeHandDrawPath(svg, projection, (finishedElem) => {
+        console.log('finishedElem', finishedElem);
         const d = finishedElem.getAttribute('d');
         if (!d) return;
         attachListeners();
@@ -1297,7 +1319,45 @@ function addPath() {
         finishedElem.setAttribute('id', id);
         providedPaths.push({d: parseAndUnprojectPath(d, projection)});
         saveDebounced();
+        setTimeout(() => {isDrawingPath = false;}, 0)
+        
     });
+}
+
+function drawFreeHand() {
+    isDrawingFreeHand= true;
+    closeMenu();
+    detachListeners();
+    freeHandDrawer.start(svg.node());
+}
+
+let freeHandDrawings = [];
+function stopDrawFreeHand() {
+    if (!isDrawingFreeHand) return;
+    attachListeners();
+    isDrawingFreeHand= false;
+    const newGroup = freeHandDrawer.stop();
+    const paths = newGroup.querySelectorAll('path');
+    if (!paths.length) return;
+
+    // Get first point and store drawing as-is
+    // let position = null;
+    // for (const pathElem of paths) {
+    //     const d = pathElem.getAttribute('d');
+    //     if (!d) continue;
+    //     position = parseAndUnprojectPath(d, projection)[0];
+    //     break;
+    // }
+
+    const unprojected = [];
+    paths.forEach(pathElem => {
+        const d = pathElem.getAttribute('d');
+        if (!d) return;
+        const parsed = parseAndUnprojectPath(d, projection);
+        unprojected.push(parsed);
+        console.log(parsed);
+    });
+    if (unprojected.length) freeHandDrawings.push(unprojected);
 }
 
 function handleChangeProp(event) {
@@ -1900,6 +1960,7 @@ function getLegendColors(dataColorDef, tab, scale, data) {
     {:else}
         <div role="button" class="px-2 py-1" on:click={editStyles}> Edit styles </div>
         <div role="button" class="px-2 py-1" on:click={addPath}> Draw path </div>
+        <div role="button" class="px-2 py-1" on:click={drawFreeHand}> Draw freehand </div>
         <div role="button" class="px-2 py-1" on:click={addPoint}> Add point </div>
         <div role="button" class="px-2 py-1" on:click={addLabel}> Add label </div>
     {/if}

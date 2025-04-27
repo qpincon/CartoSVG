@@ -126,5 +126,7 @@
 - [ ] Micro: New front page
 - [x] Micro: Debug right click
 - [ ] Micro: Stop computations when moving
+- [ ] Freehand: style group with ISE (add custom CSS rule on the fly on <g> parent)
+- [ ] Freehand: Allow drag drawing
 
 

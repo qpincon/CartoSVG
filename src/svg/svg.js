@@ -124,6 +124,18 @@ function duplicateContours(svgElem) {
     });
 }
 
+export function pathStringFromParsed(parsedD, projection) {
+    return parsedD.reduce((d, curGroup) => {
+        const [instruction, ...data] = curGroup;
+        let newData = '';
+        for (let i = 0; i < data.length; i += 2) {
+            newData += projection([data[i], data[i + 1]]) + ' ';
+        }
+        d +=  `${instruction}${newData}`;
+        return d
+    }, '');
+}
+
 export {
     createSvgFromPart, setTransformScale, setTransformTranslate, getTranslateFromTransform, 
     closestDistance, duplicateContours, duplicateContourCleanFirst, 
