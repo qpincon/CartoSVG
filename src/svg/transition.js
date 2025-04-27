@@ -43,7 +43,7 @@ export const transitionCssMicro = `
     transition-timing-function: ease;
 }
 
-.animate #micro path, .animate #frame {
+.animate path, .animate #frame {
     stroke-dasharray: 1 !important;
     fill-opacity: 0 !important;
     stroke-dashoffset: 1;
