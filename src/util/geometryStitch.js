@@ -9,7 +9,7 @@ import { groupBy } from 'lodash-es';
 import { tiles as getTiles } from '@mapbox/tile-cover';
 import bboxClip from "@turf/bbox-clip";
 import { mergeLineStrings } from "./linestitch";
-
+import { yieldToMain } from "./polyfills";
 
 /**
  * This files contains an attempt at stiching tiles together.
@@ -17,7 +17,7 @@ import { mergeLineStrings } from "./linestitch";
  * The most problematic layer is the building layer. IDs of the polygons between tiles don't match, and we can have 
  * convoluted situations with the tiles buffer. We can have:
  * - a polygon that is cut and continues on another tile
- * - the beginning of a new polygon beyond the tile extent taht is fully contained by the polygon on the other tile
+ * - the beginning of a new polygon beyond the tile extent that is fully contained by the polygon on the other tile
  * 
  * 
  * A process for stitching tiles together is:
@@ -109,7 +109,7 @@ function computeFeatureUuid(feature) {
 
 }
 
-  // Get bounds by calling map.unproject() on each corner of the viewport
+// Get bounds by calling map.unproject() on each corner of the viewport
 export function getMapRealBounds(map) {
   const canvas = map.getCanvas();
   const w = canvas.width;
@@ -122,14 +122,18 @@ export function getMapRealBounds(map) {
   const coordinates = [cUL, cUR, cLR, cLL, cUL];
   return polygon([coordinates]);
 }
-export function getRenderedFeatures(map, options) {
 
+let processCounter = 0;
+export async function getRenderedFeatures(map, options) {
+  processCounter += 1;
+  const currentProcessId = processCounter;
+  // console.log('getRenderedFeatures', processCounter, currentProcessId);
   // const visibleTiles = new Set();
   const renderedFeatures = map.queryRenderedFeatures(options).map(f => {
     f.properties.id = f.id;
     f.properties.x = f._vectorTileFeature._x;
     f.properties.y = f._vectorTileFeature._y;
-    f.properties.sourceLayer= f.sourceLayer;
+    f.properties.sourceLayer = f.sourceLayer;
     // visibleTiles.add(`${f._vectorTileFeature._x}-${f._vectorTileFeature._y}`);
     return {
       // _vectorTileFeature: f._vectorTileFeature,
@@ -162,7 +166,7 @@ export function getRenderedFeatures(map, options) {
 
   // console.log('renderedFeatures=', renderedFeatures);
 
-  const finalGeometries = stitch(renderedFeatures, tiles, mapBounds);
+  const finalGeometries = await stitch(renderedFeatures, tiles, mapBounds, currentProcessId);
 
   // tiles.forEach(t => {
   //   finalGeometries.splice(0, 0, t.polyBuffer);
@@ -170,7 +174,11 @@ export function getRenderedFeatures(map, options) {
   return finalGeometries;
 }
 
-export function stitch(renderedFeatures, tiles, mapBounds) {
+export function cancelStitch() {
+  processCounter += 1;
+}
+
+export async function stitch(renderedFeatures, tiles, mapBounds, currentProcessId) {
   // console.log('mapBounds=', mapBounds);
   // console.log('tiles=', tiles);
   const cuts = { 'h': [], 'v': [] };
@@ -222,6 +230,9 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
     return true;
   });
 
+  await yieldToMain();
+  if (currentProcessId !== processCounter) return null;
+
   const allLines = explodeGeometry(renderedFeatures, "LineString").filter(feature => {
     if (feature.properties.brunnel === "tunnel") return false;
     feature.boundingBox = bbox(feature);
@@ -230,6 +241,9 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
     return true;
   });
 
+  await yieldToMain();
+  if (currentProcessId !== processCounter) return null;
+
   let i = 0;
   [...allPolygons, ...allLines].forEach(feature => {
     feature.properties.computedId = getComputedId(feature);
@@ -237,19 +251,26 @@ export function stitch(renderedFeatures, tiles, mapBounds) {
     computeFeatureUuid(feature);
   });
 
+  await yieldToMain();
+  if (currentProcessId !== processCounter) return null;
+
 
   // console.log("allLines=", allLines);
   // console.log("allPolygons=", allPolygons);
+  const stichedLines = await stitchLines(allLines, cuts, deadZones, tiles, currentProcessId);
+  if (stichedLines === null) return null;
+  const stichedPolygons = await stitchPolygons(allPolygons, cuts, deadZones, tiles, currentProcessId);
+  if (stichedPolygons === null) return null;
   return [
-    ...explodeGeometry(stitchPolygons(allPolygons, cuts, deadZones, tiles), "Polygon"),
-    ...stitchLines(allLines, cuts, deadZones, tiles)
+    ...explodeGeometry(stichedPolygons, "Polygon"),
+    ...stichedLines
   ];
 }
 
 function explodeGeometry(geometries, type = 'LineString') {
   const multiType = `Multi${type}`;
   const exploded = [];
-  
+
   geometries.forEach(feature => {
     if (feature.layer) {
       feature.properties.mapLayerId = feature.layer.id;
@@ -276,12 +297,13 @@ function explodeGeometry(geometries, type = 'LineString') {
   return exploded;
 }
 
-function stitchLines(allLines, cuts, deadZones, tiles) {
+async function stitchLines(allLines, cuts, deadZones, tiles, currentProcessId) {
   const featuresByClass = groupBy(allLines, f => f.properties.computedId);
   // console.log('featuresByClass', featuresByClass);
   const finalFeatures = [];
 
-  Object.entries(featuresByClass).forEach(([computedId, lines]) => {
+  for (const lines of Object.values(featuresByClass)) {
+
     // console.log(computedId);
     // if (computedId !== "transportation-primary") return;
     // console.log("lines", JSON.parse(JSON.stringify(lines)));
@@ -320,12 +342,16 @@ function stitchLines(allLines, cuts, deadZones, tiles) {
     }
 
     // console.log("linesToStitch", linesToStitch);
-    finalFeatures.push(...mergeLineStrings(linesToStitch));
-  });
+    const mergedLines = mergeLineStrings(linesToStitch);
+    finalFeatures.push(...mergedLines);
+
+    await yieldToMain();
+    if (currentProcessId !== processCounter) return null;
+  }
   return finalFeatures;
 }
 
-function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
+async function stitchPolygons(allPolygons, cuts, deadZones, tiles, currentProcessId) {
 
   const featuresByClass = groupBy(allPolygons, (f) => f.properties.computedId);
 
@@ -334,7 +360,7 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
   // console.log("tolerance", cuts.tolerance, cuts.zoom);
 
   const mergedFeatures = [];
-  Object.values(featuresByClass).forEach(layerPolygons => {
+  for (const layerPolygons of Object.values(featuresByClass)) {
 
     // console.log("layerPolygons=", layerPolygons);
 
@@ -438,17 +464,20 @@ function stitchPolygons(allPolygons, cuts, deadZones, tiles) {
       const groupArr = [...group];
       const polygons = featureCollection(groupArr.map(polygonIndex => layerPolygons[polygonIndex]));
       const stitched = union(polygons, { properties: layerPolygons[groupArr[0]].properties });
+      await yieldToMain();
+      if (currentProcessId !== processCounter) return null;
       computeFeatureUuid(stitched);
       finalPolygons.push(stitched)
     }
 
     // console.log('finalPolygons=', finalPolygons);
     mergedFeatures.push(...finalPolygons);
-
+    await yieldToMain();
+    if (currentProcessId !== processCounter) return null;
     // for (const deadZone of deadZones) {
     //   mergedFeatures.push(bboxPolygon(deadZone.bbox, { properties: { deadZone: true } }));
     // }
-  });
+  }
   return mergedFeatures;
 }
 

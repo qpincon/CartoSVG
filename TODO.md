@@ -86,7 +86,7 @@
 - [x] Delay optimizing content of <image> at export time (for performance)
 
 - [x] ISE open on click
-- [ ] Check export endpoint hit
+- [x] Check export endpoint hit
 - [x] Micro: Store position (lat / lnt / zoom / pitch / bearing)
 - [x] Micro: Lock / unlock mechanism (allow map drag when on SVG) 
 - [x] Micro: Layers in "layers" tab
@@ -95,7 +95,7 @@
 - [ ] Micro: Check building to merge if below other buidling
 - [x] Micro: Railway layer 
 - [x] Micro: MapTiler + OSM attribution 
-- [ ] Micro: OSM attribution on exported file 
+- [x] Micro: OSM attribution on exported file 
 - [x] Micro: Persist currentMode in state
 - [x] Micro: remove forward element on hover
 - [x] Micro: Order building layer elements by height
@@ -113,13 +113,13 @@
     - [x] Bind style change from ISE to layer stroke / fill color 
     - [ ] Noise?
 - [x] Micro: Make "other" layer work
-- [ ] Micro: Preset palette selection
+- [x] Micro: Preset palette selection
 - [x] Micro: Background colors customization (as non-disableable layer )
 - [x] Micro: Background contour padding
 - [x] Micro: Animation on visible 
 - [x] Micro: Export (CSS + font, no tooltip mechanism)
 - [x] Micro: Bonus: cut geometries outside of border when high border radius
-- [ ] Micro: Bonus: Freehand drawing: https://github.com/steveruizok/perfect-freehand?tab=readme-ov-file
+- [x] Micro: Bonus: Freehand drawing: https://github.com/steveruizok/perfect-freehand?tab=readme-ov-file
 - [ ] Micro: Bonus: Stitch / polygon merge in web workers
 - [x] Micro: Bonus: Stroke width far from camera when pitch thinner
 - [x] Micro: Bonus: More patterns!
@@ -132,4 +132,5 @@
 - [ ] Freehand: Allow drag drawing
 - [ ] Freehand: Allow deletion
 - [ ] Double click text edit prevent ISE
+- [ ] Micro: 3d elements (see maplibre 3D model demo)
 

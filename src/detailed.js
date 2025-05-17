@@ -62,14 +62,16 @@ export function orderFeaturesByLayer(features) {
 //     return roadMinorStrokeWidth(zoom);
 // }
 
-export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions, generalParams, isLocked) {
-    console.log('layerDefinitions=', layerDefinitions);
+export async function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions, generalParams, isLocked) {
+    // console.log('layerDefinitions=', layerDefinitions);
     const mapLibreContainer = select('#maplibre-map');
     const layersToQuery = interestingBasicV2Layers.filter(layer => {
         return layerDefinitions[kebabCase(layer)]?.active !== false;
     });
     updateSvgPatterns(svg.node(), layerDefinitions);
-    const geometries = getRenderedFeatures(maplibreMap, { layers: layersToQuery });
+    const geometries = await getRenderedFeatures(maplibreMap, { layers: layersToQuery });
+    // Process got interrupted, a new call to this function is coming soom
+    if (geometries === null) return;
     orderFeaturesByLayer(geometries);
     // console.log('geometries', geometries);
 
@@ -131,7 +133,7 @@ export function drawPrettyMap(maplibreMap, svg, d3PathFunction, layerDefinitions
                 toRemove.push(el);
             }
         });
-        console.log('toRemove', toRemove);
+        // console.log('toRemove', toRemove);
         toRemove.forEach(el => el.remove());
     }, 100);
 }

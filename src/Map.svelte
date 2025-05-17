@@ -51,6 +51,7 @@ import { Map } from 'maplibre-gl';
 import MicroLayerParams from './components/MicroLayerParams.svelte';
 import * as microPalettes from "./microPalettes";
 import { FreehandDrawer} from './svg/freeHandDraw'
+    import { cancelStitch } from './util/geometryStitch';
 
 const scalesHelp = `
 <div class="inline-tooltip">  
@@ -458,7 +459,6 @@ function lockUnlock(isLocked) {
     }
 }
 
-const drawDebounced = debounce(draw, 700);
 function createMaplibreMap() {
     maplibreMap = new Map({
         container: "maplibre-map", 
@@ -481,12 +481,14 @@ function createMaplibreMap() {
                 bearing: maplibreMap.getBearing(),
             }
         }
-        drawDebounced();
+        // drawDebounced();
+        draw();
     });
 
     maplibreMap.on('movestart', (event) => {
-        console.log('movestart');
+        // console.log('movestart');
         if (currentMode !== "micro") return;
+        cancelStitch();
         d3.select('#maplibre-map').style('opacity', 1);
     });
 
