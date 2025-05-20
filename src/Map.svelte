@@ -90,14 +90,16 @@ const resolvedAdmTopo = {};
 const countriesAdm1Resolve = require.context('./assets/layers/adm1/', false, /\..*json$/, 'lazy');
 const availableCountriesAdm1 = countriesAdm1Resolve.keys().reduce((acc, file) => {
     const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
-    acc[`${iso3DataById[name]?.name} ADM1`] = file;
+    const resolvedName = iso3DataById[name]?.name;
+    if (resolvedName) acc[`${resolvedName} ADM1`] = file;
     return acc;
 }, {});
 
 const countriesAdm2Resolve = require.context('./assets/layers/adm2/', false, /\..*json$/, 'lazy');
 const availableCountriesAdm2 = countriesAdm2Resolve.keys().reduce((acc, file) => {
     const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
-    acc[`${iso3DataById[name]?.name} ADM2`] = file
+    const resolvedName = iso3DataById[name]?.name;
+    if (resolvedName) acc[`${resolvedName} ADM2`] = file;
     return acc;
 }, {});
 const allAvailableAdm = [...Object.keys(availableCountriesAdm1), ...Object.keys(availableCountriesAdm2)].sort();
@@ -168,7 +170,8 @@ function updateAdm0LandAndCountries() {
     const firstKey = Object.keys(simplified.objects)[0];
     countries = topojson.feature(simplified, simplified.objects[firstKey]);
     countries.features.forEach(feat => {
-        feat.properties = iso3DataById[feat.properties['shapeGroup']] || {};
+        const propertiesFromIso = iso3DataById[feat.properties['shapeGroup']];
+        feat.properties = propertiesFromIso || feat.properties;
     });
     land = topojson.merge(simplified, simplified.objects[firstKey].geometries);
     land = splitMultiPolygons({type: 'FeatureCollection', features: [{type:'Feature', geometry: {...land} }]}, 'land');

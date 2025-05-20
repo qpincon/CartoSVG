@@ -120,17 +120,50 @@
 - [x] Micro: Export (CSS + font, no tooltip mechanism)
 - [x] Micro: Bonus: cut geometries outside of border when high border radius
 - [x] Micro: Bonus: Freehand drawing: https://github.com/steveruizok/perfect-freehand?tab=readme-ov-file
-- [ ] Micro: Bonus: Stitch / polygon merge in web workers
+- [-] Micro: Bonus: Stitch / polygon merge in web workers
 - [x] Micro: Bonus: Stroke width far from camera when pitch thinner
 - [x] Micro: Bonus: More patterns!
 - [ ] Micro: New front page
 - [x] Micro: Debug right click
 - [x] Micro: Fill pattern hover
-- [ ] Micro: Stop computations when moving
+- [x] Micro: Stop computations when moving
 - [ ] Remove labels off canvas
 - [ ] Freehand: style group with ISE (add custom CSS rule on the fly on <g> parent)
 - [ ] Freehand: Allow drag drawing
 - [ ] Freehand: Allow deletion
 - [ ] Double click text edit prevent ISE
 - [ ] Micro: 3d elements (see maplibre 3D model demo)
+- [ ] Show tooltip conditionnaly
+- [ ] Tooltip creation: Use WYSIWYG editor
+- [ ] Allow tooltip creation on single element
+- [ ] Draw pin on map / any imported image (URL or uploaded as b64, must be < some size in kb)
+- [ ] Data export: remove empty objects
+- [ ] Data import / export: Move into modal
+- [ ] Data edition: allow inline edition with a lightweight grid edition sofware (lazy-loaded)
+- [ ] Top space above "Max legend width"
+
+- [ ] Geoboundaries: give name to disputed territories
+- [ ] Geoboundaries: attribution to exported file
+- [ ] Geoboundaries: remove job (or just send an alert)
+- [ ] "No data color" should be available in "color using data"
+- [ ] ISE: 
+  - clearer wording (stroke-width -> Stroke Width)
+  - stroke / fill -> "Stroke / Fill color"
+  - Color picker below, not to side
+  - Allow text mapping ('inline' -> "France", ".country" -> "All countries", ".country:hover": "Countries hover)
+  - Change "rule" to dropdown select
+  - Allow parametrization of modal width
+  - Callback function to allow to go up the DOM tree of selected element
+
+- [ ] Separate (lazy-load) micro and macro
+- [ ] Migrate to svelte 5
+- [ ] Use typescript
+- [ ] Use svelte/kit
+    - disable cloudflare deployment
+- [ ] Use vite
+  - require.context => import.meta.glob
+  - HtmlWebpackPlugin -> new FrontPage component
+  - Inline imports -> ?raw (https://vite.dev/guide/assets)
+
+
 
