@@ -1,19 +1,21 @@
 import * as d3 from "d3";
 import bg from '../assets/img/bg.png?inline';
-import plaid from '../assets/img/plaid.jpg';
+import type {Color, SvgSelection} from '../types';
+import type { GlowParams } from "src/params";
+// import plaid from '../assets/img/plaid.jpg';
 
-function appendGlow(selection, id = "glows", displaySource = false,
+export function appendGlow(selection: SvgSelection, id = "glows", displaySource = false,
     {
         innerBlur, innerStrength, innerColor,
         outerBlur, outerStrength, outerColor,
-    }
+    } : GlowParams
 ) {
     const colorInner = d3.rgb(innerColor);
     const colorOuter = d3.rgb(outerColor);
     const existing = d3.select(`#${id}`);
     if (!existing.empty()) existing.remove();
     let defs = selection.select('defs');
-    if (defs.empty()) defs = selection.append('defs')
+    if (defs.empty()) defs = selection.append('defs') as unknown as SvgSelection;
     const filter = defs.append('filter').attr('id', id).attr('filterUnits', 'userSpaceOnUse');
 
     // OUTER GLOW
@@ -86,9 +88,9 @@ function appendGlow(selection, id = "glows", displaySource = false,
     defs.append(() => filter.node());
 }
 
-function appendBgPattern(selection, id, seaColor, backgroundNoise = false, imageSize = 60) {
+export function appendBgPattern(selection: SvgSelection, id: string, seaColor: Color, backgroundNoise = false, imageSize = 60) {
     let defs = selection.select('defs');
-    if (defs.empty()) defs = selection.append('defs')
+    if (defs.empty()) defs = selection.append('defs') as unknown as SvgSelection;
     const existing = d3.select(`#${id}`);
     if (!existing.empty()) existing.remove();
 
@@ -112,9 +114,9 @@ function appendBgPattern(selection, id, seaColor, backgroundNoise = false, image
 }
 
 
-function appendClip(selection, width, height, rectRadius, x=0, y=0) {
+export function appendClip(selection: SvgSelection, width: number, height: number, rectRadius: number, x=0, y=0) {
     let defs = selection.select('defs');
-    if (defs.empty()) defs = selection.append('defs');
+    if (defs.empty()) defs = selection.append('defs') as unknown as SvgSelection;
     const existing = d3.select('#clipMapBorder');
     if (!existing.empty()) existing.remove();
     const clip = defs.append('clipPath')
@@ -129,68 +131,65 @@ function appendClip(selection, width, height, rectRadius, x=0, y=0) {
         .attr('y', y);
 }
 
-function frontFilter(selection) {
-    let defs = selection.select('defs');
-    if (defs.empty()) defs = selection.append('defs');
-    const filter = defs.append('filter').attr('id', 'front-filter')
-        .attr('x', '-50%')
-        .attr('y', '-50%')
-        .attr('width', '200%')
-        .attr('height', '200%');
+// function frontFilter(selection) {
+//     let defs = selection.select('defs');
+//     if (defs.empty()) defs = selection.append('defs');
+//     const filter = defs.append('filter').attr('id', 'front-filter')
+//         .attr('x', '-50%')
+//         .attr('y', '-50%')
+//         .attr('width', '200%')
+//         .attr('height', '200%');
 
-    filter.node().innerHTML = `
-    <feImage xlink:href="${plaid}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="BG"></feImage>
-    <feBlend in="BG" in2="SourceGraphic" mode="multiply" result="BLENDED_TEXT"></feBlend>
-    <!-- layer the text on top of the background image -->
-    `;
-}
+//     filter.node().innerHTML = `
+//     <feImage xlink:href="${plaid}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="BG"></feImage>
+//     <feBlend in="BG" in2="SourceGraphic" mode="multiply" result="BLENDED_TEXT"></feBlend>
+//     <!-- layer the text on top of the background image -->
+//     `;
+// }
 
-function frontFilterOld(selection) {
-    let defs = selection.select('defs');
-    if (defs.empty()) defs = selection.append('defs');
-    const filter = defs.append('filter').attr('id', 'front-filter')
-        .attr('x', '-50%')
-        .attr('y', '-50%')
-        .attr('width', '200%')
-        .attr('height', '200%');
+// function frontFilterOld(selection) {
+//     let defs = selection.select('defs');
+//     if (defs.empty()) defs = selection.append('defs');
+//     const filter = defs.append('filter').attr('id', 'front-filter')
+//         .attr('x', '-50%')
+//         .attr('y', '-50%')
+//         .attr('width', '200%')
+//         .attr('height', '200%');
 
-    filter.node().innerHTML = `<feImage xlink:href="${plaid}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none"></feImage>
-    <!-- desaturate the image -->
-    <feColorMatrix type="saturate" values="0" result="MAP"></feColorMatrix>
-    <!-- decrease level of details so the effect on text is more realistic -->
+//     filter.node().innerHTML = `<feImage xlink:href="${plaid}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none"></feImage>
+//     <!-- desaturate the image -->
+//     <feColorMatrix type="saturate" values="0" result="MAP"></feColorMatrix>
+//     <!-- decrease level of details so the effect on text is more realistic -->
     
-    <!-- use the displacement map to distort the text -->
-    <feDisplacementMap in="SourceGraphic" in2="MAP" scale="15" xChannelSelector="R" yChannelSelector="R" result="TEXTURED_TEXT"></feDisplacementMap>
-    <!-- add the image as a background behind the text again -->
-    <feImage xlink:href="${plaid}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="BG"></feImage>
-    <feColorMatrix in="TEXTURED_TEXT" result="TEXTURED_TEXT_2" type="matrix" values="1 0 0 0 0 
-            0 1 0 0 0 
-            0 0 1 0 0 
-            0 0 0 .9 0"></feColorMatrix>
-    <!--  blend the text with the background image -->
-    <feBlend in="BG" in2="TEXTURED_TEXT_2" mode="multiply" result="BLENDED_TEXT"></feBlend>
-    <!-- layer the text on top of the background image -->
-    <feMerge>
-        <feMergeNode in="BG"></feMergeNode>
-        <feMergeNode in="BLENDED_TEXT"></feMergeNode>
-    </feMerge>`;
-}
+//     <!-- use the displacement map to distort the text -->
+//     <feDisplacementMap in="SourceGraphic" in2="MAP" scale="15" xChannelSelector="R" yChannelSelector="R" result="TEXTURED_TEXT"></feDisplacementMap>
+//     <!-- add the image as a background behind the text again -->
+//     <feImage xlink:href="${plaid}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="BG"></feImage>
+//     <feColorMatrix in="TEXTURED_TEXT" result="TEXTURED_TEXT_2" type="matrix" values="1 0 0 0 0 
+//             0 1 0 0 0 
+//             0 0 1 0 0 
+//             0 0 0 .9 0"></feColorMatrix>
+//     <!--  blend the text with the background image -->
+//     <feBlend in="BG" in2="TEXTURED_TEXT_2" mode="multiply" result="BLENDED_TEXT"></feBlend>
+//     <!-- layer the text on top of the background image -->
+//     <feMerge>
+//         <feMergeNode in="BG"></feMergeNode>
+//         <feMergeNode in="BLENDED_TEXT"></feMergeNode>
+//     </feMerge>`;
+// }
 
-function frontFilterTest(selection) {
-    let defs = selection.select('defs');
-    if (defs.empty()) defs = selection.append('defs');
-    const filter = defs.append('filter').attr('id', 'front-filter');
+// export function frontFilterTest(selection) {
+//     let defs = selection.select('defs');
+//     if (defs.empty()) defs = selection.append('defs');
+//     const filter = defs.append('filter').attr('id', 'front-filter');
 
-    filter.node().innerHTML = `<feImage xlink:href="${plaid}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="IMAGE"></feImage>
-    <!-- desaturate the image -->
-    <feColorMatrix in="IMAGE" values=".33 .33 .33 0 0
-                            .33 .33 .33 0 0
-                            .33 .33 .33 0 0
-                            0   0   0  0.5 0"
-        result="DESATURATED"></feColorMatrix>
-    <feComposite in="SourceGraphic" in2="DESATURATED" operator="in"></feComposite>
-`;
-
-}
-
-export { appendGlow, appendBgPattern, frontFilter, frontFilterTest, appendClip }; 
+//     filter.node().innerHTML = `<feImage xlink:href="${plaid}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="IMAGE"></feImage>
+//     <!-- desaturate the image -->
+//     <feColorMatrix in="IMAGE" values=".33 .33 .33 0 0
+//                             .33 .33 .33 0 0
+//                             .33 .33 .33 0 0
+//                             0   0   0  0.5 0"
+//         result="DESATURATED"></feColorMatrix>
+//     <feComposite in="SourceGraphic" in2="DESATURATED" operator="in"></feComposite>
+// `;
+// }

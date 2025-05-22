@@ -19,7 +19,7 @@ const config = {
         alias: {
             svelte: path.resolve('node_modules', 'svelte')
         },
-        extensions: ['.js', '.svelte'],
+        extensions: ['.ts', '.mjs', '.js', '.svelte'],
         mainFields: ['svelte', 'browser', 'module', 'main']
     },
     output: {
@@ -51,9 +51,10 @@ const config = {
                     loader: 'svelte-loader',
                     options: {
                         compilerOptions: {
-                            dev: !isProduction
+                            dev: !isProduction,
                         },
                         preprocess: sveltePreprocess({
+                            typescript: true,
                             scss: {
                                 renderSync: true,
                             },
@@ -99,9 +100,9 @@ const config = {
         new NodePolyfillPlugin(),
         new CopyPlugin({
             patterns: [
-              { from: "ele", to: "ele" },
+                { from: "ele", to: "ele" },
             ],
-          }),
+        }),
         new HtmlWebpackPlugin({
             template: './src/index.ejs',
             title: 'CartoSVG - Design gorgeous interactive maps',

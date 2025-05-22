@@ -1,7 +1,7 @@
-import Tooltip from 'bootstrap/js/dist/tooltip';
+import { Tooltip } from 'bootstrap';
 import { formatLocale } from "d3";
 
-function download(content, mimeType, filename) {
+export function download(content: string, mimeType: string, filename: string): void {
     const a = document.createElement('a');
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
@@ -10,8 +10,8 @@ function download(content, mimeType, filename) {
     a.click();
 }
 
-function downloadURI(uri, filename) {
-    var link = document.createElement("a");
+export function downloadURI(uri: string, filename: string): void {
+    const link = document.createElement("a");
     link.setAttribute('download', filename);
     link.href = uri;
     document.body.appendChild(link);
@@ -19,44 +19,44 @@ function downloadURI(uri, filename) {
     link.remove();
 }
 
-function capitalizeFirstLetter(str) {
+export function capitalizeFirstLetter(str: string): string {
     return str[0].toUpperCase() + str.slice(1);
 }
 
-function camelCaseToSentence(str) {
+export function camelCaseToSentence(str: string): string {
     const splitted = str.replace(/([A-Z])/g, ' $1').trim().toLowerCase();
     return capitalizeFirstLetter(splitted);
 }
 
-function htmlToElement(html) {
-    if (!html) return;
-    var template = document.createElement('template');
+export function htmlToElement(html: string): ChildNode | null {
+    if (!html) return null;
+    const template = document.createElement('template');
     html = html.trim(); // Never return a text node of whitespace as the result
     template.innerHTML = html;
     return template.content.firstChild;
 }
 
-function nbDecimals(num) {
+export function nbDecimals(num: number): number {
     const splited = num.toString().split('.');
     if (splited.length === 1) return 1;
-    return num.toString().split('.')[1].length;
+    return splited[1].length;
 }
 
-function indexBy(data, col) {
+export function indexBy<T>(data: T[], col: keyof T): Record<string, T> {
     return data.reduce((acc, cur) => {
-        acc[cur[col]] = cur;
+        acc[String(cur[col])] = cur;
         return acc;
-    }, {});
+    }, {} as Record<string, T>);
 }
 
-function pick(obj, keys) {
+export function pick<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
     return keys.reduce((picked, curKey) => {
         picked[curKey] = obj[curKey];
         return picked;
-    }, {});
+    }, {} as Pick<T, K>);
 }
 
-function sortBy(data, key) {
+export function sortBy<T>(data: T[], key: keyof T): T[] | undefined {
     if (!data) return;
     return data.sort((a, b) => {
         if (!a || Object.keys(a).length === 0) return 1;
@@ -67,16 +67,16 @@ function sortBy(data, key) {
     });
 }
 
-function getNumericCols(jsonData) {
-    const nonNumericoCols = new Set();
-    const allCols = new Set();
-    const colWithNullOrUndef = new Set();
+export function getNumericCols(jsonData: Record<string, any>[]): { column: string; hasNull: boolean }[] {
+    const nonNumericoCols = new Set<string>();
+    const allCols = new Set<string>();
+    const colWithNullOrUndef = new Set<string>();
     for (const row of jsonData) {
         Object.entries(row).forEach(([key, value]) => {
             allCols.add(key);
             const isNullOrUndef = value === undefined || value === null;
-            if (isNullOrUndef) colWithNullOrUndef(key);
-            if (!isNullOrUndef && typeof (value) !== 'number') nonNumericoCols.add(key);
+            if (isNullOrUndef) colWithNullOrUndef.add(key);
+            if (!isNullOrUndef && typeof value !== 'number') nonNumericoCols.add(key);
         });
     }
     return [...allCols].reduce((acc, col) => {
@@ -86,48 +86,47 @@ function getNumericCols(jsonData) {
             hasNull: colWithNullOrUndef.has(col),
         });
         return acc;
-    }, []);
+    }, [] as { column: string; hasNull: boolean }[]);
 }
 
-function getColumns(data) {
+export function getColumns(data: Record<string, any>[]): string[] {
     if (!data.length) return [];
-    const cols = new Set();
+    const cols = new Set<string>();
     data.forEach(row => {
         Object.keys(row).forEach(col => cols.add(col));
     });
     return [...cols];
 }
 
-function findProp(propName, obj) {
-    if (propName in obj) return obj[propName];
-    for (let v of Object.values(obj)) {
-        if (typeof v === 'object') {
+export function findProp<T>(propName: string, obj: Iterable<unknown>): any {
+    if (propName in obj) return (obj as any)[propName];
+    for (const v of Object.values(obj)) {
+        if (typeof v === 'object' && v !== null) {
             const found = findProp(propName, v);
             if (found !== undefined) return found;
         }
     }
 }
 
-
-function initTooltips() {
+export function initTooltips(): void {
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     [...tooltipTriggerList].map(tooltipTriggerEl => {
         const isHtml = tooltipTriggerEl.hasAttribute('allow-html');
-        new Tooltip(tooltipTriggerEl, { placement: 'top', html: isHtml, customClass: isHtml ? 'big-tooltip' : '' })
+        new Tooltip(tooltipTriggerEl as HTMLElement, { placement: 'top', html: isHtml, customClass: isHtml ? 'big-tooltip' : '' });
     });
 }
 
-function getBestFormatter(values, locale) {
+export function getBestFormatter(values: number[], locale: any): (n: number) => string {
     const loc = formatLocale(locale);
     const max = Math.max(...values);
-    if (max < 10) return format(',.1~f');
-    if (max < 1) return format(',.2~f');
+    if (max < 10) return loc.format(',.1~f');
+    if (max < 1) return loc.format(',.2~f');
     return loc.format(',~d');
 }
 
-function tapHold(node, threshold = 300) {
+export function tapHold(node: HTMLElement, threshold = 300): { destroy: () => void } {
     const handleMouseDown = () => {
-        let intervalTimeout;
+        let intervalTimeout: NodeJS.Timeout | undefined;
         const tapTimeout = setTimeout(() => {
             intervalTimeout = setInterval(() => {
                 node.dispatchEvent(new CustomEvent('hold'));
@@ -141,7 +140,7 @@ function tapHold(node, threshold = 300) {
         };
         node.addEventListener('mousemove', cancel);
         node.addEventListener('mouseup', cancel);
-    }
+    };
 
     node.addEventListener('mousedown', handleMouseDown);
     return {
@@ -151,49 +150,41 @@ function tapHold(node, threshold = 300) {
     };
 }
 
-function RGBAToHexA(rgba, forceRemoveAlpha = false) {
+export function RGBAToHexA(rgba: string, forceRemoveAlpha = false): string {
     return "#" + rgba.replace(/^rgba?\(|\s+|\)$/g, '') // Get's rgba / rgb string values
-      .split(',') // splits them at ","
-      .filter((string, index) => !forceRemoveAlpha || index !== 3)
-      .map(string => parseFloat(string)) // Converts them to numbers
-      .map((number, index) => index === 3 ? Math.round(number * 255) : number) // Converts alpha to 255 number
-      .map(number => number.toString(16)) // Converts numbers to hex
-      .map(string => string.length === 1 ? "0" + string : string) // Adds 0 when length of one number is 1
-      .join("") // Puts the array to togehter to a string
-  }
-
-
-const chars = 'azertyuiopqsdfghjklmwxcvbn-_';
-function randomString(length) {
-    var result = '';
-    for (var i = length; i > 0; --i) result += chars[Math.floor(Math.random() * chars.length)];
-    return result;
+        .split(',') // splits them at ","
+        .filter((string, index) => !forceRemoveAlpha || index !== 3)
+        .map(string => parseFloat(string)) // Converts them to numbers
+        .map((number, index) => index === 3 ? Math.round(number * 255) : number) // Converts alpha to 255 number
+        .map(number => number.toString(16)) // Converts numbers to hex
+        .map(string => string.length === 1 ? "0" + string : string) // Adds 0 when length of one number is 1
+        .join(""); // Puts the array together to a string
 }
 
-
+const chars = 'azertyuiopqsdfghjklmwxcvbn-_';
+function randomString(length: number): string {
+    let result = '';
+    for (let i = length; i > 0; --i) result += chars[Math.floor(Math.random() * chars.length)];
+    return result;
+}
 // see https://stackoverflow.com/a/12578281
 const cssSelectorRegex = /([^\r\n,{}]+)(,(?=[^}]*{)|\s*{)/gm;
 // will
 // - Generate a unique ID for the map 
 // - Replace #static-svg-map with this ID
 // - Prefix all selectors from provided CSS with generated ID
-function discriminateCssForExport(cssToTransform) {
+export function discriminateCssForExport(cssToTransform: string): { mapId: string; finalCss: string } {
     const id = randomString(10);
     cssToTransform = cssToTransform.replaceAll('#static-svg-map', `#${id}`);
-    const replacer = (group) => {
+    const replacer = (group: string): string => {
         if (group.includes('animate')) return group;
         if (group.includes(id)) return group;
         if (group.includes('@keyframes') || group.includes('from {') || group.includes('to {')) return group;
         return `#${id} ${group}`;
-    }
+    };
     let transformed = cssToTransform.replaceAll(cssSelectorRegex, replacer);
-    /** Transform url(#...) styles */
     transformed = transformed.replaceAll(/url\("?#(.*?)"?\)/g, (g, capture1) => {
-        return `url(#${id}-${capture1})`
+        return `url(#${id}-${capture1})`;
     });
-    return {mapId: id, finalCss: transformed };
+    return { mapId: id, finalCss: transformed };
 }
-
-export { findProp, download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, 
-    sortBy, pick, htmlToElement, getNumericCols, initTooltips, getBestFormatter, tapHold, RGBAToHexA, getColumns,
-    discriminateCssForExport };

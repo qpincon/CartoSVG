@@ -24,4 +24,8 @@
     "a11y-missing-content": "ignore",
     "a11y-click-events-have-key-events": "ignore",
   },
+  "editor.formatOnSave": true,
+  "[svelte]": {
+    "editor.defaultFormatter": "svelte.svelte-vscode"
+  }
 }
