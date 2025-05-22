@@ -37,9 +37,6 @@ text {
     stroke-linejoin: round;
 }
 
-.country:hover{
-    fill: #f9f2eb;
-}
 .country.hovered {
     fill: #f9f2eb;
 }
@@ -51,11 +48,6 @@ text {
     stroke-linejoin: round;
 }
 
-.adm:hover {
-    stroke: #d29d52ff;
-    fill: #ecd6b6ff;
-    stroke-width: 2px;
-}
 .adm.hovered {
     stroke: #d29d52ff;
     fill: #ecd6b6ff;

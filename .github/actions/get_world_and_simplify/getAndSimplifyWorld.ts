@@ -16,7 +16,7 @@ async function getWorldTopojson(){
     simplified = JSON.parse(Buffer.from(simplified['output.geojson']).toString('utf-8'));
     fs.writeFileSync(`${assetsPath}/adm1_simplified.geojson`, JSON.stringify(simplified));
 
-    await mapshaper.runCommands(`-i ${assetsPath}/adm1_simplified.geojson -dissolve shapeGroup -clean -o quantization=100000000000 ${assetsPath}/world_adm0_simplified.topojson`);
+    await mapshaper.runCommands(`-i ${assetsPath}/adm1_simplified.geojson -dissolve shapeGroup where='shapeType!="DISP"' -clean -o quantization=100000000000 ${assetsPath}/world_adm0_simplified.topojson`);
     await mapshaper.runCommands(`-i ${assetsPath}/world_adm0_simplified.topojson -simplify 10% -dissolve -clean -o quantization=100000000000 ${assetsPath}/world_land_very_simplified.topojson`);
     fs.mkdirSync(`${assetsPath}/adm1`);
     await mapshaper.runCommands(`-i ${assetsPath}/adm1_simplified.geojson -split shapeGroup -o format=topojson singles quantization=100000000000 ${assetsPath}/adm1/`);

@@ -70,4 +70,4 @@
     }
 </script>
     
-<div bind:this={self} ></div>
+<div bind:this={self} style="position: absolute;" ></div>

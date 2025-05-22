@@ -3,6 +3,7 @@ const sveltePreprocess = require('svelte-preprocess');
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const fs = require('fs');
+// const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 const CopyPlugin = require("copy-webpack-plugin");
 
 const examplesMeta = JSON.parse(fs.readFileSync('./examples.json'));
@@ -94,6 +95,7 @@ const config = {
         ],
     },
     plugins: [
+        // new BundleAnalyzerPlugin(),
         new NodePolyfillPlugin(),
         new CopyPlugin({
             patterns: [

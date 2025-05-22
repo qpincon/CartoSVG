@@ -1,4 +1,5 @@
-let defaultParams = {
+
+const defaultParams = {
     General: {
         width: 600,
         height: 670,
@@ -35,18 +36,35 @@ let defaultParams = {
     },
 }
 
+const microDefaultParams = {
+    General: {
+        width: 700,
+        height: 700,
+        useViewBox: false,
+        animate: false,
+    },
+    Border: {
+        borderRadius: 1.5,
+        borderPadding: 15,
+        borderWidth: 1,
+        borderColor: "#b8b8b8",
+        frameShadow: true,
+    },
+};
+
 const paramDefs = {
-    width:          {type: 'range', min: 100, max: 800},
-    height:         {type: 'range', min: 100, max: 800},
+    width:          {type: 'range', min: 100, max: 1000},
+    height:         {type: 'range', min: 100, max: 1000},
     fieldOfView:    {type: 'range', min: 15, max: 180},
     altitude:       {type: 'range', min: 1, max: 30000, step: 10},
-    innerBlur:           {type: 'range', min: 0, max: 10, step: 0.1},
-    innerStrength:       {type: 'range', min: 0, max: 6, step: 0.1},
+    innerBlur:      {type: 'range', min: 0, max: 10, step: 0.1},
+    innerStrength:  {type: 'range', min: 0, max: 6, step: 0.1},
     graticuleStep:  {type: 'range', min: 0.1, max: 20, step: 0.1},
     borderRadius:   {type: 'range', min: 0, max: 50, step: 0.5},
     borderWidth:    {type: 'range', min: 0, max: 10},
+    borderPadding:  {type: 'range', min: 0, max: 30},
     filter:         {type: 'select', choices: ['none', 'firstGlow', 'secondGlow']},
-    projection:         {type: 'select', choices: ['satellite', 'mercator', 'equalEarth', 'geoNaturalEarth', 'geoAlbersUsa', 'geoBaker']}
+    projection:     {type: 'select', choices: ['satellite', 'mercator', 'equalEarth', 'geoNaturalEarth', 'geoAlbersUsa', 'geoBaker']}
 };
 
 const noSatelliteParams = {
@@ -73,4 +91,4 @@ const helpParams = {
     animate: `The map will animate when entering the viewport on your page. You can turn it off during edition of the map, as it will trigger on every change.`,
 };
 
-export {defaultParams, paramDefs, helpParams, noSatelliteParams };
+export {defaultParams, microDefaultParams, paramDefs, helpParams, noSatelliteParams };

@@ -25,7 +25,7 @@
 - [ ] Add spinner on loading (geosjon / font)
 - [x] Fix dragging created paths
 - [ ] Display labels using projection (how?)
-- [ ] Add credits to:
+- [x] Add credits to:
     - geoboundaries
     - d3
     - github
@@ -58,7 +58,7 @@
 - [ ] Sitemap
 - [x] Allow change fill color for land when base layer
 - [ ] README github: explain how optimizations work
-- [ ] Add example(s)
+- [x] Add example(s)
 - [x] Change default filter 2 
 - [x] Make more fine-tuning altitude/FOV more intuitive
 - [x] Allow minification of JS
@@ -84,3 +84,97 @@
 - [x] Inline style editor: give name to other elements. Add parent <text> element for <tspan>
 - [x] Only include code for tooltip when one tooltip included
 - [x] Delay optimizing content of <image> at export time (for performance)
+
+- [x] ISE open on click
+- [x] Check export endpoint hit
+- [x] Micro: Store position (lat / lnt / zoom / pitch / bearing)
+- [x] Micro: Lock / unlock mechanism (allow map drag when on SVG) 
+- [x] Micro: Layers in "layers" tab
+- [-] Micro: Building with same id = same color 
+- [x] Micro: Check building order with height
+- [ ] Micro: Check building to merge if below other buidling
+- [x] Micro: Railway layer 
+- [x] Micro: MapTiler + OSM attribution 
+- [x] Micro: OSM attribution on exported file 
+- [x] Micro: Persist currentMode in state
+- [x] Micro: remove forward element on hover
+- [x] Micro: Order building layer elements by height
+- [x] Micro: Building: Add 3 classes at random
+- [x] Micro: Allow write labels / add points
+- [x] Micro: Add nominatim search
+- [x] Micro: Save changed CSS
+- [x] Micro: CSS themes as separate .css files
+    - [x] Color + lighter color on hover
+- [x] Micro: Toggle layers 
+- [x] Micro: Layers parametrization
+    - [x] SVG pattern: density + color + width + pattern (/o\*...)
+    - [x] Stroke color + fill color
+    - [x] 3 colors for buildings (3 classes)
+    - [x] Bind style change from ISE to layer stroke / fill color 
+    - [ ] Noise?
+- [x] Micro: Make "other" layer work
+- [x] Micro: Preset palette selection
+- [x] Micro: Background colors customization (as non-disableable layer )
+- [x] Micro: Background contour padding
+- [x] Micro: Animation on visible 
+- [x] Micro: Export (CSS + font, no tooltip mechanism)
+- [x] Micro: Bonus: cut geometries outside of border when high border radius
+- [x] Micro: Bonus: Freehand drawing: https://github.com/steveruizok/perfect-freehand?tab=readme-ov-file
+- [-] Micro: Bonus: Stitch / polygon merge in web workers
+- [x] Micro: Bonus: Stroke width far from camera when pitch thinner
+- [x] Micro: Bonus: More patterns!
+- [ ] Micro: New front page
+- [x] Micro: Debug right click
+- [x] Micro: Fill pattern hover
+- [x] Micro: Stop computations when moving
+- [ ] Remove labels off canvas
+- [ ] Freehand: style group with ISE (add custom CSS rule on the fly on <g> parent)
+- [ ] Freehand: Allow drag drawing
+- [ ] Freehand: Allow deletion
+- [ ] Double click text edit prevent ISE
+- [ ] Micro: 3d elements (see maplibre 3D model demo)
+- [ ] Micro: Use protomaps (upload tiles and configure nginx to serve it, using the pm plugin in the front)
+- [ ] Self-hosting
+- [ ] Show tooltip conditionnaly
+- [ ] Tooltip creation: Use WYSIWYG editor
+- [ ] Allow tooltip creation on single element
+- [ ] Draw pin on map / any imported image (URL or uploaded as b64, must be < some size in kb)
+- [ ] Data export: remove empty objects
+- [ ] Data import / export: Move into modal
+- [ ] Data edition: allow inline edition with a lightweight grid edition sofware (lazy-loaded)
+- [ ] Top space above "Max legend width"
+- [ ] Bootstrap: allow main colors customization
+  - upgrade to 5.3
+  - use color modes
+  - pass mode as input of Map
+- [ ] Macro: Render simplified while changing altitude / fov
+- [ ] Allow external link on click of entity
+- [ ] Text / icons / images / freehand : use https://github.com/daybrush/moveable
+
+
+- [ ] Geoboundaries: give name to disputed territories
+- [ ] Geoboundaries: attribution to exported file
+- [ ] Geoboundaries: remove job (or just send an alert)
+- [ ] "No data color" should be available in "color using data"
+- [ ] ISE: 
+  - clearer wording (stroke-width -> Stroke Width)
+  - stroke / fill -> "Stroke / Fill color"
+  - Color picker below, not to side
+  - Allow text mapping ('inline' -> "France", ".country" -> "All countries", ".country:hover": "Countries hover)
+  - Change "rule" to dropdown select
+  - Allow parametrization of modal width
+  - Callback function to allow to go up the DOM tree of selected element
+
+- [ ] Separate (lazy-load) micro and macro
+- [ ] Migrate to svelte 5
+- [ ] Use typescript
+- [ ] Use svelte/kit
+    - [ ] Disable cloudflare deployment
+    - [ ] Deploy on VPS
+- [ ] Use vite
+  - require.context => import.meta.glob
+  - HtmlWebpackPlugin -> new FrontPage component
+  - Inline imports -> ?raw (https://vite.dev/guide/assets)
+
+
+

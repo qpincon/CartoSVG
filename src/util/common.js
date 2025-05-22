@@ -98,6 +98,17 @@ function getColumns(data) {
     return [...cols];
 }
 
+function findProp(propName, obj) {
+    if (propName in obj) return obj[propName];
+    for (let v of Object.values(obj)) {
+        if (typeof v === 'object') {
+            const found = findProp(propName, v);
+            if (found !== undefined) return found;
+        }
+    }
+}
+
+
 function initTooltips() {
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     [...tooltipTriggerList].map(tooltipTriggerEl => {
@@ -175,10 +186,14 @@ function discriminateCssForExport(cssToTransform) {
         if (group.includes('@keyframes') || group.includes('from {') || group.includes('to {')) return group;
         return `#${id} ${group}`;
     }
-    const transformed = cssToTransform.replaceAll(cssSelectorRegex, replacer);
+    let transformed = cssToTransform.replaceAll(cssSelectorRegex, replacer);
+    /** Transform url(#...) styles */
+    transformed = transformed.replaceAll(/url\("?#(.*?)"?\)/g, (g, capture1) => {
+        return `url(#${id}-${capture1})`
+    });
     return {mapId: id, finalCss: transformed };
 }
 
-export { download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, 
+export { findProp, download, downloadURI, capitalizeFirstLetter, camelCaseToSentence, nbDecimals, indexBy, 
     sortBy, pick, htmlToElement, getNumericCols, initTooltips, getBestFormatter, tapHold, RGBAToHexA, getColumns,
     discriminateCssForExport };

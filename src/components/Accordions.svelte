@@ -44,7 +44,7 @@
           {/if}
         </button>
       </h3>
-      {@html '<!-- Buggy - collaspe on any click inside... class:show={level === 0 && i < 4}-->'}
+      {@html "<!-- Buggy - collaspe on any click inside... class:show={level === 0 && i < 4}-->"}
       <div
         id={`panel-${title}-collapse`}
         class="accordion-collapse collapse show"
@@ -55,8 +55,8 @@
             level}px var(--bs-accordion-active-bg);"
         >
           {#each Object.keys(sections[title]) as key, i (key)}
-            <div class="field">
-              {#if otherParams[key]?.disabled !== true}
+            {#if otherParams[key]?.disabled !== true}
+              <div class="field">
                 {#if key in paramDefs}
                   {#if paramDefs[key].type == "range"}
                     <RangeInput
@@ -142,8 +142,8 @@
                     />
                   </div>
                 {/if}
-              {/if}
-            </div>
+              </div>
+            {/if}
           {/each}
         </div>
       </div>

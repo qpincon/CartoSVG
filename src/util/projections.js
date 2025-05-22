@@ -1,10 +1,52 @@
-import { geoMercator, geoEqualEarth, geoAlbersUsa, geoNaturalEarth1 } from 'd3-geo';
+import { geoMercator, geoEqualEarth, geoAlbersUsa, geoNaturalEarth1, geoTransform } from 'd3-geo';
 import { geoSatellite, geoBaker } from 'd3-geo-projection';
 import { scaleLinear, geoClipCircle, geoClipRectangle } from 'd3';
+import { LngLat, Point } from 'maplibre-gl';
 
 const degrees = 180 / Math.PI;
 const earthRadius = 6371;
 const offCanvasPx = 20;
+
+function getGeographicalBounds(projection, width, height) {
+    // Get the corners of your viewport in pixel coordinates
+    const corners = [
+        [0, 0],           // top-left
+        [width, 0],       // top-right
+        [width, height],  // bottom-right
+        [0, height]       // bottom-left
+    ];
+
+    // Convert pixel coordinates to geographical coordinates
+    const geoCorners = corners.map(corner => {
+        try {
+            return projection.invert(corner);
+        } catch (e) {
+            // Some points might not be invertible depending on the projection and rotation
+            return null;
+        }
+    }).filter(corner => corner !== null);
+
+    if (geoCorners.length === 0) {
+        return null; // No invertible corners
+    }
+
+    let minLng = Infinity;
+    let maxLng = -Infinity;
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+
+    for (const corner of geoCorners) {
+        minLng = Math.min(minLng, corner[0]);
+        maxLng = Math.max(maxLng, corner[0]);
+        minLat = Math.min(minLat, corner[1]);
+        maxLat = Math.max(maxLat, corner[1]);
+    }
+
+    return [
+        [minLng, minLat],
+        [maxLng, maxLat],
+    ];
+}
 
 function geoSatelliteCustom({ fov, width, height, longitude, latitude, rotation, altitude, tilt, borderWidth, larger = false } = {}) {
     const snyderP = 1.0 + altitude / earthRadius;
@@ -94,9 +136,9 @@ function standardProj(projFunc, { width, height, translateX, translateY, altitud
 }
 function geoAlbersUsaProj({ width, height, translateX, translateY, altitude, latitude, longitude, rotation, borderWidth, larger = false } = {}) {
     let proj = geoAlbersUsa()
-    .scale(altitude)
-    .translate([(width / 2) + translateX, (height / 2) + translateY])
-    .precision(0.1);
+        .scale(altitude)
+        .translate([(width / 2) + translateX, (height / 2) + translateY])
+        .precision(0.1);
     return proj;
 }
 
@@ -116,12 +158,11 @@ function geoBakerProj(params) {
 
 
 function updateAltitudeRange(fov = null) {
-    if (fov) {
-        const fovExtent = Math.tan(0.5 * fov / degrees);
-        const altRange = [Math.round((1/fovExtent) * 500), Math.round((1/fovExtent) * 4000)];
-        const altScale = scaleLinear().domain([1, 0]).range(altRange);
-        return altScale;
-    }
+    if (!fov) return;
+    const fovExtent = Math.tan(0.5 * fov / degrees);
+    const altRange = [Math.round((1 / fovExtent) * 500), Math.round((1 / fovExtent) * 4000)];
+    const altScale = scaleLinear().domain([1, 0]).range(altRange);
+    return altScale;
 }
 
 function getProjection(params) {
@@ -136,4 +177,33 @@ function getProjection(params) {
     }
 }
 
-export { updateAltitudeRange, getProjection};
+
+function createD3ProjectionFromMapLibre(map) {
+
+    const projection = function(coordinates) {
+        const lngLat = new LngLat(coordinates[0], coordinates[1]);
+        const point = map.project(lngLat);
+        return [point.x, point.y];
+    };
+    
+    // Add the stream method expected by D3
+    projection.stream = function(stream) {
+        return geoTransform({
+            point: function(x, y) {
+                const lngLat = new LngLat(x, y);
+                const point = map.project(lngLat);
+                stream.point(point.x, point.y);
+            }
+        }).stream(stream);
+    };
+    
+    // Add invert method
+    projection.invert = function(pixels) {
+        const point = new Point(pixels[0], pixels[1]);
+        const lngLat = map.unproject(point);
+        return [lngLat.lng, lngLat.lat];
+    };
+    return projection
+}
+
+export { updateAltitudeRange, getProjection, getGeographicalBounds, createD3ProjectionFromMapLibre };

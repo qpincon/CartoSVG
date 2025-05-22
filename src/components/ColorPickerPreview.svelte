@@ -7,6 +7,9 @@
     export let title = '';
     export let id = 'colorpickerid'; 
     export let onChange = (newCol) => {};
+    export let additionalClasses = '';
+    export let labelAbove = false;
+    
     $: _onChange = (color) => {
         onChange(color)
         changedManually = true;
@@ -14,13 +17,13 @@
     export let popup = 'left';
 
     $: if(value) {
-        if (!changedManually && colorPicker) setTimeout(() => {colorPicker.init();}, 0);
+        if (!changedManually && colorPicker) setTimeout(() => {if (colorPicker) colorPicker.init();}, 0);
         changedManually = false;
     }
 </script>
 
-<div class="row input-type">
-    <label for={id} class="col-form-label col-4">
+<div class="{labelAbove ? 'd-flex flex-column justify-content-center': 'row'} input-type {additionalClasses}">
+    <label for={id} class="col-form-label col-4 {labelAbove ? 'p-0' : ''}">
         { title }
     </label>
     <div class="d-flex align-items-center col">
@@ -50,3 +53,9 @@
         />
     </div>
 </div>
+
+<style>
+    input {
+        max-width: 8rem;
+    }
+</style>

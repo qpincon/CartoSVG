@@ -1,6 +1,7 @@
 import parsePath from 'parse-svg-path';
 import * as markers from './markerDefs';
 import { RGBAToHexA } from '../util/common';
+import { pathStringFromParsed } from './svg';
 
 export function drawCustomPaths(pathDefs, svg, projection, inlineStyles = {}) {
     if (!pathDefs) return;
@@ -32,20 +33,12 @@ export function drawCustomPaths(pathDefs, svg, projection, inlineStyles = {}) {
             pathElem.attr('marker-end', `url(#${markerId})`);
         }
         pathDef.index = index;
-        const newPath = pathDef.d.reduce((d, curGroup) => {
-            const [instruction, ...data] = curGroup;
-            let newData = '';
-            for (let i = 0; i < data.length; i += 2) {
-                newData += projection([data[i], data[i + 1]]) + ' ';
-            }
-            d +=  `${instruction}${newData}`;
-            return d
-        }, '');
+        const newPath = pathStringFromParsed(pathDef.d, projection);
         pathElem.attr('d', newPath);
         appendImageAnimated(imagesElem, pathDef);
     });
     // remove node if no image
-    if (!imagesElem.node().children) imagesElem.html('');
+    if (!imagesElem?.node()?.children) imagesElem.html('');
     else {
         let defs = svg.select('defs');
         if (defs.empty()) defs = svg.append('defs');
