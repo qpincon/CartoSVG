@@ -133,6 +133,8 @@
 - [ ] Freehand: Allow deletion
 - [ ] Double click text edit prevent ISE
 - [ ] Micro: 3d elements (see maplibre 3D model demo)
+- [ ] Micro: Use protomaps (upload tiles and configure nginx to serve it, using the pm plugin in the front)
+- [ ] Self-hosting
 - [ ] Show tooltip conditionnaly
 - [ ] Tooltip creation: Use WYSIWYG editor
 - [ ] Allow tooltip creation on single element
@@ -141,6 +143,14 @@
 - [ ] Data import / export: Move into modal
 - [ ] Data edition: allow inline edition with a lightweight grid edition sofware (lazy-loaded)
 - [ ] Top space above "Max legend width"
+- [ ] Bootstrap: allow main colors customization
+  - upgrade to 5.3
+  - use color modes
+  - pass mode as input of Map
+- [ ] Macro: Render simplified while changing altitude / fov
+- [ ] Allow external link on click of entity
+- [ ] Text / icons / images / freehand : use https://github.com/daybrush/moveable
+
 
 - [ ] Geoboundaries: give name to disputed territories
 - [ ] Geoboundaries: attribution to exported file
@@ -159,7 +169,8 @@
 - [ ] Migrate to svelte 5
 - [ ] Use typescript
 - [ ] Use svelte/kit
-    - disable cloudflare deployment
+    - [ ] Disable cloudflare deployment
+    - [ ] Deploy on VPS
 - [ ] Use vite
   - require.context => import.meta.glob
   - HtmlWebpackPlugin -> new FrontPage component
