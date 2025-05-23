@@ -1,8 +1,22 @@
-import getStroke from "perfect-freehand";
-const average = (a, b) => (a + b) / 2
+import { getStroke, type StrokeOptions } from "perfect-freehand";
+import type { Color } from "src/types";
+const average = (a: number, b: number) => (a + b) / 2
 
+const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+type Point = [number, number, number];
 export class FreehandDrawer {
-    constructor(options = {}) {
+    private freehandOptions: StrokeOptions;
+    private currentPath: SVGPathElement | null;
+    private svg: SVGSVGElement | null;
+    private currentGroup: SVGGElement | null;
+    private isDrawing: boolean;
+    private strokeColor: Color;
+    private strokeWidth: number;
+    private points: Point[];
+
+    constructor(options: Partial<StrokeOptions> & { strokeColor?: Color; strokeWidth?: number; } = {}) {
+        this.svg = null;
+        this.currentGroup = null;
         this.isDrawing = false;
         this.points = [];
         this.currentPath = null;
@@ -13,12 +27,12 @@ export class FreehandDrawer {
             streamline: 0.5,
             easing: (t) => t,
             start: {
-              taper: 0,
-              cap: true,
+                taper: 0,
+                cap: true,
             },
             end: {
-              taper: 0,
-              cap: true,
+                taper: 0,
+                cap: true,
             },
             ...options
         };
@@ -28,8 +42,6 @@ export class FreehandDrawer {
         this.handlePointerMove = this.handlePointerMove.bind(this);
         this.handlePointerUp = this.handlePointerUp.bind(this);
 
-        // SVG namespace
-        this.svgns = "http://www.w3.org/2000/svg";
 
         // Stroke styling
         this.strokeColor = options.strokeColor || "#000000";
@@ -37,7 +49,7 @@ export class FreehandDrawer {
     }
 
     // Convert perfect-freehand points to SVG path data
-    getSvgPathFromStroke(points) {
+    getSvgPathFromStroke(points: Point[]) {
         const len = points.length
 
         if (len < 4) {
@@ -67,9 +79,9 @@ export class FreehandDrawer {
     }
 
     // Start listening for drawing events
-    start(svgElement) {
+    start(svgElement: SVGSVGElement) {
         this.svg = svgElement;
-        this.currentGroup = document.createElementNS(this.svgns, "g");
+        this.currentGroup = document.createElementNS(SVG_NAMESPACE, "g");
         this.svg.append(this.currentGroup);
         this.svg.addEventListener("pointerdown", this.handlePointerDown);
         return this; // For method chaining
@@ -77,14 +89,14 @@ export class FreehandDrawer {
 
     // Stop listening for drawing events
     stop() {
-        this.svg.removeEventListener("pointerdown", this.handlePointerDown);
+        this.svg!.removeEventListener("pointerdown", this.handlePointerDown);
         document.removeEventListener("pointermove", this.handlePointerMove);
         document.removeEventListener("pointerup", this.handlePointerUp);
         return this.currentGroup;
     }
 
     // Handle pointer down event
-    handlePointerDown(event) {
+    handlePointerDown(event: PointerEvent) {
         this.isDrawing = true;
 
         // Get point in SVG coordinates
@@ -94,11 +106,11 @@ export class FreehandDrawer {
         this.points = [[svgPoint.x, svgPoint.y, event.pressure || 0.5]];
 
         // Create new path element
-        this.currentPath = document.createElementNS(this.svgns, "path");
+        this.currentPath = document.createElementNS(SVG_NAMESPACE, "path");
         this.currentPath.setAttribute("class", "freehand");
         this.currentPath.setAttribute("fill", this.strokeColor);
         this.currentPath.setAttribute("stroke", "none");
-        this.currentGroup.appendChild(this.currentPath);
+        this.currentGroup!.appendChild(this.currentPath);
 
         // Add event listeners for move and up events
         document.addEventListener("pointermove", this.handlePointerMove);
@@ -106,7 +118,7 @@ export class FreehandDrawer {
     }
 
     // Handle pointer move event
-    handlePointerMove(event) {
+    handlePointerMove(event: PointerEvent) {
         if (!this.isDrawing) return;
 
         // Get point in SVG coordinates
@@ -116,8 +128,8 @@ export class FreehandDrawer {
         this.points.push([svgPoint.x, svgPoint.y, event.pressure || 0.5]);
 
         // Update the SVG path
-        const freehandPoints = getStroke(this.points, this.freehandOptions);
-        this.currentPath.setAttribute("d", this.getSvgPathFromStroke(freehandPoints));
+        const freehandPoints = getStroke(this.points, this.freehandOptions) as Point[];
+        this.currentPath!.setAttribute("d", this.getSvgPathFromStroke(freehandPoints));
     }
 
     // Handle pointer up event
@@ -132,29 +144,29 @@ export class FreehandDrawer {
     }
 
     // Convert page coordinates to SVG coordinates
-    getSvgPoint(event) {
-        const svgPoint = this.svg.createSVGPoint();
+    getSvgPoint(event: PointerEvent) {
+        const svgPoint = this.svg!.createSVGPoint();
         svgPoint.x = event.clientX;
         svgPoint.y = event.clientY;
 
         // Convert screen coordinates to SVG coordinates
-        return svgPoint.matrixTransform(this.svg.getScreenCTM().inverse());
+        return svgPoint.matrixTransform(this.svg!.getScreenCTM()?.inverse());
     }
 
     // Set stroke color
-    setColor(color) {
+    setColor(color: Color) {
         this.strokeColor = color;
         return this;
     }
 
     // Set stroke width (size)
-    setSize(size) {
+    setSize(size: number) {
         this.freehandOptions.size = size;
         return this;
     }
 
     // Set smoothing
-    setSmoothing(value) {
+    setSmoothing(value: number) {
         this.freehandOptions.smoothing = value;
         return this;
     }

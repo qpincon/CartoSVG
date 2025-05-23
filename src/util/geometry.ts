@@ -1,3 +1,5 @@
+import type { Feature, Polygon } from "geojson";
+
 /**
  * Generates a GeoJSON polygon representing a rectangle with rounded corners
  * @param {number} width - Width of the rectangle
@@ -8,7 +10,7 @@
  * @param {number} [segments=8] - Number of segments to use for each rounded corner (default: 8)
  * @returns {Object} GeoJSON polygon object
  */
-export function createRoundedRectangleGeoJSON(width, height, cornerRadius, center_x = width / 2, center_y = height / 2, segments = 16) {
+export function createRoundedRectangleGeoJSON(width: number, height: number, cornerRadius: number, center_x = width / 2, center_y = height / 2, segments = 16): Feature<Polygon> {
     // Validate inputs
     if (width <= 0 || height <= 0) {
         throw new Error('Width and height must be positive numbers');

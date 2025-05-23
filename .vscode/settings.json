@@ -27,5 +27,6 @@
   "editor.formatOnSave": true,
   "[svelte]": {
     "editor.defaultFormatter": "svelte.svelte-vscode"
-  }
+  },
+  "svelte.plugin.svelte.format.config.printWidth": 120,
 }

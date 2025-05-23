@@ -28,12 +28,12 @@ export function camelCaseToSentence(str: string): string {
     return capitalizeFirstLetter(splitted);
 }
 
-export function htmlToElement(html: string): ChildNode | null {
+export function htmlToElement(html: string): Element | null {
     if (!html) return null;
     const template = document.createElement('template');
     html = html.trim(); // Never return a text node of whitespace as the result
     template.innerHTML = html;
-    return template.content.firstChild;
+    return template.content.firstChild as Element;
 }
 
 export function nbDecimals(num: number): number {
@@ -98,7 +98,7 @@ export function getColumns(data: Record<string, any>[]): string[] {
     return [...cols];
 }
 
-export function findProp<T>(propName: string, obj: Iterable<unknown>): any {
+export function findProp<T>(propName: string, obj: Object): any {
     if (propName in obj) return (obj as any)[propName];
     for (const v of Object.values(obj)) {
         if (typeof v === 'object' && v !== null) {

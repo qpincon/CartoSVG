@@ -1522,27 +1522,6 @@
         const template = tooltipDefs[layerName]?.template;
         return toFind?.some((str) => template.includes(str));
     }
-    // function handleInput(e) {
-    //     const file = e.target.files[0];
-    //     const reader = new FileReader();
-    //     reader.addEventListener('load', () => {
-    //         // winding order matters !!!
-    //         provided = fixOrder(JSON.parse(reader.result));
-    //         providedBorders = provided.features.length > 1 ? provided.features.reduce((acc, cur)  => {
-    //             return union(acc, cur);
-    //         }, provided.features[0]) : provided.features[0];
-    //         const boundingBox = bbox(providedBorders);
-
-    //         providedBorders = fixOrder({ type: "FeatureCollection", features: [{...providedBorders}] });
-
-    //         inlineProps.longitude = (boundingBox[2] + boundingBox[0]) / 2;
-    //         inlineProps.latitude = (boundingBox[3] + boundingBox[1]) / 2;
-    //         inlineProps.tilt = 0;
-    //         pane.refresh();
-    //         draw();
-    //     });
-    //     reader.readAsText(file);
-    // }
 
     $: cssFonts = fontsToCss(providedFonts);
 
@@ -1563,7 +1542,7 @@
         closeMenu();
         detachListeners();
         isDrawingPath = true;
-        freeHandDrawPath(svg, projection, (finishedElem) => {
+        freeHandDrawPath(svg, (finishedElem) => {
             console.log("finishedElem", finishedElem);
             const d = finishedElem.getAttribute("d");
             if (!d) return;

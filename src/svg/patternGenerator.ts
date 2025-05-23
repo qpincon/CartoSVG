@@ -1,7 +1,17 @@
+import type { Color } from "src/types";
+
 /**
  * Creates SVG pattern definitions similar to matplotlib's hatch styles
  */
 export class HatchPatternGenerator {
+  private ctx: CanvasRenderingContext2D | null;
+  private patternScale: number;
+  private size: number;
+  private strokeWidth: number;
+  private baseColor: Color;
+  private characterMap: Record<string, (pattern: SVGElement, color: Color, strokeWidth: number) => void>;
+  private offsetAccum: number = 0;
+
   constructor() {
     const canvas = document.createElement("canvas");
     this.ctx = canvas.getContext("2d");
@@ -11,7 +21,6 @@ export class HatchPatternGenerator {
     this.baseColor = '#000000';
     // Add ASCII values map for character-based pattern generation
     this.characterMap = {
-      // Basic punctuation patterns
       "#": this._hashPattern.bind(this),
       "^": this._caretPattern.bind(this),
       "=": this._equalsPattern.bind(this),
@@ -28,88 +37,83 @@ export class HatchPatternGenerator {
     };
   }
 
-
   /**
    * Generate an SVG pattern definition from a matplotlib-style hatch string
-   * @param {string} hatchString - Matplotlib style hatch pattern (e.g., '/', 'x', '+', etc.)
-   * @param {string} id - Unique ID for the SVG pattern
-   * @param {object} options - Additional options (color, size, etc.)
+   * @param options - Additional options (color, size, etc.)
    * @returns {SVGPatternElement} SVG pattern element
    */
-  updateOrCreatePattern(options = {}) {
+  updateOrCreatePattern(options: {
+    hatch: string;
+    id: string;
+    color?: Color;
+    scale?: number;
+    strokeWidth?: number;
+    backgroundColor?: string;
+  }): SVGPatternElement {
     const {
       hatch,
       id,
       color = this.baseColor,
       scale = this.patternScale,
       strokeWidth = this.strokeWidth,
-      backgroundColor = 'none'
+      backgroundColor = 'none',
     } = options;
 
-    let pattern = document.getElementById(id);
+    let pattern = document.getElementById(id) as SVGPatternElement | null;
     if (pattern) pattern.remove();
     // Create SVG pattern element
     pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
     pattern.setAttribute('id', id);
     pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-    pattern.setAttribute('width', this.size);
-    pattern.setAttribute('height', this.size);
+    pattern.setAttribute('width', this.size.toString());
+    pattern.setAttribute('height', this.size.toString());
     pattern.setAttribute('patternTransform', `scale(${scale})`);
 
     // If a background color is specified, add it
     if (backgroundColor !== 'none') {
       const background = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      background.setAttribute('width', this.size);
-      background.setAttribute('height', this.size);
+      background.setAttribute('width', this.size.toString());
+      background.setAttribute('height', this.size.toString());
       background.setAttribute('fill', backgroundColor);
       pattern.appendChild(background);
     }
     this.offsetAccum = 0;
     // Parse the hatch string and add appropriate elements
-    for (let char of hatch) {
+    for (const char of hatch) {
       if ('/\\-|+x.oO*'.includes(char)) {
         switch (char) {
           case '/': // Forward diagonal lines
             this._addDiagonalLine(pattern, color, strokeWidth, true);
             break;
-
           case '\\': // Backward diagonal lines
             this._addDiagonalLine(pattern, color, strokeWidth, false);
             break;
-
           case '-': // Horizontal lines
             this._addHorizontalLine(pattern, color, strokeWidth);
             break;
-
           case '|': // Vertical lines
             this._addVerticalLine(pattern, color, strokeWidth);
             break;
-
           case '+': // Horizontal and vertical lines (grid)
             this._addHorizontalLine(pattern, color, strokeWidth);
             this._addVerticalLine(pattern, color, strokeWidth);
             break;
-
           case 'x': // Crossed diagonal lines
             this._addDiagonalLine(pattern, color, strokeWidth, true);
             this._addDiagonalLine(pattern, color, strokeWidth, false);
             break;
-
           case '.': // Dots
             this._addDot(pattern, color, strokeWidth);
             break;
-
           case 'o': // Circles
             this._addCircle(pattern, color, strokeWidth);
             break;
-
           case '*': // Stars (combination of + and x)
             this._addDiagonalLine(pattern, color, strokeWidth, true);
             this._addDiagonalLine(pattern, color, strokeWidth, false);
             this._addHorizontalLine(pattern, color, strokeWidth);
             this._addVerticalLine(pattern, color, strokeWidth);
             break;
-
           case 'O': // Larger circles
             this._addCircle(pattern, color, strokeWidth, 0.3);
             break;
@@ -124,12 +128,8 @@ export class HatchPatternGenerator {
 
   /**
  * Add a seamless diagonal line to the pattern that works with any stroke width
- * @param {SVGElement} pattern - The SVG pattern element to add the line to
- * @param {string} color - Stroke color
- * @param {number} strokeWidth - Width of the stroke
- * @param {boolean} isForward - True for forward slash (/), false for backslash (\)
  */
-  _addDiagonalLine(pattern, color, strokeWidth, isForward) {
+  _addDiagonalLine(pattern: SVGElement, color: Color, strokeWidth: number, isForward: boolean) {
     // Calculate the extension needed to ensure seamless tiling
     // We extend the line beyond the pattern boundaries by half the stroke width
     const ext = this.size / 4;
@@ -149,7 +149,7 @@ export class HatchPatternGenerator {
 
     path.setAttribute('d', d);
     path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', strokeWidth);
+    path.setAttribute('stroke-width', `${strokeWidth}`);
     path.setAttribute('stroke-linecap', 'square'); // Sharp ends for better tiling
 
     // Ensure the path doesn't create a fill
@@ -161,46 +161,46 @@ export class HatchPatternGenerator {
   /**
    * Add a horizontal line to the pattern
    */
-  _addHorizontalLine(pattern, color, strokeWidth) {
+  _addHorizontalLine(pattern: SVGElement, color: Color, strokeWidth: number) {
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', '0');
-    line.setAttribute('y1', this.size / 2);
-    line.setAttribute('x2', this.size);
-    line.setAttribute('y2', this.size / 2);
+    line.setAttribute('y1', `${this.size / 2}`);
+    line.setAttribute('x2', `${this.size}`);
+    line.setAttribute('y2', `${this.size / 2}`);
     line.setAttribute('stroke', color);
-    line.setAttribute('stroke-width', strokeWidth);
+    line.setAttribute('stroke-width', `${strokeWidth}`);
     pattern.appendChild(line);
   }
 
   /**
    * Add a vertical line to the pattern
    */
-  _addVerticalLine(pattern, color, strokeWidth) {
+  _addVerticalLine(pattern: SVGElement, color: Color, strokeWidth: number) {
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', this.size / 2);
+    line.setAttribute('x1', `${this.size / 2}`);
     line.setAttribute('y1', '0');
-    line.setAttribute('x2', this.size / 2);
-    line.setAttribute('y2', this.size);
+    line.setAttribute('x2', `${this.size / 2}`);
+    line.setAttribute('y2', `${this.size}`);
     line.setAttribute('stroke', color);
-    line.setAttribute('stroke-width', strokeWidth);
+    line.setAttribute('stroke-width', `${strokeWidth}`);
     pattern.appendChild(line);
   }
 
   /**
    * Add a dot to the pattern
    */
-  _addDot(pattern, color, strokeWidth) {
+  _addDot(pattern: SVGElement, color: Color, strokeWidth: number) {
     this._addCirclePattern(pattern, strokeWidth, color);
   }
 
   /**
    * Add a circle to the pattern
    */
-  _addCircle(pattern, color, strokeWidth, scale = 0.18) {
+  _addCircle(pattern: SVGElement, color: Color, strokeWidth: number, scale = 0.18) {
     this._addCirclePattern(pattern, this.size * scale, 'none', color, strokeWidth);
   }
 
-  _addCirclePattern(pattern, radius, fillColor, strokeColor, strokeWidth) {
+  _addCirclePattern(pattern: SVGElement, radius: number, fillColor?: Color, strokeColor?: Color, strokeWidth?: number) {
     pattern.appendChild(this._createCircle(this.size / 2, this.size / 2, radius, fillColor, strokeColor, strokeWidth));
     pattern.appendChild(this._createCircle(0, 0, radius, fillColor, strokeColor, strokeWidth));
     pattern.appendChild(this._createCircle(0, this.size, radius, fillColor, strokeColor, strokeWidth));
@@ -208,18 +208,18 @@ export class HatchPatternGenerator {
     pattern.appendChild(this._createCircle(this.size, this.size, radius, fillColor, strokeColor, strokeWidth));
   }
 
-  _createCircle(cx, cy, radius, fillColor, strokeColor, strokeWidth) {
+  _createCircle(cx: number, cy: number, radius: number, fillColor?: Color, strokeColor?: Color, strokeWidth?: number) {
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', cx);
-    circle.setAttribute('cy', cy);
-    circle.setAttribute('r', radius);
+    circle.setAttribute('cx', `${cx}`);
+    circle.setAttribute('cy', `${cy}`);
+    circle.setAttribute('r', `${radius}`);
     if (fillColor) circle.setAttribute('fill', fillColor);
     if (strokeColor) circle.setAttribute('stroke', strokeColor);
-    if (strokeWidth) circle.setAttribute('stroke-width', strokeWidth);
+    if (strokeWidth) circle.setAttribute('stroke-width', `${strokeWidth}`);
     return circle;
   }
 
-  addOrUpdatePatternsForSVG(defs, patternDefs) {
+  addOrUpdatePatternsForSVG(defs: SVGDefsElement, patternDefs) {
     for (const def of patternDefs) {
       const pattern = this.updateOrCreatePattern(def);
       defs.appendChild(pattern);
@@ -233,7 +233,7 @@ export class HatchPatternGenerator {
    * @param {string} color - Pattern color
    * @param {number} strokeWidth - Width of strokes
    */
-  createCharacterPattern(char, pattern, color, strokeWidth) {
+  createCharacterPattern(char: string, pattern: SVGElement, color: Color, strokeWidth: number) {
     // If we have a specific implementation for this character, use it
     if (this.characterMap[char]) {
       this.characterMap[char](pattern, color, strokeWidth);
@@ -247,7 +247,7 @@ export class HatchPatternGenerator {
   /**
    * Create a zig-zag pattern based on character code
    */
-  _createZigZagPattern(pattern, color, strokeWidth) {
+  _createZigZagPattern(pattern: SVGElement, color: Color, strokeWidth: number) {
     const frequency = 2;
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
 
@@ -260,7 +260,7 @@ export class HatchPatternGenerator {
 
     path.setAttribute('d', d);
     path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', strokeWidth);
+    path.setAttribute('stroke-width', `${strokeWidth}`);
     path.setAttribute('fill', 'none');
     pattern.appendChild(path);
   }
@@ -268,7 +268,7 @@ export class HatchPatternGenerator {
   /**
    * Create a radial pattern based on character code
    */
-  _createRadialPattern(pattern, color, strokeWidth) {
+  _createRadialPattern(pattern: SVGElement, color: Color, strokeWidth: number) {
     const numLines = 5;
     const centerX = this.size / 2;
     const centerY = this.size / 2;
@@ -280,12 +280,12 @@ export class HatchPatternGenerator {
       const endY = centerY + radius * Math.sin(angle);
 
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', centerX);
-      line.setAttribute('y1', centerY);
-      line.setAttribute('x2', endX);
-      line.setAttribute('y2', endY);
+      line.setAttribute('x1', `${centerX}`);
+      line.setAttribute('y1', `${centerY}`);
+      line.setAttribute('x2', `${endX}`);
+      line.setAttribute('y2', `${endY}`);
       line.setAttribute('stroke', color);
-      line.setAttribute('stroke-width', strokeWidth);
+      line.setAttribute('stroke-width', `${strokeWidth}`);
       pattern.appendChild(line);
     }
   }
@@ -293,8 +293,8 @@ export class HatchPatternGenerator {
   /**
    * Create a checker pattern based on character code
    */
-  _createCheckerPattern(pattern, color) {
-    const divisions = 4 ;
+  _createCheckerPattern(pattern: SVGElement, color: Color) {
+    const divisions = 4;
     const cellSize = this.size / divisions;
 
     for (let i = 0; i < divisions; i++) {
@@ -302,10 +302,10 @@ export class HatchPatternGenerator {
         // Only fill alternating cells
         if ((i + j) % 2 === 0) {
           const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          rect.setAttribute('x', i * cellSize);
-          rect.setAttribute('y', j * cellSize);
-          rect.setAttribute('width', cellSize);
-          rect.setAttribute('height', cellSize);
+          rect.setAttribute('x', `${i * cellSize}`);
+          rect.setAttribute('y', `${j * cellSize}`);
+          rect.setAttribute('width', `${cellSize}`);
+          rect.setAttribute('height', `${cellSize}`);
           rect.setAttribute('fill', color);
           pattern.appendChild(rect);
         }
@@ -317,7 +317,7 @@ export class HatchPatternGenerator {
   /**
    * Create a diamond pattern based on character code
    */
-  _createDiamondPattern(pattern, color, strokeWidth) {
+  _createDiamondPattern(pattern: SVGElement, color: Color, strokeWidth: number) {
     const centerX = this.size / 2;
     const centerY = this.size / 2;
     const numDiamonds = 4;
@@ -337,7 +337,7 @@ export class HatchPatternGenerator {
 
       diamond.setAttribute('points', points);
       diamond.setAttribute('stroke', color);
-      diamond.setAttribute('stroke-width', strokeWidth);
+      diamond.setAttribute('stroke-width', `${strokeWidth}`);
       diamond.setAttribute('fill', 'none');
       pattern.appendChild(diamond);
     }
@@ -346,7 +346,7 @@ export class HatchPatternGenerator {
   /**
    * Create pattern for hash/pound
    */
-  _hashPattern(pattern, color, strokeWidth) {
+  _hashPattern(pattern: SVGElement, color: Color, strokeWidth: number) {
     // Create grid pattern with varying spacing
     const gap1 = this.size * 0.33;
     const gap2 = this.size * 0.66;
@@ -354,24 +354,24 @@ export class HatchPatternGenerator {
     // Horizontal lines
     for (let y of [gap1, gap2]) {
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', 0);
-      line.setAttribute('y1', y);
-      line.setAttribute('x2', this.size);
-      line.setAttribute('y2', y);
+      line.setAttribute('x1', '0');
+      line.setAttribute('y1', `${y}`);
+      line.setAttribute('x2', `${this.size}`);
+      line.setAttribute('y2', `${y}`);
       line.setAttribute('stroke', color);
-      line.setAttribute('stroke-width', strokeWidth);
+      line.setAttribute('stroke-width', `${strokeWidth}`);
       pattern.appendChild(line);
     }
 
     // Vertical lines
     for (let x of [gap1, gap2]) {
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', x);
-      line.setAttribute('y1', 0);
-      line.setAttribute('x2', x);
-      line.setAttribute('y2', this.size);
+      line.setAttribute('x1', `${x}`);
+      line.setAttribute('y1', '0');
+      line.setAttribute('x2', `${x}`);
+      line.setAttribute('y2', `${this.size}`);
       line.setAttribute('stroke', color);
-      line.setAttribute('stroke-width', strokeWidth);
+      line.setAttribute('stroke-width', `${strokeWidth}`);
       pattern.appendChild(line);
     }
   }
@@ -380,7 +380,7 @@ export class HatchPatternGenerator {
   /**
    * Create pattern for caret
    */
-  _caretPattern(pattern, color, strokeWidth) {
+  _caretPattern(pattern: SVGElement, color: Color, strokeWidth: number) {
     // Create multiple caret shapes (^)
     const numCarets = 4;
     const caretSize = this.size / numCarets;
@@ -397,41 +397,41 @@ export class HatchPatternGenerator {
           ${x + caretSize},${y + caretSize * 0.66}
         `);
         caret.setAttribute('stroke', color);
-        caret.setAttribute('stroke-width', strokeWidth);
+        caret.setAttribute('stroke-width', `${strokeWidth}`);
         caret.setAttribute('fill', 'none');
         pattern.appendChild(caret);
       }
     }
   }
 
-  _measureChar(char) {
-    return this.ctx.measureText(char);
+  _measureChar(char: string) {
+    return this.ctx!.measureText(char);
   }
 
-  _createCharPattern(pattern, char, color, strokeWidth) {
-    const createText = (x, y) =>  {
+  _createCharPattern(pattern: SVGElement, char: string, color: Color, strokeWidth: number) {
+    const createText = (x: number, y: number) => {
       const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       text.innerHTML = char;
-      text.setAttribute('x', x + this.offsetAccum);
-      text.setAttribute('y', y);
-      text.setAttribute('stroke-width', strokeWidth);
+      text.setAttribute('x', `${x + this.offsetAccum}`);
+      text.setAttribute('y', `${y}`);
+      text.setAttribute('stroke-width', `${strokeWidth}`);
       text.setAttribute('fill', color);
       text.setAttribute('stroke', color);
-      text.setAttribute('style', `font-size: ${this.size/2 + 1}px;`);
+      text.setAttribute('style', `font-size: ${this.size / 2 + 1}px;`);
       return text;
     }
     pattern.appendChild(createText(0, this.size - 3));
-    pattern.appendChild(createText(this.size/2, this.size/2));
+    pattern.appendChild(createText(this.size / 2, this.size / 2));
     this.offsetAccum += this._measureChar(char).width + 3;
   }
 
 
 
-  _createPathPattern(d, pattern, color, strokeWidth) {
+  _createPathPattern(d: string, pattern: SVGElement, color: Color, strokeWidth: number) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', d);
     path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', strokeWidth);
+    path.setAttribute('stroke-width', `${strokeWidth}`);
     path.setAttribute('fill', 'none');
     pattern.appendChild(path);
   }
@@ -439,7 +439,7 @@ export class HatchPatternGenerator {
   /**
    * Create pattern for equals sign
    */
-  _equalsPattern(pattern, color, strokeWidth) {
+  _equalsPattern(pattern: SVGElement, color: Color, strokeWidth: number) {
     // Create alternating horizontal bars
     const numBars = 5;
     const barHeight = this.size / (numBars * 2 - 1);
@@ -448,10 +448,10 @@ export class HatchPatternGenerator {
       const y = i * 2 * barHeight;
 
       const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      rect.setAttribute('x', 0);
-      rect.setAttribute('y', y);
-      rect.setAttribute('width', this.size);
-      rect.setAttribute('height', barHeight);
+      rect.setAttribute('x', '0');
+      rect.setAttribute('y', `${y}`);
+      rect.setAttribute('width', `${this.size}`);
+      rect.setAttribute('height', `${barHeight}`);
       rect.setAttribute('fill', color);
       pattern.appendChild(rect);
     }

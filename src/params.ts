@@ -10,12 +10,12 @@ export interface GlowParams {
     outerColor: Color;
 }
 
-export type Projection = 'satellite' | 'mercator';
+export type ProjectionName = 'satellite' | 'mercator';
 export interface MacroGeneralParams {
     width: number;
     height: number;
     useViewBox: boolean;
-    projection: Projection;
+    projection: ProjectionName;
     fieldOfView: number;
     altitude: number;
     animate: boolean;
@@ -24,7 +24,7 @@ export interface MacroBorderParams {
     borderRadius: number;
     borderWidth: number;
     borderColor: Color;
-    frameShadow: boolean;
+    frameShadow?: boolean;
 }
 
 export interface MacroBackgroundParams {

@@ -150,7 +150,7 @@
 - [ ] Macro: Render simplified while changing altitude / fov
 - [ ] Allow external link on click of entity
 - [ ] Text / icons / images / freehand : use https://github.com/daybrush/moveable
-
+- [ ] Text: just use Maj+Enter for new line instead of ++
 
 - [ ] Geoboundaries: give name to disputed territories
 - [ ] Geoboundaries: attribution to exported file

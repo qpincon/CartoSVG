@@ -1,5 +1,6 @@
 export function yieldToMain() {
-    if (globalThis.scheduler?.yield) {
+    if ((globalThis as any).scheduler?.yield) {
+        // @ts-expect-error
         return scheduler.yield();
     }
 

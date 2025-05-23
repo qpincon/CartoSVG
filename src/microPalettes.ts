@@ -1,5 +1,7 @@
-export const playful = {
-    borderParams : {
+import type { MicroPaletteWithBorder } from "./types";
+
+export const playful: Partial<MicroPaletteWithBorder> = {
+    borderParams: {
         borderColor: "#aaa", borderWidth: 3, borderRadius: 7, borderPadding: 20,
     },
     background: {
@@ -19,7 +21,7 @@ export const playful = {
     railway: { stroke: "#2a3737", active: true },
 };
 
-export const midnightBloom = {
+export const midnightBloom: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#1D2B53", disabled: true, active: true,
         pattern: { hatch: '0', color: '#29366A', strokeWidth: 0.6, scale: 1.8 }
@@ -43,7 +45,7 @@ export const midnightBloom = {
     }
 };
 
-export const candyLand = {
+export const candyLand: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#FFEEF2", disabled: true, active: true,
         pattern: { hatch: 'o', color: '#FFD6E0', strokeWidth: 0.6, scale: 1.1 }
@@ -67,7 +69,7 @@ export const candyLand = {
     }
 };
 
-export const autumnVintage = {
+export const autumnVintage: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#F8F0E3", disabled: true, active: true,
         pattern: { hatch: '.', color: '#E8DFCC', strokeWidth: 2.8, scale: 1.8 }
@@ -91,7 +93,7 @@ export const autumnVintage = {
     }
 };
 
-export const cyberpunkNeon = {
+export const cyberpunkNeon: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#0F0F19", disabled: true, active: true,
         pattern: { hatch: '0', color: "#1A1A2E", strokeWidth: 0.7, scale: 2.0 }
@@ -115,7 +117,7 @@ export const cyberpunkNeon = {
     }
 };
 
-export const coastalSerenity = {
+export const coastalSerenity: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#E6F3F7", disabled: true, active: true,
         pattern: { hatch: '.', color: "#C7E4EB", strokeWidth: 2.6, scale: 1.7 }
@@ -139,7 +141,7 @@ export const coastalSerenity = {
     }
 };
 
-export const desertSunset = {
+export const desertSunset: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#F9DCC4", disabled: true, active: true,
         pattern: { hatch: '0', color: "#EBC8A9", strokeWidth: 0.8, scale: 1.9 }
@@ -163,7 +165,7 @@ export const desertSunset = {
     }
 };
 
-export const winterFrost = {
+export const winterFrost: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#E8F0F7", disabled: true, active: true,
         pattern: { hatch: '.', color: "#D6E5F3", strokeWidth: 2.5, scale: 1.6 }
@@ -188,7 +190,7 @@ export const winterFrost = {
 };
 
 
-export const barbapapa = {
+export const barbapapa: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#FDF0FF", disabled: true, active: true,
         pattern: { hatch: 'o', color: "#F0D1F7", strokeWidth: 0.6, scale: 1.1 }
@@ -212,7 +214,7 @@ export const barbapapa = {
     }
 };
 
-export const iceCreamDreams = {
+export const iceCreamDreams: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#F7F6F3", disabled: true, active: true,
         pattern: { hatch: '.', color: "#E9E7E2", strokeWidth: 2.3, scale: 1.5 }
@@ -240,7 +242,7 @@ export const iceCreamDreams = {
 };
 
 
-export const vintageCartography = {
+export const vintageCartography: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#F0EBE1", disabled: true, active: true,
         pattern: { hatch: '~', color: "#D8D0C0", strokeWidth: 0.7, scale: 1.0 }
@@ -265,7 +267,7 @@ export const vintageCartography = {
 };
 
 
-export const classicAtlas = {
+export const classicAtlas: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#EDE8D9", disabled: true, active: true,
         pattern: { hatch: '.', color: "#DCD6C8", strokeWidth: 2.5, scale: 1.6 }
@@ -290,7 +292,7 @@ export const classicAtlas = {
 };
 
 
-export const peach = {
+export const peach: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#FFF1E6", disabled: true, active: true,
         pattern: { hatch: '.', color: "#FFE0D1", strokeWidth: 2.4, scale: 1.5 }
@@ -314,7 +316,7 @@ export const peach = {
     }
 };
 
-export const citrus = {
+export const citrus: Partial<MicroPaletteWithBorder> = {
     background: {
         fill: "#F9F7F3", disabled: true, active: true,
         pattern: { hatch: 'o', color: "#ECEAE6", strokeWidth: 0.7, scale: 1.0 }

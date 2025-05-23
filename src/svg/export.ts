@@ -1,44 +1,116 @@
 import svgoConfig from '../svgoExport.config';
 import svgoConfigText from '../svgoExportText.config';
 
-import { imageFromSpecialGElemStr, encodeSVGDataImageStr } from '../svg/contourMethods';
+import { imageFromSpecialGElemStr, encodeSVGDataImageStr } from './contourMethods';
 import { htmlToElement } from '../util/common';
 import { indexBy, pick, download, discriminateCssForExport } from '../util/common';
 import { reportStyle, reportStyleElem, fontsToCss, getUsedInlineFonts } from '../util/dom';
+import { type Selection } from 'd3-selection';
+import type { Config } from 'svgo/browser';
 
+export interface ProvidedFont {
+    name: string;
+    content: string;
+}
+
+interface TooltipDefinition {
+    enabled: boolean;
+    content: string;
+    template: string;
+}
+
+interface TooltipDefinitions {
+    [groupId: string]: TooltipDefinition;
+}
+
+interface ColumnDefinition {
+    column: string;
+}
+
+interface ZoneDataRow {
+    name: string;
+    [key: string]: any;
+}
+
+interface ZoneData {
+    data: ZoneDataRow[];
+    numericCols: ColumnDefinition[];
+    formatters: { [column: string]: (value: any) => string };
+}
+
+interface ZonesData {
+    [groupId: string]: ZoneData;
+}
+
+interface ExportOptions {
+    exportFonts?: ExportFontChoice;
+    hideOnResize?: boolean;
+    minifyJs?: boolean;
+}
+
+interface Position {
+    x: number;
+    y: number;
+}
+
+interface TransformedTexts {
+    [fontFamily: string]: {
+        [text: string]: string;
+    };
+}
+
+interface FinalDataByGroup {
+    data: { [groupId: string]: { [shapeId: string]: any } };
+    tooltips: { [groupId: string]: string };
+}
+
+interface Tooltip {
+    shapeId: string | null;
+    element: SVGForeignObjectElement | null;
+}
+
+// Enums and constants
 const domParser = new DOMParser();
 
-export const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`
-// regular function
-function isHexColor (hex) {
-    return (hex.length === 6 || hex.length === 3 || hex.length === 8) && !isNaN(Number('0x' + hex))
+export const rgb2hex = (rgb: string): string =>
+    `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/)!.slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`;
+
+export function isHexColor(hex: string): boolean {
+    return (hex.length === 6 || hex.length === 3 || hex.length === 8) && !isNaN(Number('0x' + hex));
 }
-const replaceReferenceValue = (value, prefix) => {
-    let newValue;
+
+export const replaceReferenceValue = (value: string, prefix: string): string | undefined => {
+    let newValue: string | undefined;
     // discriminate colors in hex notation
     if (value[0] === '#' && !isHexColor(value.slice(1))) {
-        newValue = `#${prefix}-${value.slice(1)}`
+        newValue = `#${prefix}-${value.slice(1)}`;
     }
     if (value.slice(0, 3) === 'url') {
-        const existing = value.match(/url\(\"?#(.*?)\"?\)/)[1];
-        newValue = `url("#${prefix}-${existing}")`;
-    } 
+        const existing = value.match(/url\(\"?#(.*?)\"?\)/)?.[1];
+        if (existing) {
+            newValue = `url("#${prefix}-${existing}")`;
+        }
+    }
     return newValue;
 };
-const exportFontChoices = Object.freeze({
-    noExport: 0,
-    convertToPath: 1,
-    embedFont: 2,
-    smallest: 3,
-});
 
-const domBaselineToBaseline = {
+export enum ExportFontChoice {
+    noExport = 0,
+    convertToPath = 1,
+    embedFont = 2,
+    smallest = 3,
+}
+
+export const exportFontChoices = Object.freeze(ExportFontChoice);
+
+const domBaselineToBaseline: Record<string, string> = {
     hanging: "top",
     auto: "middle",
     middle: "middle",
     "text-top": "bottom"
 };
-const anchorToAnchor = {
+
+const anchorToAnchor: Record<string, string> = {
     left: 'left',
     middle: 'center',
     right: 'right'
@@ -46,104 +118,128 @@ const anchorToAnchor = {
 
 export const additionnalCssExport = '#points-labels {pointer-events:none}';
 const cssFontProps = ['font-family', 'font-size', 'font-weight', 'color'];
-function getTextElems(svgElem) {
+
+export function getTextElems(svgElem: SVGElement): Element[] {
     const texts = Array.from(svgElem.querySelectorAll('text')).concat(Array.from(svgElem.querySelectorAll('tspan')));
     // ignore text elements containing tspans
-    return texts.filter(t => !(t.tagName == 'text' && t.firstChild.tagName == 'tspan'))
+    return texts.filter(t => !(t.tagName === 'text' && (t.firstChild as Element)?.tagName === 'tspan'));
 }
 
-
-function getInlineStyle(el, defaultStyles, propName) {
-    const isTspan = el.tagName == 'tspan';
-    return el.style[propName] || (isTspan ? el.parentNode.style[propName] : null) || defaultStyles.getPropertyValue(propName);
+export function getInlineStyle(el: Element, defaultStyles: CSSStyleDeclaration, propName: string): string {
+    const isTspan = el.tagName === 'tspan';
+    const elementStyle = (el as HTMLElement).style;
+    const parentStyle = isTspan ? (el.parentNode as HTMLElement)?.style : null;
+    return elementStyle[propName as any] || parentStyle?.[propName as any] || defaultStyles.getPropertyValue(propName);
 }
 
-function replaceTextsWithPaths(svgElem, transformedTexts) {
+export function replaceTextsWithPaths(svgElem: SVGElement, transformedTexts: TransformedTexts): void {
     const defaultStyles = getComputedStyle(document.body);
     const texts = getTextElems(svgElem);
+
     texts.forEach(textElem => {
         const fontFamily = getInlineStyle(textElem, defaultStyles, 'font-family');
-        const text = textElem.textContent.trim();
+        const text = textElem.textContent?.trim() || '';
         const transformed = transformedTexts[fontFamily]?.[text];
         if (!transformed) return;
+
         const pathElem = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         pathElem.setAttribute('d', transformed);
         reportStyleElem(textElem, pathElem);
-        if (textElem.tagName == 'tspan') {
-            textElem.parentNode.parentNode.append(pathElem);
-            reportStyleElem(textElem.parentNode, pathElem);
+
+        if (textElem.tagName === 'tspan') {
+            textElem.parentNode?.parentNode?.appendChild(pathElem);
+            if (textElem.parentNode) {
+                reportStyleElem(textElem.parentNode as Element, pathElem);
+            }
             textElem.remove();
+        } else {
+            textElem.replaceWith(pathElem);
         }
-        else textElem.replaceWith(pathElem);
+
         // no need to keep font-xxx properties on a path
-        cssFontProps.forEach(prop => pathElem.style.removeProperty(prop));
+        cssFontProps.forEach(prop => (pathElem.style as any).removeProperty(prop));
     });
+
     // Remove now empty <text>s
     svgElem.querySelectorAll('text:empty').forEach(el => el.remove());
 }
 
-function getTextPosition(textElem, defaultStyles) {
-    const getShift = (elem, attr) => {
+export function getTextPosition(textElem: Element, defaultStyles: CSSStyleDeclaration): Position {
+    const getShift = (elem: Element, attr: string): number => {
         const fontSize = parseFloat(getInlineStyle(elem, defaultStyles, 'font-size'));
         const delta = elem.getAttribute(attr);
         if (delta && delta.includes('em')) return parseFloat(delta) * fontSize;
         return 0;
     };
-    const getPos = (elem, direction) => {
-        let attributes = {delta: 'dx', pos: 'x'};
-        if (direction == 'y') attributes = {delta: 'dy', pos: 'y'};
-        let pos = parseFloat(elem.getAttribute(attributes.pos)) || 0;
+
+    const getPos = (elem: Element, direction: 'x' | 'y'): number => {
+        let attributes = { delta: 'dx', pos: 'x' };
+        if (direction === 'y') attributes = { delta: 'dy', pos: 'y' };
+
+        let pos = parseFloat(elem.getAttribute(attributes.pos) || '0') || 0;
         pos += getShift(elem, attributes.delta);
         let prevSibling = elem.previousSibling;
-        // if "y" is ommited, "dy" is cumulative
-        while(prevSibling !== null && !prevSibling.hasAttribute(attributes.pos)) {
-            pos += getShift(prevSibling, attributes.delta);
+
+        // if "y" is omitted, "dy" is cumulative
+        while (prevSibling !== null && !(prevSibling as Element).hasAttribute?.(attributes.pos)) {
+            pos += getShift(prevSibling as Element, attributes.delta);
             prevSibling = prevSibling.previousSibling;
         }
         return pos;
     };
-    
-    let x = getPos(textElem, 'x');
-    let y = getPos(textElem, 'y');
-    return {x, y};
+
+    const x = getPos(textElem, 'x');
+    const y = getPos(textElem, 'y');
+    return { x, y };
 }
 
-export async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption) {
+export async function inlineFontVsPath(
+    svgElem: SVGElement,
+    providedFonts: ProvidedFont[],
+    exportFontsOption: ExportFontChoice
+): Promise<boolean> {
     let nbFontChars = 0;
     let nbPathChars = 0;
-    const transformedTexts = {};
+    const transformedTexts: TransformedTexts = {};
     const SVGO = await import('svgo/browser');
-    const TextToSVG  = (await import('text-to-svg')).default;
+    const TextToSVG = (await import('text-to-svg')).default;
     const defaultStyles = getComputedStyle(document.body);
+
     await Promise.all(providedFonts.map(({ name, content }) => {
         transformedTexts[name] = {};
         nbFontChars += content.length;
         const texts = getTextElems(svgElem);
-        return new Promise(resolve => {
-            TextToSVG.load(content, function (err, textToSVG) {
+
+        return new Promise<void>(resolve => {
+            TextToSVG.load(content, function (err: any, textToSVG: any) {
                 texts.forEach(textElem => {
-                    if (textElem.tagName == 'text' && textElem.firstChild.tagName == 'tspan') return;
+                    if (textElem.tagName === 'text' && (textElem.firstChild as Element)?.tagName === 'tspan') return;
+
                     const fontFamily = getInlineStyle(textElem, defaultStyles, 'font-family');
                     if (fontFamily === name) {
-                        const text = textElem.textContent.trim();
-                        const anchor = anchorToAnchor[textElem.getAttribute('text-anchor')] || 'left';
-                        const baseline = domBaselineToBaseline[textElem.getAttribute('dominant-baseline')] || 'baseline';
+                        const text = textElem.textContent?.trim() || '';
+                        const anchor = anchorToAnchor[textElem.getAttribute('text-anchor') || ''] || 'left';
+                        const baseline = domBaselineToBaseline[textElem.getAttribute('dominant-baseline') || ''] || 'baseline';
                         const fontSize = parseFloat(getInlineStyle(textElem, defaultStyles, 'font-size'));
-                        const {x, y} = getTextPosition(textElem, defaultStyles);
+                        const { x, y } = getTextPosition(textElem, defaultStyles);
+
                         const options = {
                             x: x,
                             y: y,
                             fontSize: fontSize,
                             anchor: `${anchor} ${baseline}`
                         };
+
                         let path = textToSVG.getD(text, options);
                         const tmpSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                         const tmpPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                         tmpPath.setAttribute('d', path);
                         tmpSvg.append(tmpPath);
-                        const optimized = domParser.parseFromString(SVGO.optimize(tmpSvg.outerHTML, svgoConfigText).data, 'image/svg+xml');
+
+                        const optimized = domParser.parseFromString(SVGO.optimize(tmpSvg.outerHTML, svgoConfigText as Config).data, 'image/svg+xml');
                         path = optimized.querySelector('path')?.getAttribute('d');
                         if (!path) return;
+
                         transformedTexts[name][text] = path;
                         nbPathChars += path.length;
                     }
@@ -152,8 +248,9 @@ export async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption
             });
         });
     }));
+
     const pathIsBetter = nbPathChars + 10000 < nbFontChars;
-    if (exportFontsOption === exportFontChoices.convertToPath || pathIsBetter) {
+    if (exportFontsOption === ExportFontChoice.convertToPath || pathIsBetter) {
         replaceTextsWithPaths(svgElem, transformedTexts);
         return true;
     }
@@ -161,34 +258,43 @@ export async function inlineFontVsPath(svgElem, providedFonts, exportFontsOption
 }
 
 const urlUsingAttributes = ['marker-start', 'marker-mid', 'marker-end', 'clip-path', 'fill', 'filter', '*|href'];
-export function changeIdAndReferences(exportedMapElem, newMapId) {
+
+export function changeIdAndReferences(exportedMapElem: Element, newMapId: string): void {
     // change SVG definitions IDs
     exportedMapElem.querySelectorAll('defs > [id], #paths > [id]').forEach(elem => {
         const existingId = elem.getAttribute('id');
-        elem.setAttribute('id', `${newMapId}-${existingId}`);
+        if (existingId) {
+            elem.setAttribute('id', `${newMapId}-${existingId}`);
+        }
     });
-    
+
     // change image-filter-name special attribute for contours
     exportedMapElem.querySelectorAll('[image-filter-name]').forEach(elem => {
         const existingFilterName = elem.getAttribute('image-filter-name');
-        elem.setAttribute('image-filter-name', `${newMapId}-${existingFilterName}`);
+        if (existingFilterName) {
+            elem.setAttribute('image-filter-name', `${newMapId}-${existingFilterName}`);
+        }
     });
 
     // change inline styles with url(#...)
     exportedMapElem.querySelectorAll('[style*="url"]').forEach(elem => {
-        const computed = window.getComputedStyle(elem);
-        for (const prop of elem.style) {
-            const propValue = computed[prop];
-            if (!propValue.includes('url')) continue;
+        const computed = window.getComputedStyle(elem as Element);
+        const elementStyle = (elem as HTMLElement).style;
+
+        for (const prop of elementStyle) {
+            const propValue = computed[prop as any];
+            if (!propValue?.includes('url')) continue;
             const newValue = replaceReferenceValue(propValue, newMapId);
-            if (newValue) elem.style[prop] = newValue;
+            if (newValue) elementStyle[prop as any] = newValue;
         }
     });
+
     // change SVG elements attributes that could contain a reference to another element
     exportedMapElem.querySelectorAll(urlUsingAttributes.map(x => `[${x}]`).join(',')).forEach(elem => {
         for (const attributeName of urlUsingAttributes) {
             let attributesToCheck = [attributeName];
             if (attributeName.includes('href')) attributesToCheck = ['href', 'xlink:href'];
+
             for (const finalAttributeName of attributesToCheck) {
                 const attribute = elem.getAttribute(finalAttributeName);
                 if (!attribute) continue;
@@ -197,17 +303,9 @@ export function changeIdAndReferences(exportedMapElem, newMapId) {
             }
         }
     });
-    // remove ids from path elements
-    // exportedMapElem.querySelectorAll('.choro').forEach(layerElem => {
-    //     layerElem.childNodes.forEach(el => {
-    //         el.removeAttribute('id');
-    //     });
-    // });
 }
 
-// to insert at the end to have mapElement object defined
-
-export function getIntersectionObservingPart(isMacro) {
+export function getIntersectionObservingPart(isMacro: boolean): string {
     const intersectionObservingPart = `
         const observerOptions = {
             root: null,
@@ -242,26 +340,44 @@ export function getIntersectionObservingPart(isMacro) {
         const observer = new IntersectionObserver(intersectionCallback, observerOptions);
         observer.observe(mapElement);
     `;
+
     if (isMacro) return intersectionObservingPart;
     return `
     const allScripts = document.getElementsByTagName('script');
     const scriptTag = allScripts[allScripts.length - 1];
     const mapElement = scriptTag.parentNode;
     ${intersectionObservingPart}
-    `
+    `;
 }
-async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zonesData, providedFonts, downloadExport = true, commonCss,
-    animated, { exportFonts = exportFontChoices.convertToPath, hideOnResize = false, minifyJs = false })
-{
+
+export async function exportSvg(
+    svg: Selection<SVGSVGElement, unknown, null, undefined>,
+    width: number,
+    height: number,
+    tooltipDefs: TooltipDefinitions,
+    chosenCountries: string[],
+    zonesData: ZonesData,
+    providedFonts: ProvidedFont[],
+    downloadExport: boolean = true,
+    commonCss: string,
+    animated: boolean,
+    options: ExportOptions = {}
+): Promise<string | void> {
+    const {
+        exportFonts = ExportFontChoice.convertToPath,
+        hideOnResize = false,
+        minifyJs = false
+    } = options;
+
     const fo = svg.select('foreignObject').node();
     // remove foreign object from dom when exporting
-    if (fo) document.body.append(fo);
-    const svgNode = svg.node();
+    if (fo) document.body.append(fo as Node);
+    const svgNode = svg.node()!;
 
     // === Remove contours images (keep only <g> element to duplicate afterwards) ==
     let contours = Array.from(svgNode.querySelectorAll('image.contour-to-dup'));
-    contours = contours.map(el => {
-        const parent = el.parentNode;
+    const contoursWithParents: [Element, Element][] = contours.map(el => {
+        const parent = el.parentNode as Element;
         document.body.append(el);
         return [el, parent];
     });
@@ -269,24 +385,26 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     /** Add an element using the SVG filter, otherwise it gets removed by SVGO as it's never used directly but later in JS*/
     svgNode.querySelectorAll('[image-filter-name]').forEach(elem => {
         const filterName = elem.getAttribute('image-filter-name');
-        const emptyElementTrickSvgo = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        emptyElementTrickSvgo.classList.add('svgo-trick');
-        emptyElementTrickSvgo.setAttribute('filter', `url(#${filterName})`);
-        svgNode.append(emptyElementTrickSvgo);
+        if (filterName) {
+            const emptyElementTrickSvgo = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            emptyElementTrickSvgo.classList.add('svgo-trick');
+            emptyElementTrickSvgo.setAttribute('filter', `url(#${filterName})`);
+            svgNode.append(emptyElementTrickSvgo);
+        }
     });
     // === End remove contours ==
 
     const usedFonts = getUsedInlineFonts(svgNode);
     const usedProvidedFonts = providedFonts.filter(font => usedFonts.has(font.name));
-    
+
     const SVGO = await import('svgo/browser');
 
     // Optimize whole SVG
-    const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig).data;
+    const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig as Config).data;
 
     // === re-insert tooltip and contours ===
-    if (fo) svg.node().append(fo);
-    contours.forEach(([el, parent]) => {
+    if (fo) svg.node()!.append(fo as Node);
+    contoursWithParents.forEach(([el, parent]) => {
         parent.insertBefore(el, parent.firstChild);
     });
     svgNode.querySelectorAll('.svgo-trick').forEach(el => el.remove());
@@ -294,41 +412,46 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
 
     const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
     optimizedSVG.querySelectorAll('.svgo-trick').forEach(el => el.remove());
+
     let pathIsBetter = false;
-    if (exportFonts == exportFontChoices.smallest || exportFonts == exportFontChoices.convertToPath) {
-        pathIsBetter = await inlineFontVsPath(optimizedSVG.firstChild, providedFonts);
-    }
-    else if (exportFonts == exportFontChoices.noExport) {
+    if (exportFonts === ExportFontChoice.smallest || exportFonts === ExportFontChoice.convertToPath) {
+        pathIsBetter = await inlineFontVsPath(optimizedSVG.firstChild as SVGElement, providedFonts, exportFonts);
+    } else if (exportFonts === ExportFontChoice.noExport) {
         pathIsBetter = true;
     }
-    const finalDataByGroup = { data: {}, tooltips: {} };
+
+    const finalDataByGroup: FinalDataByGroup = { data: {}, tooltips: {} };
     let tooltipEnabled = false;
+
     [...chosenCountries, 'countries'].forEach(groupId => {
         const group = optimizedSVG.getElementById(groupId);
-        if (!group || !tooltipDefs[groupId].enabled) return;
+        if (!group || !tooltipDefs[groupId]?.enabled) return;
+
         tooltipEnabled = true;
         const ttTemplate = getFinalTooltipTemplate(groupId, tooltipDefs);
-        let usedVars = [...ttTemplate.matchAll(/\{(\w+)\}/g)].map(group => {
-            return group[1];
-        });
+        let usedVars = [...ttTemplate.matchAll(/\{(\w+)\}/g)].map(group => group[1]);
         usedVars = [...new Set(usedVars)];
-        usedVars = usedVars.filter(v => v != 'name');
+        usedVars = usedVars.filter(v => v !== 'name');
+
         let functionStr = ttTemplate.replaceAll(/\{(\w+)\}/gi, '${data.$1}');
         functionStr = functionStr.replace('data.name', 'shapeId');
         finalDataByGroup.tooltips[groupId] = functionStr;
+
         const zonesDataDup = JSON.parse(JSON.stringify(zonesData[groupId].data));
         zonesData[groupId].numericCols.forEach(colDef => {
             const col = colDef.column;
-            zonesDataDup.forEach(row => {
+            zonesDataDup.forEach((row: any) => {
                 row[col] = zonesData[groupId].formatters[col](row[col]);
             });
         });
+
         const indexed = indexBy(zonesDataDup, 'name');
-        const finalData = {};
+        const finalData: { [shapeId: string]: any } = {};
+
         for (const child of group.children) {
             const id = child.getAttribute('id');
-            if (!id) continue;
-            if (!indexed[id]) continue;
+            if (!id || !indexed[id]) continue;
+            // @ts-ignore
             finalData[id] = pick(indexed[id], usedVars);
         }
         finalDataByGroup.data[groupId] = finalData;
@@ -340,7 +463,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     window.addEventListener('resize', e => {
         contentSvg.style.display = "none"; clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => { contentSvg.style.display = 'block' }, 300);
-    });`: '';
+    });` : '';
 
     const onMouseEvents = `
         mapElement.addEventListener('mousemove', (e) => {
@@ -447,6 +570,7 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
             tooltip.element.style.opacity = tooltipVisibleOpacity;
         }
     }` : '';
+
     let finalScript = `
     (function() {
         ${encodeSVGDataImageStr}
@@ -493,35 +617,38 @@ async function exportSvg(svg, width, height, tooltipDefs, chosenCountries, zones
     // === Styling ===
     const styleElem = document.createElementNS("http://www.w3.org/2000/svg", 'style');
     const renderedCss = commonCss.replaceAll(/rgb\(.*?\)/g, rgb2hex) + additionnalCssExport;
-    const {mapId, finalCss } = discriminateCssForExport(renderedCss);
-    optimizedSVG.firstChild.setAttribute('id', mapId);
-    changeIdAndReferences(optimizedSVG.firstChild, mapId);
+    const { mapId, finalCss } = discriminateCssForExport(renderedCss);
+    (optimizedSVG.firstChild as Element).setAttribute('id', mapId);
+    changeIdAndReferences(optimizedSVG.firstChild as Element, mapId);
     // === End styling ===
 
     styleElem.innerHTML = pathIsBetter ? finalCss : finalCss + fontsToCss(usedProvidedFonts);
-    optimizedSVG.firstChild.append(styleElem);
-    optimizedSVG.firstChild.classList.remove('animate-transition');
-    optimizedSVG.firstChild.classList.add('cartosvg')
-    if (!downloadExport) return optimizedSVG.firstChild.outerHTML;
-    if (minifyJs != false) {
+    (optimizedSVG.firstChild as Element)!.append(styleElem);
+    (optimizedSVG.firstChild as Element).classList.remove('animate-transition');
+    (optimizedSVG.firstChild as Element).classList.add('cartosvg');
+
+    if (!downloadExport) return (optimizedSVG.firstChild as Element).outerHTML;
+
+    if (minifyJs !== false) {
         const terser = await import('terser');
-        finalScript = await terser.minify(finalScript, { toplevel: true, mangle: {eval: true, reserved: ['data', 'shapeId']}});
-        finalScript = finalScript.code;
+        const minified = await terser.minify(finalScript, {
+            toplevel: true,
+            mangle: { eval: true, reserved: ['data', 'shapeId'] }
+        });
+        finalScript = minified.code || finalScript;
     }
+
     const scriptElem = document.createElementNS("http://www.w3.org/2000/svg", 'script');
     const scriptContent = document.createTextNode(finalScript);
     scriptElem.appendChild(scriptContent);
-    optimizedSVG.firstChild.append(scriptElem);
-    download(optimizedSVG.firstChild.outerHTML, 'text/plain', 'cartosvg-export.svg');
+    (optimizedSVG.firstChild as Element)!.append(scriptElem);
+    download((optimizedSVG.firstChild as Element).outerHTML, 'text/plain', 'cartosvg-export.svg');
 }
 
-function getFinalTooltipTemplate(groupId, tooltipDefs) {
-    const finalReference = htmlToElement(tooltipDefs[groupId].content);
-    const finalTemplate = finalReference.cloneNode(true);
+export function getFinalTooltipTemplate(groupId: string, tooltipDefs: TooltipDefinitions): string {
+    const finalReference = htmlToElement(tooltipDefs[groupId].content)!;
+    const finalTemplate = finalReference.cloneNode(true) as Element;
     finalTemplate.innerHTML = tooltipDefs[groupId].template;
     reportStyle(finalReference, finalTemplate);
     return finalTemplate.outerHTML;
 }
-
-
-export { exportSvg, exportFontChoices };

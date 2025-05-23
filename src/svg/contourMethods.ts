@@ -1,8 +1,11 @@
-// import SVGO from 'svgo/dist/svgo.browser';
 import svgoConfig from '../svgoExport.config';
 import { select } from 'd3-selection'
 import { duplicateContourCleanFirst } from './svg';
 import { appendGlow } from './svgDefs';
+import type { ContourParams, D3Selection, InlineStyles, SvgSelection } from 'src/types';
+import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson';
+import type { GlowParams } from 'src/params';
+import type { GeoPath } from 'd3-geo';
 
 
 // Using encodeURIComponent() as replacement function
@@ -44,7 +47,9 @@ export function imageFromSpecialGElem(gElem: SVGGElement) {
 }
 export const imageFromSpecialGElemStr = imageFromSpecialGElem.toString();
 
-export function appendLandImageNew(this: SVGGElement, showSource: false, zonesFilter, width, height, borderWidth, contourParams, land, pathLarger, glowParams, animate) {
+export function appendLandImageNew(this: SVGGElement, showSource: false, zonesFilter: { [id: string]: string },
+    width: number, height: number, borderWidth: number, contourParams: ContourParams, land: FeatureCollection<Polygon> | Polygon,
+    pathLarger: GeoPath, glowParams: GlowParams, animate: boolean) {
     // for not having glow effect on sides of view where there is land
     const offCanvasWithBorder = 20 - (borderWidth / 2);
     select(this).attr('id', 'land')
@@ -52,7 +57,7 @@ export function appendLandImageNew(this: SVGGElement, showSource: false, zonesFi
         .style('will-change', 'opacity')
 
     const parent = select(this);
-    let gElem = parent.select('g');
+    let gElem = parent.select<SVGGElement>('g');
     if (gElem.empty()) {
         gElem = parent.append('g')
             .attr('stroke', contourParams.strokeColor)
@@ -68,15 +73,17 @@ export function appendLandImageNew(this: SVGGElement, showSource: false, zonesFi
             .attr('image-class', 'contour-to-dup glow-img');
 
         gElem.selectAll('path')
+            // @ts-expect-error
             .data(land.features ? land.features : land)
             .join('path')
             .attr('pathLength', 1)
+            // @ts-expect-error
             .attr('d', (d) => { return pathLarger(d) });
         let filterName = zonesFilter['land'];
         if (filterName) {
             if (showSource) {
                 filterName = `${zonesFilter['land']}-with-source`;
-                appendGlow(select('#static-svg-map'), filterName, showSource, glowParams);
+                appendGlow(select('#static-svg-map') as unknown as SvgSelection, filterName, showSource, glowParams);
             }
             gElem.attr('image-filter-name', filterName);
         }
@@ -85,13 +92,14 @@ export function appendLandImageNew(this: SVGGElement, showSource: false, zonesFi
         parent.select('g').attr('fill', contourParams.fillColor);
     }
     if (animate) return;
-    const imageElem = imageFromSpecialGElem(gElem.node());
+    const imageElem = imageFromSpecialGElem(gElem.node() as SVGGElement);
     this.append(imageElem);
 }
 
-export function appendCountryImageNew(countryData, filter, applyStyles, path, inlineStyles, animate, clear = false) {
+export function appendCountryImageNew(this: SVGDefsElement, countryData: Feature<Polygon>, filter: string,
+    applyStyles: (a: boolean) => void, path: GeoPath, inlineStyles: InlineStyles, animate: boolean, clear = false) {
     if (clear) select(this).html('');
-    const countryName = countryData.properties.name;
+    const countryName = countryData.properties!.name;
     const ref = document.getElementById(countryName);
 
     // if country not present or no stroke width and no filter, do nothing
@@ -106,7 +114,7 @@ export function appendCountryImageNew(countryData, filter, applyStyles, path, in
         .classed('country-img', true);
 
     const parent = select(this);
-    let gElem = parent.select('g');
+    let gElem = parent.select<SVGGElement>('g');
     if (gElem.empty()) {
         gElem = parent.append('g')
             .attr('image-width', '100%')
@@ -123,16 +131,17 @@ export function appendCountryImageNew(countryData, filter, applyStyles, path, in
         const strokeParams = ['stroke', 'stroke-width', 'stroke-linejoin', 'stroke-dasharray'];
         const computedRef = window.getComputedStyle(ref);
         strokeParams.forEach(p => {
+            // @ts-expect-error
             pathElem.attr(p, computedRef[p])
         });
-        ref.style['stroke-width'] = '0px';
+        ref.style.strokeWidth = '0px';
     }
     if (animate) return;
-    const imageElem = imageFromSpecialGElem(gElem.node());
+    const imageElem = imageFromSpecialGElem(gElem.node() as SVGGElement);
     this.append(imageElem);
     // remove all cloned filter elements
     if (clear) {
-        const svgElem = document.getElementById('static-svg-map');
+        const svgElem = document.getElementById('static-svg-map') as unknown as SVGSVGElement;
         duplicateContourCleanFirst(svgElem);
     }
 }
