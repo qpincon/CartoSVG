@@ -28,11 +28,11 @@
         getBestFormatter,
         getColumns,
         findProp,
+        formatUnicorn,
     } from "./util/common";
     import * as shapes from "./svg/shapeDefs";
     import * as markers from "./svg/markerDefs";
     import { setTransformScale, closestDistance, duplicateContourCleanFirst, pathStringFromParsed } from "./svg/svg";
-    import { appendLandImageNew, appendCountryImageNew } from "./svg/contourMethods";
     import { drawShapes } from "./svg/shape";
     import iso3Data from "./assets/data/iso3_filtered.json";
     import DataTable from "./components/DataTable.svelte";
@@ -52,7 +52,7 @@
     import Instructions from "./components/Instructions.svelte";
     import Icon from "./components/Icon.svelte";
     import RangeInput from "./components/RangeInput.svelte";
-    import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts, applyStyles } from "./util/dom";
+    import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts, applyStyles, DOM_PARSER } from "./util/dom";
     import { saveState, getState } from "./util/save";
     import { exportSvg, exportFontChoices } from "./svg/export";
     import { addTooltipListener } from "./tooltip";
@@ -138,22 +138,6 @@
         if (name.includes("ADM1")) return countriesAdm1Resolve(availableCountriesAdm1[name]);
         return countriesAdm2Resolve(availableCountriesAdm2[name]);
     }
-
-    String.prototype.formatUnicorn =
-        String.prototype.formatUnicorn ||
-        function () {
-            let str = this.toString();
-            if (arguments.length) {
-                const t = typeof arguments[0];
-                const args = "string" === t || "number" === t ? Array.prototype.slice.call(arguments) : arguments[0];
-
-                for (const key in args) {
-                    str = str.replace(new RegExp("\\{" + key + "\\}", "gi"), args[key]);
-                }
-            }
-
-            return str;
-        };
 
     const p = (propName, obj = currentParams ?? params) => findProp(propName, obj);
 
@@ -1841,8 +1825,7 @@
 
     let templateErrorMessages = {};
     function onTemplateChange() {
-        const domParser = new DOMParser();
-        const parsed = domParser.parseFromString(tooltipDefs[currentTab].template, "application/xml");
+        const parsed = DOM_PARSER.parseFromString(tooltipDefs[currentTab].template, "application/xml");
         const errorNode = parsed.querySelector("parsererror");
         if (errorNode) {
             templateErrorMessages[currentTab] = true;
@@ -2615,7 +2598,8 @@
                                                 on:click={editTooltip}
                                                 style="${defaultTooltipStyle}"
                                             >
-                                                {@html tooltipDefs[currentTab].template.formatUnicorn(
+                                                {@html formatUnicorn(
+                                                    tooltipDefs[currentTab].template,
                                                     getFirstDataRow(zonesData?.[currentTab]),
                                                 )}
                                             </div>

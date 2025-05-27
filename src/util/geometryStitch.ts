@@ -10,7 +10,7 @@ import { tiles as getTiles } from '@mapbox/tile-cover';
 import bboxClip from "@turf/bbox-clip";
 import { mergeLineStrings } from "./linestitch";
 import { yieldToMain } from "./polyfills";
-import type { BBox, Feature, Geometry, GeometryCollection, LineString, MultiLineString, MultiPolygon, Polygon, Position } from "geojson";
+import type { BBox, Feature, Geometry, LineString, MultiLineString, MultiPolygon, Polygon, Position } from "geojson";
 
 /**
  * This file contains an attempt at stitching tiles together.

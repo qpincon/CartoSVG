@@ -3,29 +3,20 @@ import { select, type Selection } from "d3-selection";
 import { getRenderedFeatures, type RenderedFeature } from "./util/geometryStitch";
 import { cloneDeep, debounce, kebabCase, last, random, set, size } from "lodash-es";
 import { color, hsl } from "d3-color";
-import { findStyleSheet, fontsToCss, getUsedInlineFonts, updateStyleSheetOrGenerateCss } from "./util/dom";
+import { DOM_PARSER, findStyleSheet, fontsToCss, getUsedInlineFonts, updateStyleSheetOrGenerateCss } from "./util/dom";
 import { HatchPatternGenerator } from "./svg/patternGenerator";
 import { appendClip } from "./svg/svgDefs";
 import { discriminateCssForExport, download, findProp } from "./util/common";
-import { additionnalCssExport, changeIdAndReferences, ExportFontChoice, exportFontChoices, getIntersectionObservingPart, inlineFontVsPath, rgb2hex, type ProvidedFont } from "./svg/export";
+import { additionnalCssExport, changeIdAndReferences, exportFontChoices, getIntersectionObservingPart, inlineFontVsPath, rgb2hex } from "./svg/export";
 import { createRoundedRectangleGeoJSON } from './util/geometry';
 import bboxPolygon from '@turf/bbox-polygon';
 import booleanDisjoint from '@turf/boolean-disjoint';
 import { type Feature, type Geometry, type Polygon } from 'geojson';
-import type { MacroGeneralParams, MicroGeneralParams } from './params';
-import type { Color, MicroPalette, SvgSelection } from './types';
+import type { MicroGeneralParams } from './params';
+import { type Color, type ExportOptions, type MicroLayerId, type MicroPalette, type PatternDefinition, type ProvidedFont, type SvgSelection } from './types';
 import type { Config } from 'svgo/browser';
+import type { Map } from 'maplibre-gl';
 
-// Type definitions
-interface MaplibreMap {
-    getZoom(): number;
-    // Add other maplibre methods as needed
-}
-
-
-interface ExportOptions {
-    exportFonts?: ExportFontChoice;
-}
 
 type D3Selection = Selection<SVGElement, unknown, null, undefined>;
 type D3PathFunction = (geometry: Geometry) => string | null;
@@ -81,7 +72,7 @@ export function orderFeaturesByLayer(features: RenderedFeature[]): void {
 // }
 
 export async function drawPrettyMap(
-    maplibreMap: MaplibreMap,
+    maplibreMap: Map,
     svg: D3Selection,
     d3PathFunction: D3PathFunction,
     layerDefinitions: MicroPalette,
@@ -91,7 +82,7 @@ export async function drawPrettyMap(
     // console.log('layerDefinitions=', layerDefinitions);
     const mapLibreContainer = select('#maplibre-map');
     const layersToQuery = interestingBasicV2Layers.filter(layer => {
-        return layerDefinitions[kebabCase(layer)]?.active !== false;
+        return layerDefinitions[kebabCase(layer) as MicroLayerId]?.active !== false;
     });
     updateSvgPatterns(svg.node(), layerDefinitions);
     const geometries = await getRenderedFeatures(maplibreMap, { layers: layersToQuery });
@@ -129,13 +120,13 @@ export async function drawPrettyMap(
         .attr('pathLength', 1)
         .attr("d", (d) => d3PathFunction(d.geometry))
         .attr("class", d => {
-            const layerIdKebab = kebabCase(d.properties.mapLayerId);
-            const classes = [layerIdKebab];
+            const layerIdKebab = kebabCase(d.properties.mapLayerId) as MicroLayerId;
+            const classes: string[] = [layerIdKebab];
             if (layerIdKebab.includes('path') || layerIdKebab.includes('road')) classes.push('line');
             else classes.push(d.geometry.type.includes("Line") ? 'line' : 'poly');
             const state = layerDefinitions[layerIdKebab];
             if (!state) classes.push('other');
-            if (state?.fills) {
+            if (state.fills) {
                 classes.push(`${layerIdKebab}-${random(0, state.fills.length - 1)}`);
             }
             return classes.join(' ');
@@ -353,10 +344,10 @@ export function generateCssFromState(state: MicroPalette): string | null {
 
 // Returns true if we should redraw (layer deactivated for instance)
 export function onMicroParamChange(
-    layer: string,
+    layer: MicroLayerId,
     prop: string | string[],
     value: any,
-    layerState: LayerState
+    layerState: MicroPalette
 ): boolean {
     if (prop.includes("pattern")) {
         updateSvgPatterns(document.getElementById('static-svg-map') as unknown as SVGSVGElement, layerState);
@@ -393,7 +384,7 @@ export function syncLayerStateWithCss(
     eventType: any,
     cssProp: string,
     value: string | null,
-    layerState: LayerState
+    layerState: MicroPalette
 ): boolean {
     console.log(eventType, cssProp, value, layerState);
     // Prevent removing value
@@ -422,20 +413,20 @@ export function syncLayerStateWithCss(
     return true;
 }
 
-export const replaceCssSheetContent = debounce((layerState: LayerState) => {
+export const replaceCssSheetContent = debounce((layerState: MicroPalette) => {
     const styleSheet = document.getElementById('common-style-sheet-elem-micro') as HTMLStyleElement;
     const microCss = generateCssFromState(layerState);
     if (microCss) styleSheet.innerHTML = microCss;
 }, 500);
 
-export function updateSvgPatterns(svgNode: SVGElement | null, layerState: LayerState): void {
+export function updateSvgPatterns(svgNode: SVGElement | null, layerState: MicroPalette): void {
     if (!svgNode) return;
-    const patterns = Object.values(layerState).map((def) => {
+    const patterns: PatternDefinition[] = Object.values(layerState).map((def) => {
         return {
             ...def.pattern,
             backgroundColor: def.fill
         }
-    }).filter((pattern): pattern is PatternDefinition & { backgroundColor: string } =>
+    }).filter((pattern) =>
         pattern?.active === true && pattern.backgroundColor != null
     );
 
@@ -444,14 +435,13 @@ export function updateSvgPatterns(svgNode: SVGElement | null, layerState: LayerS
         if (pattern.id?.includes('background')) continue;
         patterns.push({
             ...pattern,
-            backgroundColor: lighten(pattern.backgroundColor),
+            backgroundColor: lighten(pattern.backgroundColor!),
             id: `${pattern.id}-light`
         });
     }
     patternGenerator.addOrUpdatePatternsForSVG(svgNode.querySelector('defs') as unknown as SVGDefsElement, patterns);
 }
 
-const domParser = new DOMParser();
 
 export async function exportMicro(
     svg: D3Selection,
@@ -476,7 +466,7 @@ export async function exportMicro(
 
     // Optimize whole SVG
     const finalSvg = SVGO.optimize(svgNode.outerHTML, svgoConfig as Config).data;
-    const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
+    const optimizedSVG = DOM_PARSER.parseFromString(finalSvg, 'image/svg+xml');
     let pathIsBetter = false;
 
     if (exportFonts == exportFontChoices.smallest || exportFonts == exportFontChoices.convertToPath) {

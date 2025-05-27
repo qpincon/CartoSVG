@@ -29,4 +29,22 @@
     "editor.defaultFormatter": "svelte.svelte-vscode"
   },
   "svelte.plugin.svelte.format.config.printWidth": 120,
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/src/assets/layers": true,
+    "**/src/examples": true,
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/dist": true,
+    "**/src/assets/layers": true,
+    "**/src/examples": true,
+  },
 }

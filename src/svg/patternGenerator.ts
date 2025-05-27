@@ -1,4 +1,4 @@
-import type { Color } from "src/types";
+import type { Color, PatternDefinition } from "src/types";
 
 /**
  * Creates SVG pattern definitions similar to matplotlib's hatch styles
@@ -42,14 +42,7 @@ export class HatchPatternGenerator {
    * @param options - Additional options (color, size, etc.)
    * @returns {SVGPatternElement} SVG pattern element
    */
-  updateOrCreatePattern(options: {
-    hatch: string;
-    id: string;
-    color?: Color;
-    scale?: number;
-    strokeWidth?: number;
-    backgroundColor?: string;
-  }): SVGPatternElement {
+  updateOrCreatePattern(options: PatternDefinition): SVGPatternElement {
     const {
       hatch,
       id,
@@ -59,11 +52,11 @@ export class HatchPatternGenerator {
       backgroundColor = 'none',
     } = options;
 
-    let pattern = document.getElementById(id) as SVGPatternElement | null;
+    let pattern = document.getElementById(id!) as SVGPatternElement | null;
     if (pattern) pattern.remove();
     // Create SVG pattern element
     pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
-    pattern.setAttribute('id', id);
+    pattern.setAttribute('id', id!);
     pattern.setAttribute('patternUnits', 'userSpaceOnUse');
     pattern.setAttribute('width', this.size.toString());
     pattern.setAttribute('height', this.size.toString());
@@ -79,7 +72,7 @@ export class HatchPatternGenerator {
     }
     this.offsetAccum = 0;
     // Parse the hatch string and add appropriate elements
-    for (const char of hatch) {
+    for (const char of hatch!) {
       if ('/\\-|+x.oO*'.includes(char)) {
         switch (char) {
           case '/': // Forward diagonal lines
@@ -219,7 +212,7 @@ export class HatchPatternGenerator {
     return circle;
   }
 
-  addOrUpdatePatternsForSVG(defs: SVGDefsElement, patternDefs) {
+  addOrUpdatePatternsForSVG(defs: SVGDefsElement, patternDefs: PatternDefinition[]) {
     for (const def of patternDefs) {
       const pattern = this.updateOrCreatePattern(def);
       defs.appendChild(pattern);

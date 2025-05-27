@@ -4,49 +4,12 @@ import svgoConfigText from '../svgoExportText.config';
 import { imageFromSpecialGElemStr, encodeSVGDataImageStr } from './contourMethods';
 import { htmlToElement } from '../util/common';
 import { indexBy, pick, download, discriminateCssForExport } from '../util/common';
-import { reportStyle, reportStyleElem, fontsToCss, getUsedInlineFonts } from '../util/dom';
+import { reportStyle, reportStyleElem, fontsToCss, getUsedInlineFonts, DOM_PARSER } from '../util/dom';
 import { type Selection } from 'd3-selection';
 import type { Config } from 'svgo/browser';
+import { ExportFontChoice, type ExportOptions, type ProvidedFont, type TooltipDefs, type ZonesData } from 'src/types';
 
-export interface ProvidedFont {
-    name: string;
-    content: string;
-}
 
-interface TooltipDefinition {
-    enabled: boolean;
-    content: string;
-    template: string;
-}
-
-interface TooltipDefinitions {
-    [groupId: string]: TooltipDefinition;
-}
-
-interface ColumnDefinition {
-    column: string;
-}
-
-interface ZoneDataRow {
-    name: string;
-    [key: string]: any;
-}
-
-interface ZoneData {
-    data: ZoneDataRow[];
-    numericCols: ColumnDefinition[];
-    formatters: { [column: string]: (value: any) => string };
-}
-
-interface ZonesData {
-    [groupId: string]: ZoneData;
-}
-
-interface ExportOptions {
-    exportFonts?: ExportFontChoice;
-    hideOnResize?: boolean;
-    minifyJs?: boolean;
-}
 
 interface Position {
     x: number;
@@ -64,13 +27,8 @@ interface FinalDataByGroup {
     tooltips: { [groupId: string]: string };
 }
 
-interface Tooltip {
-    shapeId: string | null;
-    element: SVGForeignObjectElement | null;
-}
 
 // Enums and constants
-const domParser = new DOMParser();
 
 export const rgb2hex = (rgb: string): string =>
     `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/)!.slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`;
@@ -93,13 +51,6 @@ export const replaceReferenceValue = (value: string, prefix: string): string | u
     }
     return newValue;
 };
-
-export enum ExportFontChoice {
-    noExport = 0,
-    convertToPath = 1,
-    embedFont = 2,
-    smallest = 3,
-}
 
 export const exportFontChoices = Object.freeze(ExportFontChoice);
 
@@ -236,7 +187,7 @@ export async function inlineFontVsPath(
                         tmpPath.setAttribute('d', path);
                         tmpSvg.append(tmpPath);
 
-                        const optimized = domParser.parseFromString(SVGO.optimize(tmpSvg.outerHTML, svgoConfigText as Config).data, 'image/svg+xml');
+                        const optimized = DOM_PARSER.parseFromString(SVGO.optimize(tmpSvg.outerHTML, svgoConfigText as Config).data, 'image/svg+xml');
                         path = optimized.querySelector('path')?.getAttribute('d');
                         if (!path) return;
 
@@ -354,7 +305,7 @@ export async function exportSvg(
     svg: Selection<SVGSVGElement, unknown, null, undefined>,
     width: number,
     height: number,
-    tooltipDefs: TooltipDefinitions,
+    tooltipDefs: TooltipDefs,
     chosenCountries: string[],
     zonesData: ZonesData,
     providedFonts: ProvidedFont[],
@@ -410,7 +361,7 @@ export async function exportSvg(
     svgNode.querySelectorAll('.svgo-trick').forEach(el => el.remove());
     // === End re-insertion === 
 
-    const optimizedSVG = domParser.parseFromString(finalSvg, 'image/svg+xml');
+    const optimizedSVG = DOM_PARSER.parseFromString(finalSvg, 'image/svg+xml');
     optimizedSVG.querySelectorAll('.svgo-trick').forEach(el => el.remove());
 
     let pathIsBetter = false;
@@ -645,8 +596,8 @@ export async function exportSvg(
     download((optimizedSVG.firstChild as Element).outerHTML, 'text/plain', 'cartosvg-export.svg');
 }
 
-export function getFinalTooltipTemplate(groupId: string, tooltipDefs: TooltipDefinitions): string {
-    const finalReference = htmlToElement(tooltipDefs[groupId].content)!;
+export function getFinalTooltipTemplate(groupId: string, tooltipDefs: TooltipDefs): string {
+    const finalReference = htmlToElement(tooltipDefs[groupId].content!)!;
     const finalTemplate = finalReference.cloneNode(true) as Element;
     finalTemplate.innerHTML = tooltipDefs[groupId].template;
     reportStyle(finalReference, finalTemplate);

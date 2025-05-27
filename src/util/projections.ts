@@ -2,26 +2,11 @@ import { geoMercator, geoEqualEarth, geoAlbersUsa, geoNaturalEarth1, geoTransfor
 import { geoSatellite, geoBaker } from 'd3-geo-projection';
 import { scaleLinear, geoClipCircle, geoClipRectangle } from 'd3';
 import { LngLat, Point, Map } from 'maplibre-gl';
+import type { ProjectionParams } from 'src/types';
 
 const degrees = 180 / Math.PI;
 const earthRadius = 6371;
 const offCanvasPx = 20;
-
-type ProjectionParams = {
-    width: number;
-    height: number;
-    translateX?: number;
-    translateY?: number;
-    altitude: number;
-    latitude?: number;
-    longitude?: number;
-    rotation?: number;
-    borderWidth: number;
-    larger?: boolean;
-    fov?: number;
-    tilt?: number;
-    projectionName?: string;
-};
 
 type ProjectionFunction = (params: ProjectionParams) => any;
 

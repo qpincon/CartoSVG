@@ -4,29 +4,9 @@ import { reportStyle } from '../util/dom';
 import { setTransformTranslate, getTranslateFromTransform } from './svg';
 import { addSvgText } from './shape';
 import { drag } from 'd3-drag';
-interface LegendDef {
-    noData: {
-        active: boolean;
-        color: string;
-        text: string;
-    };
-    direction: 'h' | 'v';
-    maxWidth: number;
-    rectWidth: number;
-    rectHeight: number;
-    lineWidth: number;
-    x: number;
-    y: number;
-    title: string;
-    titleChanged?: boolean;
-    labelOnLeft?: boolean;
-    changes: Record<string, { dx: number; dy: number; title?: string }>;
-}
-
-type LegendColor = [string, string];
+import type { LegendColor, LegendDef } from "src/types";
 
 export function drawLegend(
-    // this: SVGGElement,
     legendSelection: d3.Selection<SVGGElement, unknown, null, undefined>,
     legendDef: LegendDef,
     legendColors: LegendColor[],

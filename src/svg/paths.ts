@@ -2,25 +2,9 @@ import parsePath from 'parse-svg-path';
 import * as markers from './markerDefs';
 import { RGBAToHexA } from '../util/common';
 import { pathStringFromParsed } from './svg';
-import type { Coords, D3Selection, SvgSelection } from 'src/types';
+import type { Coords, D3Selection, MarkerName, PathDef, SvgSelection } from 'src/types';
 
 
-type MarkerName = keyof typeof markers;
-
-interface PathDefImage {
-    name: string;
-    content: string;
-}
-
-interface PathDef {
-    image?: PathDefImage;
-    marker?: MarkerName;
-    d: any; // Parsed path data structure
-    height?: number;
-    width?: number;
-    duration?: number;
-    index?: number;
-}
 
 export type Project = (coords: Coords) => Coords;
 export type Projection = Project & {

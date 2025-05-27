@@ -1,7 +1,6 @@
 import type { Coords } from "src/types";
 import type { Projection } from "./paths";
-
-const domParser = new DOMParser();
+import { DOM_PARSER } from "src/util/dom";
 
 // remove buggy paths, covering the whole svg element
 export function removeCoveringAll(groupElement: SVGGElement | null): void {
@@ -83,7 +82,7 @@ export function setTransformTranslate(el: SVGElement, translateStr: string): voi
 
 export function createSvgFromPart(partStr: string): SVGElement {
     const svgStr = `<svg xmlns="http://www.w3.org/2000/svg">${partStr}</svg>`;
-    const parsed = domParser.parseFromString(svgStr, 'text/html').body.childNodes[0];
+    const parsed = DOM_PARSER.parseFromString(svgStr, 'text/html').body.childNodes[0];
     return parsed?.firstChild as SVGElement;
 }
 

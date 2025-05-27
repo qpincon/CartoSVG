@@ -3,17 +3,9 @@ import { drag, type D3DragEvent } from 'd3-drag';
 import { createSvgFromPart, setTransformTranslate, getTranslateFromTransform } from './svg';
 import * as shapes from './shapeDefs';
 import type { Projection } from './paths';
-import type { Coords } from 'src/types';
+import type { Coords, ShapeDefinition } from 'src/types';
 
 
-interface ShapeDefinition {
-    id: string;
-    pos: Coords;
-    name?: ShapeName; // for symbols
-    text?: string; // for labels
-}
-
-export type ShapeName = keyof typeof shapes;
 
 type DragCallback = () => void;
 

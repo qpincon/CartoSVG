@@ -1,7 +1,7 @@
+import type { InlineStyles, ProvidedFont } from "src/types";
 import { setTransformScale } from "../svg/svg";
 
-type Font = { name: string; content: string };
-export type InlineStyles = Record<string, Record<string, string | number | null>>;
+export const DOM_PARSER = new DOMParser();
 
 export function reportStyle(reference: Element, target: Element): void {
     const walkerRef = document.createTreeWalker(reference, NodeFilter.SHOW_ELEMENT);
@@ -24,7 +24,7 @@ export function reportStyleElem(ref: Element, target: Element): void {
     }
 }
 
-export function fontsToCss(fonts: Font[]): string {
+export function fontsToCss(fonts: ProvidedFont[]): string {
     return fonts.map(({ name, content }) => {
         return `@font-face {
             font-family: ${name};
