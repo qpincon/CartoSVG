@@ -47,7 +47,7 @@ export function imageFromSpecialGElem(gElem: SVGGElement) {
 }
 export const imageFromSpecialGElemStr = imageFromSpecialGElem.toString();
 
-export function appendLandImageNew(this: SVGGElement, showSource: false, zonesFilter: { [id: string]: string },
+export function appendLandImageNew(this: SVGGElement, showSource: boolean, zonesFilter: { [id: string]: string },
     width: number, height: number, borderWidth: number, contourParams: ContourParams, land: FeatureCollection<Polygon> | Polygon,
     pathLarger: GeoPath, glowParams: GlowParams, animate: boolean) {
     // for not having glow effect on sides of view where there is land
@@ -96,7 +96,7 @@ export function appendLandImageNew(this: SVGGElement, showSource: false, zonesFi
     this.append(imageElem);
 }
 
-export function appendCountryImageNew(this: SVGDefsElement, countryData: Feature<Polygon>, filter: string,
+export function appendCountryImageNew(this: SVGGElement, countryData: Feature<Polygon>, filter: string | null,
     applyStyles: (a: boolean) => void, path: GeoPath, inlineStyles: InlineStyles, animate: boolean, clear = false) {
     if (clear) select(this).html('');
     const countryName = countryData.properties!.name;

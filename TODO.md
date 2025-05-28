@@ -127,6 +127,7 @@
 - [x] Micro: Debug right click
 - [x] Micro: Fill pattern hover
 - [x] Micro: Stop computations when moving
+- [ ] Click on increment range on significant digits legend does nothing
 - [ ] Remove labels off canvas
 - [ ] Freehand: style group with ISE (add custom CSS rule on the fly on <g> parent)
 - [ ] Freehand: Allow drag drawing
@@ -169,7 +170,7 @@
 - [ ] Migrate to svelte 5
 - [ ] Use typescript
 - [ ] Use svelte/kit
-    - [ ] Disable cloudflare deployment
+    - [x] Disable cloudflare deployment
     - [ ] Deploy on VPS
 - [ ] Use vite
   - require.context => import.meta.glob

@@ -2,29 +2,14 @@ import parsePath from 'parse-svg-path';
 import * as markers from './markerDefs';
 import { RGBAToHexA } from '../util/common';
 import { pathStringFromParsed } from './svg';
-import type { Coords, D3Selection, MarkerName, PathDef, SvgSelection } from 'src/types';
+import type { Coords, D3Selection, InlineStyles, MarkerName, ParsedPath, PathDef, SvgSelection } from 'src/types';
+import type { GeoProjection } from 'd3-geo';
 
-
-
-export type Project = (coords: Coords) => Coords;
-export type Projection = Project & {
-    invert(coordinates: Coords): Coords;
-}
-
-interface InlineStyles {
-    [key: string]: {
-        stroke?: string;
-        [property: string]: any;
-    };
-}
-
-type ParsedPathGroup = (string | number)[];
-type ParsedPath = ParsedPathGroup[];
 
 export function drawCustomPaths(
     pathDefs: PathDef[],
     svg: SvgSelection,
-    projection: Projection,
+    projection: GeoProjection,
     inlineStyles: InlineStyles = {}
 ): void {
     if (!pathDefs) return;
@@ -156,7 +141,7 @@ function extractTranslateFromElem(elem: Element): [number | null, number | null]
 
 export function parseAndUnprojectPath(
     pathElemOrStr: string | Element,
-    projection: Projection
+    projection: GeoProjection
 ): ParsedPath {
     let pathStr: string;
     let xTranslate = 0;
@@ -177,7 +162,7 @@ export function parseAndUnprojectPath(
         for (let i = 1; i < group.length; i += 2) {
             const x = group[i] as number;
             const y = group[i + 1] as number;
-            const inverted = projection.invert([x + xTranslate, y + yTranslate]);
+            const inverted = projection.invert!([x + xTranslate, y + yTranslate])!;
             transformed.push(...inverted);
         }
         return transformed;

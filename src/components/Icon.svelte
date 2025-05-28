@@ -1,17 +1,19 @@
-<script>
-    export let svg = null;
-    export let fillColor = 'currentColor';
-    export let strokeColor = 'currentColor';
-    export let width = '1.4rem';
-    export let height = width;
-    export let marginRight = '5px';
-    export let className = '';
+<script lang="ts">
+    import type { Color } from "src/types";
 
-    function constructSvg(svg, fillColor, strokeColor, width, height) {
-        const styleStr = `style="width: ${width}; height: ${height}; fill: ${fillColor}; stroke: ${strokeColor}; margin-right: ${marginRight};"`
+    export let svg: string;
+    export let fillColor: Color = "currentColor";
+    export let strokeColor: Color = "currentColor";
+    export let width: string = "1.4rem";
+    export let height: string = width;
+    export let marginRight: string = "5px";
+    export let className = "";
+
+    function constructSvg(svg: string, fillColor: Color, strokeColor: Color, width: string, height: string) {
+        const styleStr = `style="width: ${width}; height: ${height}; fill: ${fillColor}; stroke: ${strokeColor}; margin-right: ${marginRight};"`;
         return `${svg.slice(0, 4)} ${styleStr} class="${className}" ${svg.slice(4)}`;
     }
-    $: constructedSvg = constructSvg(svg, fillColor, strokeColor, width, height)
+    $: constructedSvg = constructSvg(svg, fillColor, strokeColor, width, height);
 </script>
 
 {@html constructedSvg}

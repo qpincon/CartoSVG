@@ -7,7 +7,7 @@ import { indexBy, pick, download, discriminateCssForExport } from '../util/commo
 import { reportStyle, reportStyleElem, fontsToCss, getUsedInlineFonts, DOM_PARSER } from '../util/dom';
 import { type Selection } from 'd3-selection';
 import type { Config } from 'svgo/browser';
-import { ExportFontChoice, type ExportOptions, type ProvidedFont, type TooltipDefs, type ZonesData } from 'src/types';
+import { ExportFontChoice, type ExportOptions, type ProvidedFont, type SvgSelection, type TooltipDefs, type ZonesData } from 'src/types';
 
 
 
@@ -302,7 +302,7 @@ export function getIntersectionObservingPart(isMacro: boolean): string {
 }
 
 export async function exportSvg(
-    svg: Selection<SVGSVGElement, unknown, null, undefined>,
+    svg: SvgSelection,
     width: number,
     height: number,
     tooltipDefs: TooltipDefs,
@@ -392,7 +392,7 @@ export async function exportSvg(
         zonesData[groupId].numericCols.forEach(colDef => {
             const col = colDef.column;
             zonesDataDup.forEach((row: any) => {
-                row[col] = zonesData[groupId].formatters[col](row[col]);
+                row[col] = zonesData[groupId].formatters![col](row[col]);
             });
         });
 

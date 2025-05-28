@@ -114,7 +114,6 @@ export function geoSatelliteCustom(params: ProjectionParams): any {
         .scale(scale)
         .translate([((width / 2)), (yShift + height / 2)])
         .rotate([-longitude, -latitude, rotation])
-        // @ts-expect-error
         .tilt(tilt)
         .distance(snyderP)
         .preclip(preclip)
@@ -188,7 +187,7 @@ export function geoBakerProj(params: ProjectionParams): any {
     return standardProj(geoBaker, params);
 }
 
-export function updateAltitudeRange(fov: number | null = null): ((value: number) => number) | undefined {
+export function updateAltitudeRange(fov: number | null = null): d3.ScaleLinear<number, number, never> | undefined {
     if (!fov) return;
     const fovExtent = Math.tan(0.5 * fov / degrees);
     const altRange = [Math.round((1 / fovExtent) * 500), Math.round((1 / fovExtent) * 4000)];

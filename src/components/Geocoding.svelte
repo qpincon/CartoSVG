@@ -1,25 +1,33 @@
-<script>
+<script lang="ts">
     import { onMount } from "svelte";
     import { debounce } from "lodash";
+    import type { Map as MapLibreMap } from "maplibre-gl";
+
+    // Types
+    interface SearchResult {
+        display_name: string;
+        lat: string;
+        lon: string;
+    }
 
     // Props
-    export let maplibreMap = null; // Reference to the MapLibre map instance
-    export let placeholder = "Search for a location...";
-    export let debounceTime = 300; // ms
-    export let apiUrl = "https://nominatim.openstreetmap.org/search";
+    export let maplibreMap: MapLibreMap | null = null; // Reference to the MapLibre map instance
+    export let placeholder: string = "Search for a location...";
+    export let debounceTime: number = 300; // ms
+    export let apiUrl: string = "https://nominatim.openstreetmap.org/search";
 
     // State
-    let searchInput;
-    let searchQuery = "";
-    let searchResults = [];
-    let isLoading = false;
-    let isResultsVisible = false;
-    let error = null;
-    let selectedIndex = -1;
-    let resultsContainer;
+    let searchInput: HTMLInputElement;
+    let searchQuery: string = "";
+    let searchResults: SearchResult[] = [];
+    let isLoading: boolean = false;
+    let isResultsVisible: boolean = false;
+    let error: string | null = null;
+    let selectedIndex: number = -1;
+    let resultsContainer: HTMLDivElement;
 
     // Create debounced search function
-    const debouncedSearch = debounce(async (query) => {
+    const debouncedSearch = debounce(async (query: string): Promise<void> => {
         if (!query || query.length < 3) {
             searchResults = [];
             isResultsVisible = false;
@@ -33,9 +41,7 @@
         selectedIndex = -1;
 
         try {
-            const response = await fetch(
-                `${apiUrl}?format=json&q=${encodeURIComponent(query)}`,
-            );
+            const response = await fetch(`${apiUrl}?format=json&q=${encodeURIComponent(query)}`);
 
             if (!response.ok) {
                 throw new Error("Network response was not ok");
@@ -57,33 +63,31 @@
     }
 
     // Select a location result
-    function selectLocation(result) {
+    function selectLocation(result: SearchResult): void {
         searchQuery = result.display_name;
         isResultsVisible = false;
         selectedIndex = -1;
 
-        maplibreMap.jumpTo({
-            center: [parseFloat(result.lon), parseFloat(result.lat)],
-            zoom: 14,
-            bearing: 0,
-            pitch: 0,
-        });
+        if (maplibreMap) {
+            maplibreMap.jumpTo({
+                center: [parseFloat(result.lon), parseFloat(result.lat)],
+                zoom: 14,
+                bearing: 0,
+                pitch: 0,
+            });
+        }
     }
 
     // Handle click outside to close results
-    function handleClickOutside(event) {
-        if (
-            searchInput &&
-            !searchInput.contains(event.target) &&
-            resultsContainer &&
-            !resultsContainer.contains(event.target)
-        ) {
+    function handleClickOutside(event: MouseEvent): void {
+        const target = event.target as Node;
+        if (searchInput && !searchInput.contains(target) && resultsContainer && !resultsContainer.contains(target)) {
             isResultsVisible = false;
         }
     }
 
     // Handle keyboard navigation
-    function handleKeydown(event) {
+    function handleKeydown(event: KeyboardEvent): void {
         if (!isResultsVisible || searchResults.length === 0) {
             return;
         }
@@ -97,18 +101,12 @@
 
             case "ArrowUp":
                 event.preventDefault();
-                selectedIndex =
-                    selectedIndex <= 0
-                        ? searchResults.length - 1
-                        : selectedIndex - 1;
+                selectedIndex = selectedIndex <= 0 ? searchResults.length - 1 : selectedIndex - 1;
                 scrollSelectedIntoView();
                 break;
 
             case "Enter":
-                if (
-                    selectedIndex >= 0 &&
-                    selectedIndex < searchResults.length
-                ) {
+                if (selectedIndex >= 0 && selectedIndex < searchResults.length) {
                     event.preventDefault();
                     selectLocation(searchResults[selectedIndex]);
                 }
@@ -125,11 +123,9 @@
     }
 
     // Scroll the selected item into view if needed
-    function scrollSelectedIntoView() {
+    function scrollSelectedIntoView(): void {
         setTimeout(() => {
-            const selectedElement = document.querySelector(
-                ".search-result-item.selected",
-            );
+            const selectedElement = document.querySelector(".search-result-item.selected") as HTMLElement;
             if (selectedElement && resultsContainer) {
                 // Check if the element is not fully visible
                 const containerRect = resultsContainer.getBoundingClientRect();
@@ -175,12 +171,7 @@
     />
 
     {#if isResultsVisible}
-        <div
-            bind:this={resultsContainer}
-            class="search-results"
-            id="search-results-list"
-            role="listbox"
-        >
+        <div bind:this={resultsContainer} class="search-results" id="search-results-list" role="listbox">
             {#if isLoading}
                 <div class="search-status">Searching...</div>
             {:else if error}
@@ -190,12 +181,9 @@
             {:else}
                 {#each searchResults as result, i}
                     <div
-                        class="search-result-item {i === selectedIndex
-                            ? 'selected'
-                            : ''}"
+                        class="search-result-item {i === selectedIndex ? 'selected' : ''}"
                         on:click={() => selectLocation(result)}
-                        on:keydown={(e) =>
-                            e.key === "Enter" && selectLocation(result)}
+                        on:keydown={(e) => e.key === "Enter" && selectLocation(result)}
                         tabindex={i === selectedIndex ? 0 : -1}
                         role="option"
                         aria-selected={i === selectedIndex}

@@ -1,53 +1,56 @@
-<script>
+<script lang="ts">
     import Icon from "./Icon.svelte";
     import ColorPicker from "./ColorPicker.svelte";
-    import addIcon from "../assets/img/add.svg?inline";
-    import { debounce } from 'lodash-es';
-    export let customCategoricalPalette = [];
-    export let onChange = () => {};
-    export let mapping = {};
+    import addIcon from "../assets/img/add.svg?raw";
+    import { debounce } from "lodash-es";
+    import { type Color } from "src/types";
 
-    function _onChange() {
-        onChange();
+    export let customCategoricalPalette: string[] = [];
+    export let onChange: (force?: boolean) => void = () => {};
+    export let mapping: Record<string, Set<string>> = {};
+
+    function _onChange(force?: boolean): void {
+        onChange(force);
     }
 
-    $:_onChangeDebounced = debounce(_onChange, 300);
-    let colorPickers = [];
+    $: _onChangeDebounced = debounce(_onChange, 300);
+    let colorPickers: ColorPicker[] = [];
 
-    let hoveringColor = false;
-    let dragStartIndex = null;
-    function dropColor(event, target) {
-        event.dataTransfer.dropEffect = "move";
-        const newList = customCategoricalPalette;
+    let hoveringColor: number | null = null;
+    let dragStartIndex: number | null = null;
 
-        if (dragStartIndex < target) {
-            newList.splice(target + 1, 0, newList[dragStartIndex]);
-            newList.splice(dragStartIndex, 1);
-        } else {
-            newList.splice(target, 0, newList[dragStartIndex]);
-            newList.splice(dragStartIndex + 1, 1);
+    function dropColor(event: DragEvent, target: number): void {
+        event.dataTransfer!.dropEffect = "move";
+        const newList = [...customCategoricalPalette];
+
+        if (dragStartIndex !== null) {
+            if (dragStartIndex < target) {
+                newList.splice(target + 1, 0, newList[dragStartIndex]);
+                newList.splice(dragStartIndex, 1);
+            } else {
+                newList.splice(target, 0, newList[dragStartIndex]);
+                newList.splice(dragStartIndex + 1, 1);
+            }
+            customCategoricalPalette = newList;
+            hoveringColor = null;
+            _onChange(true);
         }
-        customCategoricalPalette = newList;
-        hoveringColor = null;
-        _onChange(true);
-        
     }
 
-    function dragStartColor(event, i) {
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.dropEffect = "move";
+    function dragStartColor(event: DragEvent, i: number): void {
+        event.dataTransfer!.effectAllowed = "move";
+        event.dataTransfer!.dropEffect = "move";
         dragStartIndex = i;
     }
 
-    function findMatchedValues(color) {
+    function findMatchedValues(color: string): string | null {
         if (!(color in mapping)) return null;
-        return [...mapping[color]].join(', ');
+        return [...mapping[color]].join(", ");
     }
 
-    function getColors(x, y) {
+    function getColors(x: Record<string, Set<string>>, y: string[]): string[] {
         return customCategoricalPalette;
     }
-
 </script>
 
 <span> Tip: it is possible to re-order dragging and dropping the colors.</span>
@@ -59,7 +62,7 @@
             draggable="true"
             on:dragstart={(event) => dragStartColor(event, i)}
             on:drop|preventDefault={(event) => dropColor(event, i)}
-            ondragover="return false"
+            on:dragover={() => false}
             class:is-hovered-color={hoveringColor === i}
             on:dragenter={() => (hoveringColor = i)}
         >
@@ -74,21 +77,21 @@
             <div
                 class="border border border-primary rounded-1 color-preview"
                 style={`background-color: ${color};`}
-                on:click={(e) => {
+                on:click={(e: MouseEvent) => {
                     colorPickers[i].open();
                 }}
             >
                 <ColorPicker
                     bind:this={colorPickers[i]}
-                    value={color}
-                    onChange={(c) => {
+                    value={color as Color}
+                    onChange={(c: string) => {
                         customCategoricalPalette[i] = c;
                         _onChangeDebounced();
                     }}
                 />
             </div>
             <span> {color} </span>
-            <span> {findMatchedValues(color)}</span>
+            <span> {findMatchedValues(color) ?? ""}</span>
         </div>
     {/each}
     <div

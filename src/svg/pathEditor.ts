@@ -1,11 +1,7 @@
 import parsePath from 'parse-svg-path';
 import { closestDistance } from './svg';
 import { pointer } from 'd3';
-
-interface Point {
-    x: number;
-    y: number;
-}
+import type { Point } from 'src/types';
 
 interface DistanceResult {
     advancement: number;

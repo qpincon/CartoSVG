@@ -1,5 +1,5 @@
-import type { Coords } from "src/types";
-import type { Projection } from "./paths";
+import type { GeoProjection } from "d3-geo";
+import type { Coords, ParsedPath, Point } from "src/types";
 import { DOM_PARSER } from "src/util/dom";
 
 // remove buggy paths, covering the whole svg element
@@ -23,13 +23,20 @@ export function removeCoveringAll(groupElement: SVGGElement | null): void {
     }
 }
 
-export function distance(p1: DOMPoint, p2: DOMPoint): number {
+export function distance(p1: Point, p2: Point): number {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     return Math.sqrt(dx * dx + dy * dy);
 }
 
-export function closestDistance(point: DOMPoint, pathElem: SVGPathElement): { distance: number; point: DOMPoint; advancement: number } {
+export interface DistanceQueryResult {
+    distance?: number;
+    point?: Point;
+    advancement?: number;
+    elem?: SVGPathElement;
+}
+
+export function closestDistance(point: Point, pathElem: SVGPathElement): DistanceQueryResult {
     const pathLength = pathElem.getTotalLength();
     const delta = 10;
     const nbSample = Math.ceil(pathLength / delta);
@@ -113,7 +120,7 @@ export function duplicateContours(svgElem: SVGSVGElement): void {
     });
 }
 
-export function pathStringFromParsed(parsedD: [string, ...number[]][], projection: Projection): string {
+export function pathStringFromParsed(parsedD: ParsedPath, projection: GeoProjection): string {
     return parsedD.reduce((d, curGroup) => {
         const [instruction, ...data] = curGroup;
         let newData = '';

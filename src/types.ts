@@ -1,35 +1,86 @@
 import * as CSS from 'csstype';
 import type { MicroBorderParams } from './params';
-export type SvgSelection = d3.Selection<d3.BaseType, any, SVGSVGElement, any>;
-export type D3Selection<T extends d3.BaseType> = d3.Selection<T, any, T, any>;
 import * as markers from './svg/markerDefs';
 import * as shapes from './svg/shapeDefs';
+import type { Feature, FeatureCollection, Geometry, MultiLineString, Polygon } from 'geojson';
+import type { AnyScaleKey } from './util/color-scales';
 
+export type SvgSelection = d3.Selection<SVGSVGElement, any, SVGSVGElement, any>;
+export type D3Selection<T extends d3.BaseType> = d3.Selection<T, any, T, any>;
+export type SvgGSelection = d3.Selection<SVGGElement, unknown, SVGGElement, undefined>;
+export type FrameSelection = d3.Selection<SVGRectElement, unknown, SVGSVGElement, unknown>;
 export type ShapeName = keyof typeof shapes;
+export type Prettify<T> = {
+    [K in keyof T]: T[K];
+} & {};
 
+type FlattenObject<T> = T[keyof T];
+// Helper utility to convert union to intersection
+export type UnionToIntersection<U> =
+    (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never;
+export type Flatten<T> = UnionToIntersection<FlattenObject<T>>;
 type RGB = `rgb(${number}, ${number}, ${number})`;
 type RGBA = `rgba(${number}, ${number}, ${number}, ${number})`;
 export type HEX = `#${string}`;
 
-export type Color = RGB | RGBA | HEX | CSS.DataType.NamedColor | 'none';
+export type Color = RGB | RGBA | HEX | CSS.DataType.NamedColor | 'none' | 'currentColor';
 export type Coords = [number, number];
+export interface Point {
+    x: number;
+    y: number;
+}
+export interface ContextMenuInfo {
+    event: MouseEvent;
+    position: [number, number];
+    target: SVGPathElement;
+}
+
+export interface MenuState {
+    chosingPoint: boolean;
+    pointSelected: boolean;
+    addingLabel: boolean;
+    pathSelected: boolean;
+    addingImageToPath: boolean;
+    chosingMarker: boolean;
+}
 
 export interface ProjectionParams {
     width: number;
     height: number;
-    translateX?: number;
-    translateY?: number;
+    translateX: number;
+    translateY: number;
     altitude: number;
-    latitude?: number;
-    longitude?: number;
-    rotation?: number;
+    latitude: number;
+    longitude: number;
+    rotation: number;
     borderWidth: number;
     larger?: boolean;
     fov?: number;
-    tilt?: number;
+    tilt: number;
     projectionName?: string;
 };
 
+export interface MacroGroupData {
+    name?: string;
+    type?: string;
+    data?: FeatureCollection<Geometry> | MultiLineString[] | [{ type: string }]
+    id?: string | null;
+    // TODO: delete
+    props?: unknown[];
+    class?: string;
+    countryData?: Feature<Polygon, { name: string }>;
+    filter?: string | null;
+    showSource?: boolean;
+    containerClass?: string;
+}
+
+export type InlineProps = Prettify<Pick<ProjectionParams, 'longitude' | 'latitude' | 'translateX' | 'translateY' | 'altitude' | 'rotation' | 'tilt'> & {
+    showLand: boolean;
+    showCountries: boolean;
+}>
+
+export type ParsedPathGroup = [string, number, number];
+export type ParsedPath = ParsedPathGroup[];
 export interface ContourParams {
     strokeWidth: number;
     strokeColor: Color;
@@ -49,6 +100,7 @@ export interface TooltipDefs {
         enabled: boolean;
         template: string;
         content?: string;
+        locale: string;
     };
 }
 
@@ -58,17 +110,21 @@ export interface ProvidedFont {
 }
 
 
-interface ZoneDataRow {
+export interface ZoneDataRow {
     name: string;
-    [key: string]: any;
+    [key: string]: string | number;
 }
 interface ColumnDefinition {
     column: string;
 }
-interface ZoneData {
+
+export type Formatter = (value: number) => string;
+export type FormatterObject = { [column: string]: Formatter };
+export interface ZoneData {
     data: ZoneDataRow[];
+    provided?: boolean;
     numericCols: ColumnDefinition[];
-    formatters: { [column: string]: (value: any) => string };
+    formatters?: FormatterObject;
 }
 
 export interface ZonesData {
@@ -95,19 +151,39 @@ export interface LegendDef {
         active: boolean;
         color: Color;
         text: string;
+        manual: boolean;
     };
     direction: 'h' | 'v';
     maxWidth: number;
     rectWidth: number;
     rectHeight: number;
     lineWidth: number;
+    significantDigits?: number;
     x: number;
     y: number;
     title: string;
+    // template string
+    sampleHtml?: string;
     titleChanged?: boolean;
     labelOnLeft?: boolean;
     changes: Record<string, { dx: number; dy: number; title?: string }>;
 }
+
+export interface ColorDef {
+    enabled: boolean;
+    colorScale: "category" | "quantile" | "quantize";
+    colorColumn: string;
+    colorPalette: AnyScaleKey | 'Custom';
+    nbBreaks: 5;
+    legendEnabled: false;
+}
+
+export type ColorScale = d3.ScaleQuantile<string, number>
+    | d3.ScaleQuantize<string, number>
+    | d3.ScaleOrdinal<string, string>;
+
+export type Mode = 'micro' | 'macro';
+export type OrdinalMapping = Record<string, Record<string, Set<string>>>;
 
 export interface PathDefImage {
     name: string;
@@ -129,10 +205,10 @@ export interface PathDef {
 export interface ShapeDefinition {
     id: string;
     pos: Coords;
+    scale: number;
     name?: ShapeName; // for symbols
     text?: string; // for labels
 }
-
 
 export interface PatternDefinition {
     hatch?: string;
@@ -182,4 +258,11 @@ export type MicroPalette = {
 };
 export type MicroPaletteWithBorder = MicroPalette & {
     borderParams: MicroBorderParams;
+}
+
+export type InlinePropsMicro = {
+    center: [number, number],
+    zoom: number;
+    pitch: number;
+    bearing: number;
 }

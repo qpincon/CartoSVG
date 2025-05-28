@@ -1,7 +1,7 @@
-<script>
+<script lang="ts">
   import logo from "../assets/img/logo_brand.webp";
-  import githubLogo from "../assets/img/github.svg?inline";
-  export let activeTitle = "index.html";
+  import githubLogo from "../assets/img/github.svg?raw";
+  export let activeTitle: string = "index.html";
 </script>
 
 <div id="navbar">
@@ -9,12 +9,7 @@
     <img src={logo} alt="Logo" height="50" width="140" />
   </a>
   {#if activeTitle === "index.html"}
-    <a
-      class:active={activeTitle === "about.html"}
-      role="button"
-      href="about.html"
-      >About
-    </a>
+    <a role="button" href="about.html">About </a>
   {/if}
   <slot></slot>
 </div>

@@ -1,56 +1,71 @@
-<script>
+<script lang="ts">
     import { fade, fly } from "svelte/transition";
     import { quintOut } from "svelte/easing";
-    import { initTooltips } from '../util/common';
+    import { initTooltips } from "../util/common";
 
-    const noop = () => {};
+    // Types
+    interface EventRemover {
+        remove: () => void;
+    }
 
-    export let open = false;
-    export let dialogClasses = "";
-    export let modalWidth = "50%";
-    export let backdrop = true;
-    export let ignoreBackdrop = false;
-    export let keyboard = true;
-    export let describedby = "";
-    export let labelledby = "";
-    export let onOpened = noop;
-    export let onClosed = noop;
+    type NoopFunction = () => void;
 
-    let _keyboardEvent;
+    const noop: NoopFunction = () => {};
 
-    function attachEvent(target, ...args) {
-        target.addEventListener(...args);
+    // Props
+    export let open: boolean = false;
+    export let dialogClasses: string = "";
+    export let modalWidth: string = "50%";
+    export let backdrop: boolean = true;
+    export let ignoreBackdrop: boolean = false;
+    export let keyboard: boolean = true;
+    export let describedby: string = "";
+    export let labelledby: string = "";
+    export let onOpened: NoopFunction = noop;
+    export let onClosed: NoopFunction = noop;
+
+    let _keyboardEvent: EventRemover | null = null;
+
+    function attachEvent(
+        target: EventTarget,
+        type: string,
+        listener: EventListener,
+        options?: boolean | AddEventListenerOptions,
+    ): EventRemover {
+        target.addEventListener(type, listener, options);
         return {
-            remove: () => target.removeEventListener(...args),
+            remove: () => target.removeEventListener(type, listener, options),
         };
     }
 
-    function checkClass(className) {
+    function checkClass(className: string): boolean {
         return document.body.classList.contains(className);
     }
 
-    function modalOpen() {
+    function modalOpen(): void {
         if (!checkClass("modal-open")) {
             document.body.classList.add("modal-open");
         }
     }
-    function modalClose() {
+
+    function modalClose(): void {
         if (checkClass("modal-open")) {
             document.body.classList.remove("modal-open");
         }
     }
 
-    function handleBackdrop(event) {
+    function handleBackdrop(event: MouseEvent): void {
         if (backdrop && !ignoreBackdrop) {
             event.stopPropagation();
             open = false;
         }
     }
 
-    function onModalOpened() {
+    function onModalOpened(): void {
         if (keyboard) {
-            _keyboardEvent = attachEvent(document, "keydown", (e) => {
-                if (event.key === "Escape") {
+            _keyboardEvent = attachEvent(document, "keydown", (e: Event) => {
+                const keyboardEvent = e as KeyboardEvent;
+                if (keyboardEvent.key === "Escape") {
                     open = false;
                 }
             });
@@ -59,14 +74,15 @@
         onOpened();
     }
 
-    function onModalClosed() {
+    function onModalClosed(): void {
         if (_keyboardEvent) {
             _keyboardEvent.remove();
+            _keyboardEvent = null;
         }
         onClosed();
     }
 
-    // Watching changes for Open vairable
+    // Watching changes for Open variable
     $: {
         if (open) {
             modalOpen();
@@ -98,14 +114,20 @@
         >
             <div class="modal-content">
                 <div class="modal-header p-3">
-                    <slot name="header"/>
-                    <button type="button" class="btn-close me-2" data-bs-dismiss="modal" aria-label="Close" on:click={() => open = false}></button>
+                    <slot name="header" />
+                    <button
+                        type="button"
+                        class="btn-close me-2"
+                        data-bs-dismiss="modal"
+                        aria-label="Close"
+                        on:click={() => (open = false)}
+                    ></button>
                 </div>
                 <div class="modal-body p-3">
-                    <slot name="content"/>
+                    <slot name="content" />
                 </div>
                 <div class="modal-footer">
-                    <slot name="footer"/>
+                    <slot name="footer" />
                 </div>
             </div>
         </div>

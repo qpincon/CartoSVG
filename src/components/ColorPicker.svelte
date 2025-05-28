@@ -1,73 +1,81 @@
-<script>
-    import Picker from 'vanilla-picker';
-    
-    import { onMount, onDestroy } from 'svelte';
-    
-    export let value = "#AAAAAAFF";
-    export let options = {};
-    export let onChange = () => {};
-    let self;
-    let pickerElem;
-    
-    $: if (pickerElem || value.length) {
-        if(isHexColor(value)) pickerElem.setColor(value);
+<script lang="ts">
+    import Picker, { type Options, type Color as ColorInternal } from "vanilla-picker";
+
+    import { onMount, onDestroy } from "svelte";
+    import type { Color } from "src/types";
+
+    interface ExtendedPicker extends Picker {
+        __originalOpenHandler?: () => void;
+        openHandler: () => void;
     }
 
-    export function setColor(hexString) {
-        if (!isHexColor(hexString)) return;
-        pickerElem.setColor(hexString);
+    export let value: Color = "#AAAAAAFF";
+    export let options: Options = {};
+    export let onChange: (newColor: Color, oldColor?: Color) => void = () => {};
+    let self: HTMLElement;
+    let pickerElem: ExtendedPicker;
+
+    $: if (pickerElem || value.length) {
+        if (isHexColor(value)) pickerElem.setColor(value, true);
     }
-    
-    export function open() {
+
+    export function setColor(hexString: Color): void {
+        if (!isHexColor(hexString)) return;
+        pickerElem.setColor(hexString, true);
+    }
+
+    export function open(): void {
         pickerElem.show();
         pickerElem.openHandler();
     }
 
-    function isHexColor (hex) {
-        return typeof hex === 'string'
-            && (hex.length === 8 || hex.length === 6)
-            && !isNaN(Number('0x' + hex))
-}
+    function isHexColor(hex: Color): boolean {
+        return typeof hex === "string" && (hex.length === 8 || hex.length === 6) && !isNaN(Number("0x" + hex));
+    }
 
-    function setValue(val) {
+    function setValue(val: Color): void {
         if (val === value) return;
-        onChange(val, value)
+        onChange(val, value);
         value = val;
     }
-    
-    function _onChange(color) {
-        setValue(color.hex);
-    }
-    
-    onMount( () => {
-        _init(options);
-    });
-    
-    onDestroy( () => {
-        pickerElem.destroy();
-    });
 
-    export function init() {
-        _init(options);
-    }
-    function _onOpen() {
+    function _onChange(color: ColorInternal): void {
+        setValue(color.hex as Color);
     }
 
-    function _init(opts) {
+    onMount(() => {
+        _init(options);
+    });
+
+    onDestroy(() => {
+        if (pickerElem) {
+            pickerElem.destroy();
+        }
+    });
+
+    export function init(): void {
+        _init(options);
+    }
+
+    function _onOpen(): void {
+        // Handler for when picker opens
+    }
+
+    function _init(opts: Options): void {
         if (!self) return;
         if (pickerElem) pickerElem.destroy();
         opts.onChange = _onChange;
         pickerElem = new Picker({
             parent: self,
             color: value,
-            ...opts
-        });
+            ...opts,
+        }) as ExtendedPicker;
         pickerElem.__originalOpenHandler = pickerElem.openHandler;
-        pickerElem.openHandler = function(e) {
+        pickerElem.openHandler = function () {
             _onOpen();
-            this.__originalOpenHandler();
+            this.__originalOpenHandler?.();
         };
     }
 </script>
-    
-<div bind:this={self} style="position: absolute;" ></div>
+
+<div bind:this={self} style="position: absolute;"></div>

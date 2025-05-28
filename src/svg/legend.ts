@@ -1,22 +1,21 @@
-import * as d3 from "d3";
 import { select } from 'd3-selection';
 import { reportStyle } from '../util/dom';
 import { setTransformTranslate, getTranslateFromTransform } from './svg';
 import { addSvgText } from './shape';
 import { drag } from 'd3-drag';
-import type { LegendColor, LegendDef } from "src/types";
+import type { LegendColor, LegendDef, SvgGSelection } from "src/types";
 
 export function drawLegend(
-    legendSelection: d3.Selection<SVGGElement, unknown, null, undefined>,
+    legendSelection: SvgGSelection,
     legendDef: LegendDef,
     legendColors: LegendColor[],
     isCategorical: boolean,
-    sampleElem: SVGElement | null,
+    sampleElem: SVGSVGElement,
     tabName: string,
     saveFunc: () => void,
     applyStyles: () => void,
     entryWidth: number = legendDef.lineWidth
-): d3.Selection<SVGGElement, unknown, null, undefined> {
+): SvgGSelection {
     const colors = [...legendColors];
     if (legendDef.noData.active) {
         colors.unshift([legendDef.noData.color, legendDef.noData.text]);

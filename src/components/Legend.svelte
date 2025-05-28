@@ -1,11 +1,12 @@
-<script>
+<script lang="ts">
     import { createEventDispatcher } from "svelte";
 
     import RangeInput from "./RangeInput.svelte";
     import ColorPickerPreview from "./ColorPickerPreview.svelte";
+    import type { LegendDef } from "src/types";
     const dispatch = createEventDispatcher();
 
-    export let definition = {
+    export let definition: LegendDef = {
         x: 0,
         y: 0,
         lineWidth: 100,
@@ -22,12 +23,13 @@
             text: "N/A",
             color: "#AAAAAA",
         },
+        changes: {},
     };
     export let categorical = false;
 
     // dispatch event on each change
-    function sendChange(e) {
-        const id = e.target.getAttribute("id");
+    function sendChange(e: Event) {
+        const id = (e.target as HTMLElement).getAttribute("id");
         if (id === "vhSwitchV") {
             definition.rectHeight = definition.rectWidth = 30;
         } else if (id === "vhSwitchH" && !categorical) {
@@ -50,8 +52,7 @@
                 value="h"
                 autocomplete="off"
             />
-            <label class="btn btn-outline-primary" for="vhSwitchH">Horizontal</label
-            >
+            <label class="btn btn-outline-primary" for="vhSwitchH">Horizontal</label>
             <input
                 type="radio"
                 class="btn-check"
@@ -63,50 +64,36 @@
             />
             <label class="btn btn-outline-primary" for="vhSwitchV">Vertical</label>
         </div>
-        {#if categorical || definition.direction === 'v'}
+        {#if categorical || definition.direction === "v"}
             <div class="mx-2 form-check">
                 <input
-                    type="checkbox" class="form-check-input" id='labelOnLeft'
+                    type="checkbox"
+                    class="form-check-input"
+                    id="labelOnLeft"
                     bind:checked={definition.labelOnLeft}
                 />
-                <label for='labelOnLeft' class="form-check-label"> Label on left </label>
+                <label for="labelOnLeft" class="form-check-label"> Label on left </label>
             </div>
         {/if}
     </div>
     {#if definition.direction === "h" && categorical}
-        <RangeInput
-            title="Max legend width"
-            bind:value={definition.maxWidth}
-            min="50"
-            max="800"
-            step="10"
-        />
+        <RangeInput title="Max legend width" bind:value={definition.maxWidth} min="50" max="800" step="10" />
     {/if}
     {#if !categorical}
-        <RangeInput
-            title="Significant digits"
-            bind:value={definition.significantDigits}
-        />
+        <RangeInput title="Significant digits" bind:value={definition.significantDigits!} />
     {/if}
-    <RangeInput
-        title="Legend color width"
-        bind:value={definition.rectWidth}
-        min="10"
-        max="100"
-    />
-    <RangeInput
-        title="Legend color height"
-        bind:value={definition.rectHeight}
-        min="10"
-        max="100"
-    />
+    <RangeInput title="Legend color width" bind:value={definition.rectWidth} min="10" max="100" />
+    <RangeInput title="Legend color height" bind:value={definition.rectHeight} min="10" max="100" />
     <div class="form-check form-switch">
         <input
-            type="checkbox" role="switch" class="form-check-input" id='noDataActive'
+            type="checkbox"
+            role="switch"
+            class="form-check-input"
+            id="noDataActive"
             bind:checked={definition.noData.active}
-            on:change={() => definition.noData.manual = true}
+            on:change={() => (definition.noData.manual = true)}
         />
-        <label for='noDataActive' class="form-check-label"> No data in legend </label>
+        <label for="noDataActive" class="form-check-label"> No data in legend </label>
     </div>
     {#if definition.noData.active}
         <div class="d-flex">

@@ -1,4 +1,5 @@
-import type { Color } from "./types";
+import type { Color, Flatten, Prettify, UnionToIntersection } from "./types";
+
 
 
 export interface GlowParams {
@@ -125,8 +126,8 @@ export interface SelectDefinition {
 
 export type ParamDefinition = RangeDefinition | SelectDefinition;
 
-
-export const paramDefs: { [paramName: string]: ParamDefinition } = {
+export type ParamDefinitions = { [paramName: string]: ParamDefinition };
+export const paramDefs: ParamDefinitions = {
     width: { type: 'range', min: 100, max: 1000 },
     height: { type: 'range', min: 100, max: 1000 },
     fieldOfView: { type: 'range', min: 15, max: 180 },
@@ -143,7 +144,13 @@ export const paramDefs: { [paramName: string]: ParamDefinition } = {
     projection: { type: 'select', choices: ['satellite', 'mercator', 'equalEarth', 'geoNaturalEarth', 'geoAlbersUsa', 'geoBaker'] }
 };
 
-export const noSatelliteParams = {
+export type OtherParams = {
+    [param: string]: {
+        disabled?: boolean;
+        rename?: string;
+    }
+}
+export const noSatelliteParams: OtherParams = {
     fieldOfView: {
         disabled: true,
     },
@@ -151,11 +158,12 @@ export const noSatelliteParams = {
         rename: 'scale',
     }
 };
-
+export type ParamKey = Prettify<keyof Flatten<MacroParams> | keyof MacroParams>;
+export type HelpParams = Partial<Record<ParamKey, string>>;
 const glowHelpGeneral = `The glow effect is used by default on the "land" layer. You can tweak the parameters on how the inner and outer effect are achieved.`;
 const blurHelp = "The quantity of blur applied on the glow.";
 const strengthHelp = "The thickness of the glow effect.";
-export const helpParams = {
+export const helpParams: HelpParams = {
     firstGlow: glowHelpGeneral,
     secondGlow: glowHelpGeneral,
     innerBlur: blurHelp,

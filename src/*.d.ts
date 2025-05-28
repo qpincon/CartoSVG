@@ -1,5 +1,6 @@
+
 declare module '*.png' {
-  const value: number;
+  const value: string;
   export = value;
 }
 declare module '*inline' {
@@ -16,6 +17,18 @@ declare module '*.svg' {
   export = value;
 }
 
+declare module '*.topojson' {
+  const value: TopoJSON.Topology;
+  export default value;
+}
+
+declare namespace svelteHTML {
+  interface HTMLAttributes<T> {
+    "on:hold"?: CompositionEventHandler<T>;
+  }
+}
+
+
 declare module 'd3-geo-projection' {
   import { GeoProjection, GeoStreamWrapper } from 'd3-geo';
 
@@ -25,5 +38,7 @@ declare module 'd3-geo-projection' {
 }
 
 declare module 'parse-svg-path' {
-  export default function parsePath(d: string): [string, number, number][];
+  import type { ParsedPathGroup } from './types';
+
+  export default function parsePath(d: string): ParsedPathGroup[];
 }

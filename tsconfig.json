@@ -5,16 +5,23 @@
     "module": "esnext",
     "moduleResolution": "node",
     "resolveJsonModule": true,
+    "useDefineForClassFields": true,
     "baseUrl": ".",
     "outDir": "dist/",
     "allowJs": true,
-    "checkJs": true
+    "isolatedModules": true,
+    "checkJs": true,
+    "types": [
+      "vite/client"
+    ]
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
     "node_modules/*",
-    "./dist/**/*"
+    "./dist/**/*",
+    "src/assets/layers/**/*",
+    "src/examples/**/*"
   ],
 }

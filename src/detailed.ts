@@ -12,7 +12,7 @@ import { createRoundedRectangleGeoJSON } from './util/geometry';
 import bboxPolygon from '@turf/bbox-polygon';
 import booleanDisjoint from '@turf/boolean-disjoint';
 import { type Feature, type Geometry, type Polygon } from 'geojson';
-import type { MicroGeneralParams } from './params';
+import type { MicroGeneralParams, MicroParams } from './params';
 import { type Color, type ExportOptions, type MicroLayerId, type MicroPalette, type PatternDefinition, type ProvidedFont, type SvgSelection } from './types';
 import type { Config } from 'svgo/browser';
 import type { Map } from 'maplibre-gl';
@@ -73,10 +73,10 @@ export function orderFeaturesByLayer(features: RenderedFeature[]): void {
 
 export async function drawPrettyMap(
     maplibreMap: Map,
-    svg: D3Selection,
+    svg: SvgSelection,
     d3PathFunction: D3PathFunction,
     layerDefinitions: MicroPalette,
-    generalParams: MicroGeneralParams,
+    generalParams: MicroParams,
     isLocked: boolean
 ): Promise<void> {
     // console.log('layerDefinitions=', layerDefinitions);
@@ -84,7 +84,7 @@ export async function drawPrettyMap(
     const layersToQuery = interestingBasicV2Layers.filter(layer => {
         return layerDefinitions[kebabCase(layer) as MicroLayerId]?.active !== false;
     });
-    updateSvgPatterns(svg.node(), layerDefinitions);
+    updateSvgPatterns(svg.node() as SVGElement, layerDefinitions);
     const geometries = await getRenderedFeatures(maplibreMap, { layers: layersToQuery });
     // Process got interrupted, a new call to this function is coming soon
     if (geometries === null) return;
@@ -161,7 +161,7 @@ export async function drawPrettyMap(
     }, 100);
 }
 
-function roundedRectFromParams(microParams: MicroGeneralParams): Feature<Polygon> {
+function roundedRectFromParams(microParams: MicroParams): Feature<Polygon> {
     const width = findProp('width', microParams) as number;
     const height = findProp('height', microParams) as number;
     const borderPadding = findProp('borderPadding', microParams) as number;
@@ -199,7 +199,7 @@ export function drawMicroFrame(
     borderPadding: number,
     borderColor: string,
     animated: boolean
-) {
+): Selection<SVGRectElement, any, SVGSVGElement, any> {
     // Calculate positions and dimensions
     // For the outer frame (border padding)
     const outerFrameHalfWidth = borderPadding / 2;
@@ -232,7 +232,7 @@ export function drawMicroFrame(
     return frame;
 }
 
-export function initLayersState(providedPalette: MicroPalette): MicroPalette {
+export function initLayersState(providedPalette: Partial<MicroPalette>): MicroPalette {
     const palette = cloneDeep(providedPalette);
     if (!palette['forest']) palette['forest'] = { ...palette['wood'], active: false };
     if (!palette['path']) palette['path'] = { ...palette['road-network'], active: false };
@@ -265,7 +265,7 @@ export function initLayersState(providedPalette: MicroPalette): MicroPalette {
     //     palette['building1'] = { stroke: strokeRef, fill: lighter1 };
     //     palette['building2'] = { stroke: strokeRef, fill: lighter2 };
     // }
-    return palette;
+    return palette as MicroPalette;
 }
 
 function lighten(c: string, quantity: number = 0.2): Color {
@@ -444,8 +444,8 @@ export function updateSvgPatterns(svgNode: SVGElement | null, layerState: MicroP
 
 
 export async function exportMicro(
-    svg: D3Selection,
-    generalParams: MicroGeneralParams,
+    svg: SvgSelection,
+    generalParams: MicroParams,
     providedFonts: ProvidedFont[],
     commonCss: string,
     animated: boolean,

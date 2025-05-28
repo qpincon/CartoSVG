@@ -1,43 +1,44 @@
-<script>
-
+<script lang="ts">
     import ColorPickerPreview from "./ColorPickerPreview.svelte";
     import RangeInput from "./RangeInput.svelte";
     import { camelCaseToSentence, initTooltips } from "../util/common";
+    import type { Color, MicroLayerId, MicroPalette, MicroPaletteWithBorder } from "src/types";
 
-    export let layerDefinitions = {};
-    export let onUpdate = () => {};
-    export let onPaletteChange = () => {};
-    export let availablePalettes = {};
+    export let layerDefinitions: MicroPalette;
+    export let onUpdate: (
+        layer: MicroLayerId,
+        key: string | string[],
+        value: number | Color | string | boolean,
+    ) => void = () => {};
+    export let onPaletteChange: (paletteId: string) => void = () => {};
+    export let availablePalettes: Record<string, MicroPaletteWithBorder> = {};
 
     $: layers = Object.entries(layerDefinitions).filter(([layerId, _]) => layerId !== "borderParams");
-    let selectedPalette;
-    function updated(layer, key, value) {
+    let selectedPalette: string;
+    function updated(layer: MicroLayerId, key: string | string[], value: number | Color | string | boolean) {
         console.log(layer, key, value);
         onUpdate(layer, key, value);
         if (key[0] === "active") {
             layerDefinitions[layer].menuOpened = layerDefinitions[layer].active;
         }
         if (key[1] === "active") {
-            layerDefinitions[layer].pattern.menuOpened =
-                layerDefinitions[layer].pattern.active;
+            layerDefinitions[layer].pattern!.menuOpened = layerDefinitions[layer].pattern!.active;
         }
         initTooltips();
     }
 
-    function paletteChanged(paletteId) {
+    function paletteChanged(paletteId: string) {
         onPaletteChange(paletteId);
     }
 
-    function collapseLayer(layer) {
-        layerDefinitions[layer].menuOpened =
-            !layerDefinitions[layer].menuOpened;
+    function collapseLayer(layer: MicroLayerId) {
+        layerDefinitions[layer].menuOpened = !layerDefinitions[layer].menuOpened;
         layerDefinitions = layerDefinitions;
         setTimeout(() => initTooltips(), 0);
     }
 
-    function collapseLayerPattern(layer) {
-        layerDefinitions[layer].pattern.menuOpened =
-            !layerDefinitions[layer].pattern.menuOpened;
+    function collapseLayerPattern(layer: MicroLayerId) {
+        layerDefinitions[layer].pattern!.menuOpened = !layerDefinitions[layer].pattern!.menuOpened;
         layerDefinitions = layerDefinitions;
         setTimeout(() => initTooltips(), 0);
     }
@@ -45,14 +46,12 @@
 
 <div class="py-2 mb-4 pe-2 border border-primary rounded-1">
     <div class="row my-3 mx-1">
-        <label class="col-4 col-form-label" for="palette-select">
-            Preset palette</label
-        >
+        <label class="col-4 col-form-label" for="palette-select"> Preset palette</label>
         <select
             id="palette-select"
             class="form-select form-select-sm me-4 col"
             bind:value={selectedPalette}
-            on:change={(e) => paletteChanged(e.target.value)}
+            on:change={(e) => paletteChanged((e.target as HTMLSelectElement).value)}
         >
             <option hidden selected>Chose a preset palette</option>
             {#each Object.keys(availablePalettes) as paletteId}
@@ -71,7 +70,7 @@
                     disabled={def.disabled}
                     id={title}
                     bind:checked={def.active}
-                    on:change={() => updated(title, ["active"], def.active)}
+                    on:change={() => updated(title as MicroLayerId, ["active"], def.active!)}
                 />
                 <label for={title} class="form-check-label">
                     {camelCaseToSentence(title)}
@@ -81,7 +80,7 @@
                 <div
                     class="toggle"
                     class:opened={def.menuOpened === true}
-                    on:click={() => collapseLayer(title)}
+                    on:click={() => collapseLayer(title as MicroLayerId)}
                 ></div>
             {/if}
         </div>
@@ -99,7 +98,7 @@
                             value={def.fill}
                             onChange={(col) => {
                                 def.fill = col;
-                                updated(title, ["fill"], col);
+                                updated(title as MicroLayerId, ["fill"], col);
                             }}
                         />
                     {/if}
@@ -113,8 +112,8 @@
                                 title={`Fill ${fillIndex}`}
                                 value={fill}
                                 onChange={(col) => {
-                                    def.fills[fillIndex] = col;
-                                    updated(title, ["fills", 0], col);
+                                    def.fills![fillIndex] = col;
+                                    updated(title as MicroLayerId, ["fills", "0"], col);
                                 }}
                             />
                         {/each}
@@ -129,7 +128,7 @@
                             value={def.stroke}
                             onChange={(col) => {
                                 def.stroke = col;
-                                updated(title, ["stroke"], col);
+                                updated(title as MicroLayerId, ["stroke"], col);
                             }}
                         />
                     {/if}
@@ -146,31 +145,20 @@
                                 id={`input-${def.pattern.id}`}
                                 bind:checked={def.pattern.active}
                                 on:change={() =>
-                                    updated(
-                                        title,
-                                        ["pattern", "active"],
-                                        def.pattern.active,
-                                    )}
+                                    updated(title as MicroLayerId, ["pattern", "active"], def.pattern!.active!)}
                             />
-                            <label
-                                for={`input-${def.pattern.id}`}
-                                class="form-check-label"
-                            >
-                                Pattern
-                            </label>
+                            <label for={`input-${def.pattern.id}`} class="form-check-label"> Pattern </label>
                         </div>
                         {#if def.pattern.active}
                             <div
                                 class="toggle"
                                 class:opened={def.pattern.menuOpened === true}
-                                on:click={() => collapseLayerPattern(title)}
+                                on:click={() => collapseLayerPattern(title as MicroLayerId)}
                             ></div>
                         {/if}
                     </div>
                     {#if def.pattern.menuOpened}
-                        <div
-                            class="wrap-params ps-2 ms-4 border-start border-1 d-flex flex-wrap"
-                        >
+                        <div class="wrap-params ps-2 ms-4 border-start border-1 d-flex flex-wrap">
                             <div class="mx-2">
                                 <label for={`${def.pattern.id}-hatch`}>
                                     <a
@@ -180,8 +168,7 @@
                                     <span
                                         class="help-tooltip fs-6"
                                         data-bs-toggle="tooltip"
-                                        data-bs-title="One or multiple of \ / | + - * x  . o O, and more!"
-                                        >?</span
+                                        data-bs-title="One or multiple of \ / | + - * x  . o O, and more!">?</span
                                     ></label
                                 >
                                 <input
@@ -190,13 +177,9 @@
                                     id={`${def.pattern.id}-hatch`}
                                     bind:value={def.pattern.hatch}
                                     on:input={(e) => {
-                                        let val = e.target.value;
-                                        def.pattern.hatch = val;
-                                        updated(
-                                            title,
-                                            ["pattern", "hatch"],
-                                            val,
-                                        );
+                                        let val = (e.target as HTMLInputElement).value;
+                                        def.pattern!.hatch = val;
+                                        updated(title as MicroLayerId, ["pattern", "hatch"], val);
                                     }}
                                 />
                             </div>
@@ -208,25 +191,21 @@
                                 title="Color"
                                 value={def.pattern.color}
                                 onChange={(col) => {
-                                    def.pattern.color = col;
-                                    updated(title, ["pattern", "color"], col);
+                                    def.pattern!.color = col;
+                                    updated(title as MicroLayerId, ["pattern", "color"], col);
                                 }}
                             />
                             <RangeInput
                                 labelAbove={true}
                                 title="Weight"
                                 id={`${def.pattern.id}-strokeWidth`}
-                                bind:value={def.pattern.strokeWidth}
+                                bind:value={def.pattern.strokeWidth!}
                                 min="0.2"
                                 max="5"
                                 step="0.2"
                                 onChange={(val) => {
-                                    def.pattern.strokeWidth = val;
-                                    updated(
-                                        title,
-                                        ["pattern", "strokeWidth"],
-                                        val,
-                                    );
+                                    def.pattern!.strokeWidth = val;
+                                    updated(title as MicroLayerId, ["pattern", "strokeWidth"], val);
                                 }}
                             />
                             <RangeInput
@@ -234,13 +213,13 @@
                                 title="Scale"
                                 helpText="Controls the density of the pattern"
                                 id={`${def.pattern.id}-scale`}
-                                bind:value={def.pattern.scale}
+                                bind:value={def.pattern.scale!}
                                 min="0.1"
                                 max="3"
                                 step="0.1"
                                 onChange={(val) => {
-                                    def.pattern.scale = val;
-                                    updated(title, ["pattern", "scale"], val);
+                                    def.pattern!.scale = val;
+                                    updated(title as MicroLayerId, ["pattern", "scale"], val);
                                 }}
                             />
                         </div>

@@ -88,11 +88,11 @@ export class FreehandDrawer {
     }
 
     // Stop listening for drawing events
-    stop() {
+    stop(): SVGGElement {
         this.svg!.removeEventListener("pointerdown", this.handlePointerDown);
         document.removeEventListener("pointermove", this.handlePointerMove);
         document.removeEventListener("pointerup", this.handlePointerUp);
-        return this.currentGroup;
+        return this.currentGroup!;
     }
 
     // Handle pointer down event

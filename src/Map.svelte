@@ -1,9 +1,14 @@
-<script>
+<script lang="ts">
     import { onMount, tick } from "svelte";
     import * as topojson from "topojson-client";
     import { presimplify, simplify } from "topojson-simplify";
-
-    import * as d3 from "d3";
+    import { scaleLinear, scalePow, scaleOrdinal, scaleQuantize, scaleQuantile } from "d3-scale";
+    import { color as d3Color } from "d3-color";
+    import { geoGraticule, geoPath } from "d3-geo";
+    import { select, pointer } from "d3-selection";
+    import { drag } from "d3-drag";
+    import { zoom } from "d3-zoom";
+    import { extent } from "d3-array";
     import InlineStyleEditor from "../node_modules/inline-style-editor/dist/inline-style-editor.mjs";
     import "bootstrap/js/dist/dropdown";
     import { debounce, throttle } from "lodash-es";
@@ -16,7 +21,6 @@
     import { splitMultiPolygons } from "./util/geojson";
     import { createD3ProjectionFromMapLibre, getProjection, updateAltitudeRange } from "./util/projections";
     import PaletteEditor from "./components/PaletteEditor.svelte";
-
     import Geocoding from "./components/Geocoding.svelte";
     import {
         download,
@@ -32,21 +36,25 @@
     } from "./util/common";
     import * as shapes from "./svg/shapeDefs";
     import * as markers from "./svg/markerDefs";
-    import { setTransformScale, closestDistance, duplicateContourCleanFirst, pathStringFromParsed } from "./svg/svg";
+    import {
+        setTransformScale,
+        closestDistance,
+        duplicateContourCleanFirst,
+        pathStringFromParsed,
+        type DistanceQueryResult,
+    } from "./svg/svg";
     import { drawShapes } from "./svg/shape";
     import iso3Data from "./assets/data/iso3_filtered.json";
     import DataTable from "./components/DataTable.svelte";
-
     import Examples from "./components/Examples.svelte";
     import Legend from "./components/Legend.svelte";
-    import defaultBaseCssMacro from "./assets/pagestyleMacro.css?inline";
+    import defaultBaseCssMacro from "./assets/pagestyleMacro.css?raw";
     import { drawLegend } from "./svg/legend";
     import { freeHandDrawPath } from "./svg/freeHandPath";
     import Modal from "./components/Modal.svelte";
     import Accordions from "./components/Accordions.svelte";
     import Navbar from "./components/Navbar.svelte";
     import ColorPickerPreview from "./components/ColorPickerPreview.svelte";
-
     import macroImg from "./assets/img/macro.png";
     import microImg from "./assets/img/micro.png";
     import Instructions from "./components/Instructions.svelte";
@@ -69,11 +77,61 @@
     } from "./detailed";
     import { Map } from "maplibre-gl";
     import MicroLayerParams from "./components/MicroLayerParams.svelte";
-    import * as microPalettes from "./microPalettes";
+    import * as _microPalettes from "./microPalettes";
     import { FreehandDrawer } from "./svg/freeHandDraw";
     import { cancelStitch } from "./util/geometryStitch";
-
-    const scalesHelp = `
+    import type {
+        SvgSelection,
+        D3Selection,
+        InlineStyles,
+        ZonesData,
+        TooltipDefs,
+        LegendDef,
+        PathDef,
+        ShapeDefinition,
+        MicroPalette,
+        MicroPaletteWithBorder,
+        ProjectionParams,
+        ContourParams,
+        ExportFontChoice,
+        ExportOptions,
+        LegendColor,
+        ProvidedFont,
+        CssDict,
+        Color,
+        InlineProps,
+        InlinePropsMicro,
+        MicroLayerId,
+        MacroGroupData,
+        FrameSelection,
+        ParsedPath,
+        ContextMenuInfo,
+        MenuState,
+        PathDefImage,
+        MarkerName,
+        ZoneDataRow,
+        ZoneData,
+        ShapeName,
+        Formatter,
+        FormatterObject,
+        ColorDef,
+        SvgGSelection,
+        OrdinalMapping,
+        ColorScale,
+        Mode,
+    } from "./types";
+    import type { MacroParams, MicroParams } from "./params";
+    import type { Feature, FeatureCollection, MultiLineString, Polygon } from "geojson";
+    import { appendCountryImageNew, appendLandImageNew } from "./svg/contourMethods";
+    import {
+        CATEGORICAL_SCHEMES,
+        CONTINUOUS_SCHEMES,
+        type AnyScaleKey,
+        type CategoricalScaleKey,
+        type ContinuousScaleKey,
+    } from "./util/color-scales";
+    const microPalettes = _microPalettes as Record<string, MicroPaletteWithBorder>;
+    const scalesHelp: string = `
 <div class="inline-tooltip">  
     <p> 
         <i> Quantiles </i> separate a population into intervals of similar sizes (the 10% poorest, the 50% tallest, the 1% richest…). It is defined by the data itself (a set of values).
@@ -84,19 +142,23 @@
     Those scales are only available when numeric data is associated with the layer. 
 </div>
 `;
-    const defaultTooltipStyle = `color:black; will-change: opacity; font-size: 14px; padding: 5px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content; border-radius:7px;`;
+    const defaultTooltipStyle: string = `color:black; will-change: opacity; font-size: 14px; padding: 5px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content; border-radius:7px;`;
 
-    const iconsReq = require.context("./assets/img/.?inline", false, /\.svg$/);
-    const icons = iconsReq.keys().reduce((acc, iconFile) => {
-        const name = iconFile.match(/\w+/)[0]; // remove extension
-        acc[name] = iconsReq(iconFile);
-        return acc;
-    }, {});
+    const icons: Record<string, string> = import.meta.glob("./assets/img/*.svg", { eager: true, query: "?raw" });
+    Object.keys(icons).forEach((iconName) => {
+        const name = iconName.match(/\w+/)![0]; // remove extension
+        icons[name] = icons[iconName];
+        delete icons[iconName];
+    });
+    // const icons: Record<string, string> = Object.keys(iconsReq).reduce<Record<string, string>>((acc, iconFile) => {
+    //     const name = iconFile.match(/\w+/)![0]; // remove extension
+    //     acc[name] = iconsReq[iconFile];
+    //     return acc;
+    // }, {});
 
-    let params = JSON.parse(JSON.stringify(defaultParams));
-    let microParams = JSON.parse(JSON.stringify(microDefaultParams));
-    // Computed
-    let currentParams = params;
+    let params: MacroParams = JSON.parse(JSON.stringify(defaultParams));
+    let microParams: MicroParams = JSON.parse(JSON.stringify(microDefaultParams));
+    let currentParams: MacroParams | MicroParams = params;
     $: if (params || microParams || currentMode) {
         let prevParams = currentParams;
         currentParams = currentMode === "micro" ? microParams : params;
@@ -107,41 +169,71 @@
         tick().then(() => initTooltips());
     }
     const iso3DataById = indexBy(iso3Data, "alpha-3");
-    const resolvedAdm = {};
-    const resolvedAdmTopo = {};
-    const countriesAdm1Resolve = require.context("./assets/layers/adm1/", false, /\..*json$/, "lazy");
-    const availableCountriesAdm1 = countriesAdm1Resolve.keys().reduce((acc, file) => {
-        const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
+    const resolvedAdm: Record<string, any> = {};
+    const resolvedAdmTopo: Record<string, any> = {};
+    const availableCountriesAdm1 = import.meta.glob("./assets/layers/adm1/*.json");
+    Object.keys(availableCountriesAdm1).forEach((adm1FileName) => {
+        const name = adm1FileName.match(/[-a-zA-Z-_]+/)![0]; // remove extension
         const resolvedName = iso3DataById[name]?.name;
-        if (resolvedName) acc[`${resolvedName} ADM1`] = file;
-        return acc;
-    }, {});
+        const finalName = resolvedName ? `${resolvedName} ADM1` : name;
+        availableCountriesAdm1[finalName] = availableCountriesAdm1[adm1FileName];
+        delete availableCountriesAdm1[adm1FileName];
+    });
+    // const availableCountriesAdm1: Record<string, string> = Object.keys(countriesAdm1Resolve).reduce<
+    //     Record<string, string>
+    // >((acc, file) => {
+    //     const name = file.match(/[-a-zA-Z-_]+/)![0]; // remove extension
+    //     const resolvedName = iso3DataById[name]?.name;
+    //     if (resolvedName) acc[`${resolvedName} ADM1`] = file;
+    //     return acc;
+    // }, {});
 
-    const countriesAdm2Resolve = require.context("./assets/layers/adm2/", false, /\..*json$/, "lazy");
-    const availableCountriesAdm2 = countriesAdm2Resolve.keys().reduce((acc, file) => {
-        const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
+    const availableCountriesAdm2 = import.meta.glob("./assets/layers/adm2/*.json");
+    Object.keys(availableCountriesAdm2).forEach((adm1FileName) => {
+        const name = adm1FileName.match(/[-a-zA-Z-_]+/)![0]; // remove extension
         const resolvedName = iso3DataById[name]?.name;
-        if (resolvedName) acc[`${resolvedName} ADM2`] = file;
-        return acc;
-    }, {});
-    const allAvailableAdm = [...Object.keys(availableCountriesAdm1), ...Object.keys(availableCountriesAdm2)].sort();
+        const finalName = resolvedName ? `${resolvedName} ADM2` : name;
+        availableCountriesAdm2[finalName] = availableCountriesAdm2[adm1FileName];
+        delete availableCountriesAdm2[adm1FileName];
+    });
 
-    const formatLocaleResolve = require.context("../node_modules/d3-format/locale/", false, /\..*json$/);
-    const resolvedLocales = {};
-    const availableFormatLocales = formatLocaleResolve.keys().map((file) => {
-        const name = file.match(/[-a-zA-Z-_]+/)[0]; // remove extension
-        resolvedLocales[name] = formatLocaleResolve(file);
-        return name;
-    }, {});
+    // const countriesAdm2Resolve = import.meta.glob("./assets/layers/adm2/*.json");
+    // const availableCountriesAdm2: Record<string, string> = Object.keys(countriesAdm2Resolve).reduce<
+    //     Record<string, string>
+    // >((acc, file) => {
+    //     const name = file.match(/[-a-zA-Z-_]+/)![0]; // remove extension
+    //     const resolvedName = iso3DataById[name]?.name;
+    //     if (resolvedName) acc[`${resolvedName} ADM2`] = file;
+    //     return acc;
+    // }, {});
+    const allAvailableAdm: string[] = [
+        ...Object.keys(availableCountriesAdm1),
+        ...Object.keys(availableCountriesAdm2),
+    ].sort();
 
-    function resolveAdm(name) {
-        if (name.includes("ADM1")) return countriesAdm1Resolve(availableCountriesAdm1[name]);
-        return countriesAdm2Resolve(availableCountriesAdm2[name]);
+    const resolvedLocales = import.meta.glob<d3.FormatLocaleDefinition>("../node_modules/d3-format/locale/", {
+        eager: true,
+    });
+    Object.keys(resolvedLocales).forEach((localeFileName) => {
+        const name = localeFileName.match(/\w+/)![0]; // remove extension
+        icons[name] = icons[localeFileName];
+        delete icons[localeFileName];
+    });
+    // const availableFormatLocales: string[] = Object.keys(formatLocaleResolve).map((file) => {
+    //     const name = file.match(/[-a-zA-Z-_]+/)![0]; // remove extension
+    //     resolvedLocales[name] = formatLocaleResolve[file];
+    //     return name;
+    // }, {});
+
+    function resolveAdm(name: string): Promise<any> {
+        if (name.includes("ADM1")) return availableCountriesAdm1[name]();
+        return availableCountriesAdm2[name]();
     }
 
-    const p = (propName, obj = currentParams ?? params) => findProp(propName, obj);
+    const p = (propName: string, obj: MacroParams | MicroParams = currentParams ?? params): any =>
+        findProp(propName, obj);
 
-    const positionVars = [
+    const positionVars: string[] = [
         "longitude",
         "latitude",
         "rotation",
@@ -152,65 +244,67 @@
         "width",
         "height",
     ];
-    let redrawTimeoutId;
-    /** Used for shape simplification */
-    let visibleArea;
-    let countries = null;
-    let land = null;
-    let adm0Topo = null;
-    let simpleLand = null;
-    let openContextMenuInfo;
+    let redrawTimeoutId: number;
+    let visibleArea: number | undefined;
+    let countries: FeatureCollection<Polygon, { name: string }>;
+    let land: FeatureCollection<Polygon>;
+    let adm0Topo: any = null;
+    let simpleLand: Feature | null = null;
+    let openContextMenuInfo: ContextMenuInfo;
 
     const adm0LandTopoPromise = import("./assets/layers/world_adm0_simplified.topojson").then(
         ({ default: topoAdm0 }) => {
+            // @ts-expect-error
             adm0Topo = presimplify(topoAdm0);
         },
     );
 
-    function updateLayerSimplification() {
+    function updateLayerSimplification(): void {
         updateAdm0LandAndCountries();
         Object.keys(resolvedAdmTopo).forEach((countryAdm) => {
             const simplified = simplify(resolvedAdmTopo[countryAdm], visibleArea);
-            // const sizeSimp = sizeOf(simplified);
-            // const sizeTopo = sizeOf(resolvedAdmTopo[countryAdm]);
-            // console.log(countryAdm, 'before', sizeTopo, 'simplified=', sizeSimp, `(${((sizeTopo - sizeSimp) / sizeTopo) * 100}% of reduction)`);
             const firstKey = Object.keys(simplified.objects)[0];
             resolvedAdm[countryAdm] = topojson.feature(simplified, simplified.objects[firstKey]);
         });
     }
-    function updateAdm0LandAndCountries() {
+
+    function updateAdm0LandAndCountries(): void {
         const simplified = simplify(adm0Topo, visibleArea);
-        // const sizeSimp = sizeOf(simplified);
-        // const sizeTopo = sizeOf(adm0Topo);
-        // console.log('before', sizeTopo, 'simplified=', sizeSimp, `(${((sizeTopo - sizeSimp) / sizeTopo) * 100}% of reduction)`);
         const firstKey = Object.keys(simplified.objects)[0];
-        countries = topojson.feature(simplified, simplified.objects[firstKey]);
-        countries.features.forEach((feat) => {
+        countries = topojson.feature(simplified, simplified.objects[firstKey]) as FeatureCollection<
+            Polygon,
+            { name: string }
+        >;
+        countries.features.forEach((feat: any) => {
             const propertiesFromIso = iso3DataById[feat.properties["shapeGroup"]];
             feat.properties = propertiesFromIso || feat.properties;
         });
+        // @ts-expect-error
         land = topojson.merge(simplified, simplified.objects[firstKey].geometries);
         land = splitMultiPolygons(
             {
                 type: "FeatureCollection",
+                // @ts-expect-error
                 features: [{ type: "Feature", geometry: { ...land } }],
             },
             "land",
         );
     }
+
     const verySimpleLand = import("./assets/layers/world_land_very_simplified.topojson").then(({ default: land }) => {
         const firstKey = Object.keys(land.objects)[0];
-        simpleLand = topojson.feature(land, land.objects[firstKey]);
+        simpleLand = topojson.feature(land, land.objects[firstKey]) as Feature;
     });
 
     const layerPromises = Promise.all([adm0LandTopoPromise, verySimpleLand]);
 
-    let path = null;
-    let pathLarger = null;
-    let projection = null;
-    let projectionLarger = null;
-    let svg: SvgSelection = null;
-    const defaultLegendDef = {
+    let path: d3.GeoPath<any, any>;
+    let pathLarger: d3.GeoPath<any, any>;
+    let projection: d3.GeoProjection;
+    let projectionLarger: d3.GeoProjection;
+    let svg: SvgSelection;
+    const defaultLegendDef: LegendDef = {
+        title: "",
         x: 20,
         y: Math.max(0, p("height") - 200),
         lineWidth: 100,
@@ -220,8 +314,8 @@
         maxWidth: 200,
         direction: "v",
         labelOnLeft: false,
-        title: null,
-        sampleHtml: null,
+        // title: null,
+        // sampleHtml: null,
         noData: {
             active: false,
             manual: false,
@@ -230,28 +324,28 @@
         },
         changes: {},
     };
-    const defaultColorDef = {
+    const defaultColorDef: ColorDef = {
         enabled: false,
-        colorScale: null,
-        colorColumn: null,
-        colorPalette: null,
+        colorScale: "category",
+        colorColumn: "name",
+        colorPalette: "Pastel1",
         nbBreaks: 5,
         legendEnabled: false,
     };
 
-    const defaultInlineProps = {
+    const defaultInlineProps: InlineProps = {
         longitude: 15,
         latitude: 42.5,
         translateX: 0,
         translateY: 0,
-        altitude: null,
+        altitude: 3200,
         rotation: 0,
         tilt: 0,
         showLand: true,
         showCountries: true,
     };
 
-    const defaultInlinePropsMicro = {
+    const defaultInlinePropsMicro: InlinePropsMicro = {
         center: [2.3468, 48.8548],
         zoom: 13.8,
         pitch: 0,
@@ -259,30 +353,30 @@
     };
 
     // ====== State micro ====
-    let microLayerDefinitions = initLayersState(microPalettes["peach"]);
+    let microLayerDefinitions: MicroPalette = initLayersState(microPalettes["peach"]);
 
     // ====== State macro =======
     let baseCss = defaultBaseCssMacro;
-    let providedPaths = [];
-    let providedShapes = []; // {name, coords, scale, id}
-    let chosenCountriesAdm = [];
-    let inlineProps = JSON.parse(JSON.stringify(defaultInlineProps));
-    let inlinePropsMicro = JSON.parse(JSON.stringify(defaultInlinePropsMicro));
+    let providedPaths: PathDef[] = [];
+    let providedShapes: ShapeDefinition[] = []; // {name, coords, scale, id}
+    let chosenCountriesAdm: string[] = [];
+    let inlineProps: InlineProps = JSON.parse(JSON.stringify(defaultInlineProps));
+    let inlinePropsMicro: InlinePropsMicro = JSON.parse(JSON.stringify(defaultInlinePropsMicro));
 
-    let providedFonts = [];
+    let providedFonts: ProvidedFont[] = [];
     let shapeCount = 0;
-    let inlineStyles = {}; // elemID -> prop -> value
-    let zonesData = {}; // key => {data (list), provided (bool), numericCols (list)}
+    let inlineStyles: InlineStyles = {}; // elemID -> prop -> value
+    let zonesData: ZonesData = {};
     /** For each */
-    let zonesFilter = { land: "firstGlow" };
-    let lastUsedLabelProps = { "font-size": "14px" };
-    let contourParams = {
+    let zonesFilter: Record<string, string> = { land: "firstGlow" };
+    let lastUsedLabelProps: CssDict = { "font-size": "14px" };
+    let contourParams: ContourParams = {
         strokeWidth: 1,
         strokeColor: "#a0a0a07d",
         strokeDash: 0,
         fillColor: "#ffffff",
     };
-    let tooltipDefs = {
+    let tooltipDefs: TooltipDefs = {
         countries: {
             template: defaultTooltipContent(true),
             content: defaultTooltipFull(defaultTooltipContent(true)),
@@ -291,54 +385,56 @@
         },
     };
 
-    let colorDataDefs = {
+    let colorDataDefs: Record<string, typeof defaultColorDef> = {
         countries: { ...defaultColorDef },
     };
-    let legendDefs = {
+    let legendDefs: Record<string, LegendDef> = {
         countries: JSON.parse(JSON.stringify(defaultLegendDef)),
     };
-    let orderedTabs = ["countries", "land"];
-    let customCategoricalPalette = ["#ff0000ff", "#00ff00ff", "#0000ffff"];
+    let orderedTabs: string[] = ["countries", "land"];
+    let customCategoricalPalette: Color[] = ["#ff0000ff", "#00ff00ff", "#0000ffff"];
 
     // ==== End state =====
 
-    let cssFonts;
-    let commonCss;
-    const menuStates = {
+    let cssFonts: string | undefined;
+    let commonCss: string | undefined;
+    const menuStates: MenuState = {
         chosingPoint: false,
         pointSelected: false,
         addingLabel: false,
         pathSelected: false,
         addingImageToPath: false,
+        chosingMarker: false,
     };
-    let editedLabelId;
-    let textInput;
+    let editedLabelId: string | null;
+    let textInput: HTMLInputElement;
     let typedText = "";
-    let styleEditor;
-    let contextualMenu;
+    let styleEditor: InlineStyleEditor | null = null;
+    let contextualMenu: HTMLDivElement & {
+        opened?: boolean;
+    };
     let showModal = false;
     let showExportConfirm = false;
     let showInstructions = false;
-    let exportForm;
-    let htmlTooltipElem;
-    let currentTab = "countries";
+    let exportForm: HTMLFormElement;
+    let htmlTooltipElem: HTMLElement;
+    let currentMacroLayerTab: string = "land";
 
-    let mainMenuSelection = "general";
-    let currentMode = "macro";
+    let mainMenuSelection: string = "general";
+    let currentMode: Mode = "macro";
     $: if (true || mainMenuSelection) {
         tick().then(() => initTooltips());
     }
-    // $: if (true || currentMode) { switchMode() }
     let editingPath = false;
     let isDrawingFreeHand = false;
     let isDrawingPath = false;
     $: iseOnClickEnabled = !editingPath && !isDrawingFreeHand && !isDrawingPath;
     // This contains the common CSS that can ben editor with inline-css-editor
     // we also have a special svelte:head element containing all CSS that is not in baseCss (border style, legend colors, etc.)
-    let commonStyleSheetElemMacro;
-    let commonStyleSheetElemMicro;
-    let zoomFunc;
-    let dragFunc;
+    let commonStyleSheetElemMacro: HTMLStyleElement;
+    let commonStyleSheetElemMicro: HTMLStyleElement;
+    let zoomFunc: d3.ZoomBehavior<any, any>;
+    let dragFunc: d3.DragBehavior<any, any, any>;
     /**
      * Map used for drawing zoomed-in cities as SVG using custom palette
      * It is hidden when in "macro" mode.
@@ -346,8 +442,8 @@
      *  - visible if the map is not zoomed enough
      *  - hidden if it is zoomed enough. Instead, we have the custom SVG displaying
      */
-    let maplibreMap;
-    let mapLoadedPromise;
+    let maplibreMap: Map;
+    let mapLoadedPromise: Promise<unknown>;
     let microLocked = false;
     onMount(async () => {
         commonStyleSheetElemMacro = document.createElement("style");
@@ -360,17 +456,27 @@
         createMaplibreMap();
 
         const microCss = generateCssFromState(microLayerDefinitions);
-        commonStyleSheetElemMicro = document.createElement("style");
-        commonStyleSheetElemMicro.setAttribute("id", "common-style-sheet-elem-micro");
-        document.head.appendChild(commonStyleSheetElemMicro);
-        commonStyleSheetElemMicro.innerHTML = microCss;
+        if (microCss) {
+            commonStyleSheetElemMicro = document.createElement("style");
+            commonStyleSheetElemMicro.setAttribute("id", "common-style-sheet-elem-micro");
+            document.head.appendChild(commonStyleSheetElemMicro);
+            commonStyleSheetElemMicro.innerHTML = microCss;
+        } else {
+            console.error("No generated CSS");
+        }
 
         await mapLoadedPromise;
 
         projectAndDraw();
         styleEditor = new InlineStyleEditor({
-            onStyleChanged: (target, eventType, cssProp, value) => {
-                const elemId = target.getAttribute("id");
+            onStyleChanged: (
+                target: HTMLElement,
+                eventType: "inline" | CSSStyleRule,
+                cssProp: string,
+                value: string,
+            ) => {
+                const elemId = target.getAttribute("id")!;
+                const eventAsRule = eventType as CSSStyleRule;
                 if (currentMode === "micro") {
                     if (eventType === "inline" && target.hasAttribute("id")) {
                         handleInlineStyleChange(elemId, target, cssProp, value);
@@ -384,21 +490,23 @@
                  * Due to a Firefox bug (the :hover selector is not applied when we move the DOM node when hovering a polygon)
                  * we need to apply the :hover style to a custom class selector .hovered, that will be applied programatically
                  */
-                if (eventType.selectorText?.includes?.(":hover")) {
-                    const selectorTextToModify = eventType.selectorText.replace(":hover", ".hovered");
-                    const rule = Array.from(eventType.parentStyleSheet.rules).find(
-                        (r) => r.selectorText === selectorTextToModify,
-                    );
-                    for (const propName of eventType.style) {
-                        rule.style.setProperty(propName, eventType.style[propName]);
+                if (eventAsRule.selectorText?.includes?.(":hover")) {
+                    const selectorTextToModify = eventAsRule.selectorText.replace(":hover", ".hovered");
+                    const rule = Array.from(eventAsRule.parentStyleSheet!.cssRules)
+                        .filter((r) => r instanceof CSSStyleRule)
+                        .find((r: CSSStyleRule) => r.selectorText === selectorTextToModify);
+                    if (rule) {
+                        for (const propName of eventAsRule.style) {
+                            rule.style.setProperty(propName, eventAsRule.style.getPropertyValue(propName));
+                        }
                     }
                 }
 
                 if (legendSample && legendSample.contains(target) && cssProp !== "fill") {
-                    legendDefs[currentTab].sampleHtml = legendSample.outerHTML;
+                    legendDefs[currentMacroLayerTab].sampleHtml = legendSample.outerHTML;
                     colorizeAndLegend();
                 } else if (htmlTooltipElem && htmlTooltipElem.contains(target)) {
-                    tooltipDefs[currentTab].content = htmlTooltipElem.outerHTML;
+                    tooltipDefs[currentMacroLayerTab].content = htmlTooltipElem.outerHTML;
                 } else if (eventType === "inline") {
                     if (target.hasAttribute("id")) {
                         handleInlineStyleChange(elemId, target, cssProp, value);
@@ -407,14 +515,14 @@
                 /** Update <image> tag corresponding to changed element */
                 if (
                     (eventType === "inline" && target.classList.contains("country")) ||
-                    eventType?.selectorText === ".country"
+                    eventAsRule?.selectorText === ".country"
                 ) {
                     computedOrderedTabs.forEach((tab) => {
                         if (tab.substring(0, tab.length - 5) !== elemId) return;
                         const filter = zonesFilter[tab];
-                        const countryData = countries.features.find((country) => country.properties.name === elemId);
+                        const countryData = countries.features.find((country) => country.properties?.name === elemId)!;
                         appendCountryImageNew.call(
-                            d3.select(`[id='${elemId}-img']`).node(),
+                            select(`[id='${elemId}-img']`).node() as SVGGElement,
                             countryData,
                             filter,
                             applyInlineStyles,
@@ -428,13 +536,15 @@
                 }
                 save();
             },
-            getElems: (el) => {
+            getElems: (el: HTMLElement) => {
                 if (el.classList.contains("freehand")) {
                     return [[el.parentElement, "Clicked"]];
                 }
                 if (el.classList.contains("adm")) {
-                    const parentCountry = el.parentNode.getAttribute("id").replace(/ ADM(1|2)/, "");
-                    const parentCountryIso3 = iso3Data.find((row) => row.name === parentCountry)["name"];
+                    const parent = el.parentNode as HTMLElement;
+                    const parentCountry = parent?.getAttribute("id")?.replace(/ ADM(1|2)/, "") || "";
+                    const parentCountryIso3 = iso3Data.find((row) => row.name === parentCountry)?.["name"];
+                    if (!parentCountryIso3) return [[el, "Clicked"]];
                     const countryElem = document.getElementById(parentCountryIso3);
                     if (!countryElem) return [[el, "Clicked"]];
                     return [
@@ -456,7 +566,7 @@
                     min: 0.5,
                     max: 5,
                     step: 0.1,
-                    getter: (el) => {
+                    getter: (el: HTMLElement) => {
                         if (el.closest("#points-labels") == null) return null;
                         const transform = el.getAttribute("transform");
                         if (!transform) return 1;
@@ -466,13 +576,13 @@
                         }
                         return 1;
                     },
-                    setter: (el, val) => {
+                    setter: (el: SVGElement, val: number) => {
                         const scaleStr = `scale(${val})`;
                         setTransformScale(el, scaleStr);
                     },
                 },
             },
-            cssRuleFilter: (el, cssSelector) => {
+            cssRuleFilter: (el: HTMLElement, cssSelector: string) => {
                 if (cssSelector.includes(".hovered")) return false;
                 if (cssSelector.includes("ssc-")) return false;
                 if (cssSelector.includes("#micro path")) return false;
@@ -495,10 +605,10 @@
         });
     });
 
-    function lockUnlock(isLocked) {
+    function lockUnlock(isLocked: boolean) {
         microLocked = isLocked;
 
-        const mapLibreContainer = d3.select("#maplibre-map");
+        const mapLibreContainer = select("#maplibre-map");
         if (microLocked) {
             svg.style("pointer-events", "auto");
             mapLibreContainer.style("pointer-events", "none");
@@ -538,7 +648,7 @@
             // console.log('movestart');
             if (currentMode !== "micro") return;
             cancelStitch();
-            d3.select("#maplibre-map").style("opacity", 1);
+            select("#maplibre-map").style("opacity", 1);
         });
 
         maplibreMap.on("click", (event) => {
@@ -554,19 +664,23 @@
                     writable: false,
                     value: clickedElem,
                 });
-                svg.node().dispatchEvent(e.originalEvent);
+                (svg.node() as SVGSVGElement).dispatchEvent(e.originalEvent);
             }
         });
-        mapLoadedPromise = maplibreMap.once("load");
+        mapLoadedPromise = maplibreMap.once("load") as Promise<unknown>;
     }
 
-    function handleMicroParamChange(layer, prop, value) {
+    function handleMicroParamChange(
+        layer: MicroLayerId,
+        prop: string | string[],
+        value: number | Color | string | boolean,
+    ): void {
         const shouldRedraw = onMicroParamChange(layer, prop, value, microLayerDefinitions);
         if (shouldRedraw) draw();
         save();
     }
 
-    function handleMicroPaletteChange(paletteId) {
+    function handleMicroPaletteChange(paletteId: string): void {
         const palette = microPalettes[paletteId];
         if (palette.borderParams) {
             microParams["Border"] = {
@@ -575,14 +689,14 @@
             };
         }
         microLayerDefinitions = initLayersState(palette);
-        updateSvgPatterns(document.getElementById("static-svg-map"), microLayerDefinitions);
+        updateSvgPatterns(document.getElementById("static-svg-map") as unknown as SVGSVGElement, microLayerDefinitions);
         replaceCssSheetContent(microLayerDefinitions);
         // handleMicroParamChange('other', ['pattern'])
         draw();
         save();
     }
 
-    function handleInlineStyleChange(elemId, target, cssProp, value) {
+    function handleInlineStyleChange(elemId: string, target: HTMLElement, cssProp: string, value: string): void {
         if (elemId.includes("label")) {
             lastUsedLabelProps[cssProp] = value;
         }
@@ -590,17 +704,18 @@
         else inlineStyles[elemId] = { [cssProp]: value };
         // update path markers
         if (cssProp === "stroke" && target.hasAttribute("marker-end")) {
-            const markerId = target.getAttribute("marker-end").match(/url\(#(.*)\)/)[1];
+            const markerId = target.getAttribute("marker-end")?.match(/url\(#(.*)\)/)?.[1];
+            if (!markerId) return;
             const newMarkerId = `${markerId.split("-")[0]}-${value.substring(1)}`;
-            d3.select(`#${markerId}`).attr("fill", value).attr("id", newMarkerId);
-            d3.select(target).attr("marker-end", `url(#${newMarkerId})`);
+            select(`#${markerId}`).attr("fill", value).attr("id", newMarkerId);
+            select(target).attr("marker-end", `url(#${newMarkerId})`);
         }
     }
 
-    function switchMode(newMode) {
+    function switchMode(newMode: Mode): void {
         if (currentMode === newMode) return;
         currentMode = newMode;
-        const mapLibreContainer = d3.select("#maplibre-map");
+        const mapLibreContainer = select("#maplibre-map");
         if (currentMode === "micro") {
             mapLibreContainer.style("display", "block");
             mainMenuSelection = "general";
@@ -611,10 +726,9 @@
         setTimeout(() => initTooltips(), 0);
     }
 
-    function attachListeners() {
-        const container = d3.select("#map-container");
-        dragFunc = d3
-            .drag()
+    function attachListeners(): void {
+        const container = select("#map-container");
+        dragFunc = drag()
             .filter((e) => currentMode === "macro" && !e.button) // Remove ctrlKey
             .on("drag", dragged)
             .on("start", () => {
@@ -623,8 +737,7 @@
                 closeMenu();
             });
 
-        zoomFunc = d3
-            .zoom()
+        zoomFunc = zoom()
             .filter((e) => currentMode === "macro")
             .wheelDelta((event) => -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002))
             .on("zoom", zoomed)
@@ -635,15 +748,15 @@
         container.call(zoomFunc);
     }
 
-    function detachListeners() {
-        const container = d3.select("#map-container");
+    function detachListeners(): void {
+        const container = select("#map-container");
         container.on(".drag", null);
         container.on(".zoom", null);
     }
 
     const redrawThrottle = throttle(redraw, 50);
-    function redraw(propName) {
-        if (positionVars.includes(propName)) {
+    function redraw(propName?: string): void {
+        if (propName && positionVars.includes(propName)) {
             // mapLibreFitBounds();
             projectAndDraw(true);
         }
@@ -654,13 +767,14 @@
         }, 300);
     }
 
-    let altScale = d3.scaleLinear().domain([1, 0]).range([100, 10000]);
+    let altScale = scaleLinear().domain([1, 0]).range([100, 10000]);
     // scale for simplification according to zoom
-    let threshScale = d3.scalePow().domain([0, 1]).range([0.1, 0]).exponent(0.08);
-    function zoomed(event) {
+    let threshScale = scalePow().domain([0, 1]).range([0.1, 0]).exponent(0.08);
+    function zoomed(event: d3.D3ZoomEvent<SVGSVGElement, unknown>): void {
         if (!event.sourceEvent) return;
         if (event.sourceEvent.type === "dblclick") return;
         if (!projection) return;
+        // @ts-expect-error
         event.transform.k = Math.max(Math.min(event.transform.k, 1), 0.00001);
         let newAltitude = Math.round(altScale(event.transform.k));
         // Ensure that zooming at max of scale actlually decreases altitude
@@ -676,7 +790,7 @@
     }
 
     const sensitivity = 75;
-    function dragged(event) {
+    function dragged(event: d3.D3DragEvent<SVGSVGElement, unknown, unknown>): void {
         inlineProps.translateX += event.dx;
         inlineProps.translateY += event.dy;
         const isSatellite = params["General"].projection === "satellite";
@@ -692,14 +806,14 @@
             const [yPartX, yPartY] = [-Math.sin(rotRad), Math.cos(rotRad)];
             const k = sensitivity / projection.scale();
             const adjustedDx = (event.dx * xPartX + event.dy * yPartX) * k;
-            const adjustedDy = (event.dy * yPartY + event.dx * xPartY) * k;
+            const adjustedDy = (event.dy * yPartY + event.dx * xPartX) * k;
             inlineProps.longitude = -rotate[0] - adjustedDx;
             inlineProps.latitude = -rotate[1] + adjustedDy;
         }
         redraw("longitude");
     }
 
-    function changeAltitudeScale(autoAdjustAltitude = true) {
+    function changeAltitudeScale(autoAdjustAltitude = true): void {
         const projName = p("projection");
         const fov = p("fieldOfView");
         let invertAlt = false;
@@ -708,7 +822,7 @@
             if (newAltScale) altScale = newAltScale;
             invertAlt = true;
         } else {
-            altScale = d3.scaleLinear().domain([0, 1]).range([90, 2000]);
+            altScale = scaleLinear().domain([0, 1]).range([90, 2000]);
         }
         const altitude = inlineProps.altitude || params["General"].altitude;
         const originalScale = altScale.invert(altitude);
@@ -731,7 +845,7 @@
     }
 
     let accordionVisiblityParams = {};
-    function changeProjection() {
+    function changeProjection(): void {
         const projName = p("projection");
         if (projName !== "satellite") {
             accordionVisiblityParams = noSatelliteParams;
@@ -755,22 +869,22 @@
         projectionLarger = getProjection({ ...projectionParams, larger: true });
     }
 
-    function computeCurrentTab() {
+    function computeCurrentTab(): void {
         computedOrderedTabs = orderedTabs.filter((x) => {
             if (x === "countries") return inlineProps.showCountries;
             if (x === "land") return inlineProps.showLand;
             return true;
         });
         if (!computedOrderedTabs.length || (computedOrderedTabs.length === 1 && computedOrderedTabs[0] === "land"))
-            currentTab = null;
-        else if (computedOrderedTabs.length > 0 && currentTab === null) {
+            currentMacroLayerTab = "land";
+        else if (computedOrderedTabs.length > 0 && currentMacroLayerTab === null) {
             let i = 0;
             while (computedOrderedTabs[i] === "land") ++i;
-            currentTab = computedOrderedTabs[i];
+            currentMacroLayerTab = computedOrderedTabs[i];
         }
     }
 
-    async function initializeAdms(simplified) {
+    async function initializeAdms(simplified: boolean): Promise<void> {
         for (const countryAdm of chosenCountriesAdm) {
             if (!(countryAdm in resolvedAdm)) {
                 const resolved = await resolveAdm(countryAdm);
@@ -792,9 +906,9 @@
             }
             if (!(countryAdm in zonesData) && !zonesData?.[countryAdm]?.provided) {
                 const data = sortBy(
-                    resolvedAdm[countryAdm].features.map((f) => f.properties),
+                    resolvedAdm[countryAdm].features.map((f: Feature) => f.properties),
                     "name",
-                );
+                )!;
                 zonesData[countryAdm] = {
                     data: data,
                     provided: false,
@@ -803,33 +917,34 @@
             }
         }
     }
-    const countryFilteredImages = new Set();
+    const countryFilteredImages = new Set<string>();
     const freeHandDrawer = new FreehandDrawer();
     let firstDraw = true;
     // without 'countries' if unchecked
-    let computedOrderedTabs = [];
-    async function draw(simplified = false, _) {
+    let computedOrderedTabs: string[] = [];
+    async function draw(simplified = false) {
         const width = p("width"),
             height = p("height");
-        const container = d3.select("#map-container");
-        const mapLibreContainer = d3.select("#maplibre-map");
+        const container = select("#map-container");
+        const mapLibreContainer = select("#maplibre-map");
         const animated = p("animate");
 
         countryFilteredImages.clear();
         computeCurrentTab();
         await initializeAdms(simplified);
         container.html("");
-        const graticule = d3.geoGraticule().step([p("graticuleStep"), p("graticuleStep")])();
+        const graticule = geoGraticule().step([p("graticuleStep"), p("graticuleStep")])();
         if (!p("showGraticule")) graticule.coordinates = [];
         if (simplified) {
-            let canvas = container.select("#canvas");
-            if (canvas.empty())
+            let canvas = container.select<HTMLCanvasElement>("#canvas");
+            if (canvas.empty()) {
                 canvas = container.append("canvas").attr("id", "canvas").attr("width", width).attr("height", height);
-            const context = canvas.node().getContext("2d");
+            }
+            const context = canvas!.node()!.getContext("2d")!;
             context.fillStyle = "#55a4c5";
             context.rect(0, 0, width, height);
             context.fillStyle = "#cdb396";
-            path = d3.geoPath(projection, context);
+            path = geoPath(projection, context);
             context.beginPath(), path(simplified ? simpleLand : land), context.fill();
             context.beginPath(),
                 path(graticule),
@@ -838,13 +953,13 @@
                 context.stroke();
             return;
         }
-        svg = container.select("svg");
+        svg = container.select("svg") as unknown as SvgSelection;
         if (svg.empty())
             svg = container
                 .append("svg")
                 .attr("xmlns", "http://www.w3.org/2000/svg")
                 .attr("xmlns:xlink", "http://www.w3.org/1999/xlink")
-                .attr("id", "static-svg-map");
+                .attr("id", "static-svg-map") as unknown as SvgSelection;
 
         svg.classed("animate-transition", true).classed("animate", animated);
 
@@ -855,8 +970,8 @@
         }
         container.style("width", `${width}px`).style("height", `${height}px`);
         mapLibreContainer.style("width", `${width}px`).style("height", `${height}px`);
-        path = d3.geoPath(projection);
-        pathLarger = d3.geoPath(projectionLarger);
+        path = geoPath(projection);
+        pathLarger = geoPath(projectionLarger);
         svg.html("");
         svg.append("defs");
         svg.on(
@@ -868,18 +983,20 @@
                 e.preventDefault();
                 closeMenu();
                 let target = null;
-                const [x, y] = d3.pointer(e);
+                const [x, y] = pointer(e);
                 const point = { x, y };
-                const paths = Array.from(document.getElementById("paths").children);
-                const closestPoint = paths.reduce((prev, curElem) => {
+                const pathsElement = document.getElementById("paths");
+                if (!pathsElement) return;
+                const paths = Array.from(pathsElement.children) as SVGPathElement[];
+                const closestPoint = paths.reduce<DistanceQueryResult>((prev: DistanceQueryResult, curElem) => {
                     const curDist = closestDistance(point, curElem);
                     curDist.elem = curElem;
-                    return prev.distance < curDist.distance ? prev : curDist;
+                    return prev.distance! < curDist.distance! ? prev : curDist;
                 }, {});
                 if (closestPoint.distance && closestPoint.distance < 6) {
                     menuStates.pathSelected = true;
                     target = closestPoint.elem;
-                    selectedPathIndex = closestPoint.elem.getAttribute("id").match(/\d+$/)[0];
+                    selectedPathIndex = parseInt(closestPoint.elem!.getAttribute("id")!.match(/\d+$/)![0]);
                 }
                 showMenu(e, target);
                 return false;
@@ -893,7 +1010,7 @@
             else if (iseOnClickEnabled) openEditor(e);
         });
 
-        const groupData = [];
+        const groupData: MacroGroupData[] = [];
         if (currentMode === "macro") {
             Object.values(zonesFilter).forEach((filterName) => {
                 if (!filterName) return;
@@ -904,14 +1021,14 @@
             drawMacro(graticule, groupData);
             appendBgPattern(svg, "noise", p("seaColor"), p("backgroundNoise"));
         } else if (currentMode === "micro") await drawMicro();
-        drawCustomPaths(providedPaths, svg, projection, inlineStyles, path);
+        drawCustomPaths(providedPaths, svg, projection, inlineStyles);
 
         if (currentMode === "macro") {
-            d3.select("#outline").style("fill", "url(#noise)");
+            select("#outline").style("fill", "url(#noise)");
             colorizeAndLegend();
         }
         computeCss();
-        let frame;
+        let frame: FrameSelection;
         if (currentMode === "macro") frame = drawMacroFrame(groupData);
         if (currentMode === "micro")
             frame = drawMicroFrame(
@@ -926,18 +1043,18 @@
             );
 
         if (animated) {
-            frame.on("animationend", (e) => {
+            frame!.on("animationend", (e) => {
                 setTimeout(() => {
                     svg.classed("animate", false);
                     svg.selectAll("path[pathLength]").attr("pathLength", null);
                     if (currentMode === "macro") {
                         const landElem = svg.select("#land");
-                        const landGroupDef = groupData.find((x) => x.type === "landImg");
+                        const landGroupDef = groupData.find((x) => x.type === "landImg")!;
                         const countryGroupDefs = groupData.filter((x) => x.type === "filterImg");
                         if (!landElem.empty() && landGroupDef) {
                             appendLandImageNew.call(
-                                landElem.node(),
-                                landGroupDef.showSource,
+                                landElem.node() as SVGGElement,
+                                landGroupDef.showSource || false,
                                 zonesFilter,
                                 width,
                                 height,
@@ -951,16 +1068,16 @@
                         }
                         countryGroupDefs.forEach((def) => {
                             appendCountryImageNew.call(
-                                svg.select(`[id='${def.name}']`).node(),
-                                def.countryData,
-                                def.filter,
+                                svg.select(`[id='${def.name}']`).node() as SVGGElement,
+                                def.countryData!,
+                                def.filter ?? null,
                                 applyInlineStyles,
                                 path,
                                 inlineStyles,
                                 false,
                             );
                         });
-                        duplicateContourCleanFirst(svg.node());
+                        duplicateContourCleanFirst(svg.node() as SVGSVGElement);
                     }
                     setTimeout(() => {
                         svg.selectAll("g[image-class]").classed("hidden-after", true);
@@ -971,12 +1088,12 @@
         }
 
         drawAndSetupShapes();
-        const map = document.getElementById("static-svg-map");
+        const map = document.getElementById("static-svg-map") as unknown as SVGSVGElement;
         if (!map) return;
         await tick();
         if (currentMode === "macro") {
             addTooltipListener(map, tooltipDefs, zonesData);
-            duplicateContourCleanFirst(svg.node());
+            duplicateContourCleanFirst(svg.node() as SVGSVGElement);
         }
         if (firstDraw) maplibreMap.resize();
         // if (firstDraw) mapLibreFitBounds();
@@ -987,7 +1104,7 @@
         }
     }
 
-    function drawMacro(graticule, groupData) {
+    function drawMacro(graticule: MultiLineString, groupData: MacroGroupData[]): void {
         const width = p("width"),
             height = p("height");
         const borderWidth = p("borderWidth");
@@ -1013,13 +1130,11 @@
             const filter = zonesFilter[layer] ? zonesFilter[layer] : null;
             if (layer === "countries" && inlineProps.showCountries && countries) {
                 if (!("countries" in zonesData) && !zonesData?.["countries"]?.provided) {
-                    const data = sortBy(
-                        countries.features.map((f) => f.properties),
-                        "name",
-                    );
+                    const countryProps = countries.features.map((f) => f.properties);
+                    sortBy(countryProps, "name")!;
                     zonesData["countries"] = {
-                        data: data,
-                        numericCols: getNumericCols(data),
+                        data: countryProps,
+                        numericCols: getNumericCols(countryProps),
                     };
                     getZonesDataFormatters();
                 }
@@ -1059,17 +1174,13 @@
         groupData.push({
             name: "paths",
             data: [],
-            id: null,
             props: [],
-            class: null,
             filter: null,
         });
         groupData.push({
             name: "points-labels",
             data: [],
-            id: null,
             props: [],
-            class: null,
             filter: null,
         });
         // const groups = svg.selectAll('svg').data(groupData).join('svg').attr('id', d => d.name);
@@ -1078,13 +1189,13 @@
             .selectAll("g")
             .data(groupData)
             .join("g")
-            .attr("id", (d) => d.name);
+            .attr("id", (d) => d.name!);
         // .attr('clip-path', 'url(#clipMapBorder)')
-        function drawPaths(data) {
+        function drawPaths(this: SVGGElement, data: MacroGroupData) {
             if (data.type === "landImg")
                 return appendLandImageNew.call(
                     this,
-                    data.showSource,
+                    data.showSource ?? false,
                     zonesFilter,
                     width,
                     height,
@@ -1098,34 +1209,36 @@
             if (data.type === "filterImg")
                 return appendCountryImageNew.call(
                     this,
-                    data.countryData,
-                    data.filter,
+                    data.countryData!,
+                    data.filter ?? null,
                     applyInlineStyles,
                     path,
                     inlineStyles,
                     animated,
                 );
             if (!data.data) return;
-            const parentPathElem = d3.select(this).style("will-change", "opacity");
+            const parentPathElem = select(this).style("will-change", "opacity");
             if (data.containerClass) parentPathElem.classed(data.containerClass, true);
             const pathElem = parentPathElem
                 .selectAll("path")
+                // @ts-expect-error
                 .data(data.data.features ? data.data.features : data.data)
                 .join("path")
                 .attr("pathLength", 1)
                 .attr("d", (d) => {
                     return path(d);
                 });
+            // @ts-expect-error
             if (data.id) pathElem.attr("id", (d) => d.properties[data.id]);
             if (data.class) pathElem.attr("class", data.class);
             if (data.filter) parentPathElem.attr("filter", `url(#${data.filter})`);
-            data.props.forEach((prop) => pathElem.attr(prop, (d) => d.properties[prop]));
+            // data.props?.forEach((prop) => pathElem.attr(prop, (d) => d.properties[prop]));
         }
-
+        // @ts-expect-error
         groups.each(drawPaths);
     }
 
-    function drawMacroFrame(groupData) {
+    function drawMacroFrame(groupData: any[]): FrameSelection {
         const borderWidth = p("borderWidth");
         const borderRadius = p("borderRadius");
         const width = p("width"),
@@ -1145,13 +1258,13 @@
             .attr("rx", rx);
         return frame;
     }
-    async function drawMicro() {
+    async function drawMicro(): Promise<void> {
         console.log("drawmicro");
         if (!maplibreMap) return;
         await mapLoadedPromise;
-        projection = createD3ProjectionFromMapLibre(maplibreMap, p("width"), p("height"), p("borderRadius"));
-        path = d3.geoPath(projection);
-        drawPrettyMap(maplibreMap, svg, path, microLayerDefinitions, currentParams, microLocked);
+        projection = createD3ProjectionFromMapLibre(maplibreMap);
+        path = geoPath(projection);
+        drawPrettyMap(maplibreMap, svg, path, microLayerDefinitions, microParams, microLocked);
         freeHandDrawings.forEach((drawingGroup) => {
             const gDrawing = svg.append("g");
             for (const drawing of drawingGroup) {
@@ -1162,13 +1275,13 @@
         applyInlineStyles();
     }
 
-    function projectAndDraw(simplified = false) {
+    function projectAndDraw(simplified = false): void {
         changeProjection();
         draw(simplified);
     }
 
-    let totalCommonCss;
-    function computeCss() {
+    let totalCommonCss: string;
+    function computeCss(): void {
         if (currentMode === "micro") {
             let css = `
         #paths > path {
@@ -1188,7 +1301,7 @@
         const width = p("width");
         const height = p("height");
         const borderRadius = p("borderRadius");
-        const finalColorsCss = Object.values(colorsCss).reduce((acc, cur) => {
+        const finalColorsCss = Object.values(colorsCssByTab).reduce((acc, cur) => {
             acc += cur;
             return acc;
         }, "");
@@ -1210,8 +1323,8 @@
         totalCommonCss = exportStyleSheet("#outline") + commonCss;
     }
 
-    function save() {
-        baseCss = exportStyleSheet("#outline");
+    function save(): void {
+        baseCss = exportStyleSheet("#outline")!;
         saveState({
             params,
             microParams,
@@ -1238,7 +1351,7 @@
         });
     }
 
-    function resetState() {
+    function resetState(): void {
         params = JSON.parse(JSON.stringify(defaultParams));
         microParams = JSON.parse(JSON.stringify(microDefaultParams));
         baseCss = defaultBaseCssMacro;
@@ -1247,12 +1360,15 @@
         providedShapes = [];
         chosenCountriesAdm = [];
         orderedTabs = ["countries", "land"];
-        currentTab = "countries";
+        currentMacroLayerTab = "countries";
         inlineProps = JSON.parse(JSON.stringify(defaultInlineProps));
         inlinePropsMicro = JSON.parse(JSON.stringify(defaultInlinePropsMicro));
         microLayerDefinitions = initLayersState(microPalettes["peach"]);
         if (currentMode === "micro") {
-            updateSvgPatterns(document.getElementById("static-svg-map"), microLayerDefinitions);
+            updateSvgPatterns(
+                document.getElementById("static-svg-map") as unknown as SVGElement,
+                microLayerDefinitions,
+            );
             replaceCssSheetContent(microLayerDefinitions);
         }
         setTimeout(() => {
@@ -1269,6 +1385,7 @@
                 template: defaultTooltipContent(true),
                 content: defaultTooltipFull(defaultTooltipContent(true)),
                 locale: "en-US",
+                enabled: false,
             },
         };
         contourParams = {
@@ -1290,7 +1407,7 @@
         projectAndDraw();
     }
 
-    function restoreState(givenState) {
+    function restoreState(givenState?: any): void {
         let state;
         if (givenState) {
             state = givenState;
@@ -1320,7 +1437,10 @@
         if (state.microLayerDefinitions) microLayerDefinitions = state.microLayerDefinitions;
         inlinePropsMicro = state.inlinePropsMicro ?? defaultInlinePropsMicro;
         if (currentMode === "micro") {
-            updateSvgPatterns(document.getElementById("static-svg-map"), microLayerDefinitions);
+            updateSvgPatterns(
+                document.getElementById("static-svg-map") as unknown as SVGElement,
+                microLayerDefinitions,
+            );
             replaceCssSheetContent(microLayerDefinitions);
         }
         setTimeout(() => {
@@ -1335,8 +1455,8 @@
         updateLayerSimplification();
     }
 
-    function saveProject() {
-        baseCss = exportStyleSheet("#outline");
+    function saveProject(): void {
+        baseCss = exportStyleSheet("#outline")!;
         const state = {
             params,
             microParams,
@@ -1361,12 +1481,13 @@
         download(JSON.stringify(state), "text/json", "project.cartosvg");
     }
 
-    function loadProject(e) {
+    function loadProject(e: Event): void {
+        // @ts-expect-error
         const file = e.target.files[0];
         const reader = new FileReader();
         reader.addEventListener("load", () => {
             try {
-                const providedState = JSON.parse(reader.result);
+                const providedState = JSON.parse(reader.result as string);
                 restoreState(providedState);
                 save();
                 projectAndDraw();
@@ -1377,7 +1498,7 @@
         reader.readAsText(file);
     }
 
-    function loadExample(e) {
+    function loadExample(e: CustomEvent): void {
         if (
             !window.confirm(
                 "Caution: Loading the example will discard your current project. Please save it first if you want to keep it.",
@@ -1389,23 +1510,23 @@
         projectAndDraw();
     }
 
-    function applyInlineStyles(styleAll = false) {
+    function applyInlineStyles(styleAll = false): void {
         applyStyles(inlineStyles, styleAll ? countryFilteredImages : null);
         save();
     }
 
-    function openEditor(e) {
+    function openEditor(e: MouseEvent): void {
         styleEditor.open(e.target, e.pageX, e.pageY);
     }
+    let selectedPathIndex: number;
 
-    let selectedPathIndex;
-    function editPath() {
+    function editPath(): void {
         closeMenu();
         const pathElem = openContextMenuInfo.target;
         detachListeners();
         editingPath = true;
 
-        new PathEditor(pathElem, svg.node(), (editedPathElem) => {
+        new PathEditor(pathElem, svg.node() as SVGSVGElement, (editedPathElem) => {
             // element was deleted
             if (!editedPathElem) {
                 providedPaths.splice(selectedPathIndex, 1);
@@ -1419,35 +1540,36 @@
         });
     }
 
-    function deletePath() {
+    function deletePath(): void {
         closeMenu();
         providedPaths.splice(selectedPathIndex, 1);
         drawShapesAndSave();
     }
 
-    function addImageToPath(e) {
+    function addImageToPath(e: Event): void {
         menuStates.pathSelected = false;
         menuStates.addingImageToPath = true;
     }
 
-    function choseMarker(e) {
+    function choseMarker(e: Event): void {
         menuStates.pathSelected = false;
         menuStates.chosingMarker = true;
     }
 
-    function importImagePath(e) {
+    function importImagePath(e: Event): void {
+        // @ts-expect-error
         const file = e.target.files[0];
         const fileName = file.name;
         const reader = new FileReader();
         reader.addEventListener("load", () => {
-            const newImage = { name: fileName, content: reader.result };
+            const newImage: PathDefImage = { name: fileName, content: reader.result as string };
             providedPaths[selectedPathIndex].image = newImage;
             if (!providedPaths[selectedPathIndex].duration) {
                 providedPaths[selectedPathIndex].duration = 10;
                 providedPaths[selectedPathIndex].width = 20;
                 providedPaths[selectedPathIndex].height = 10;
             }
-            drawCustomPaths(providedPaths, svg, projection, inlineStyles, path);
+            drawCustomPaths(providedPaths, svg, projection, inlineStyles);
             applyInlineStyles();
             save();
         });
@@ -1455,22 +1577,22 @@
     }
 
     const saveDebounced = debounce(save, 200);
-    function changeDurationAnimation(e) {
-        providedPaths[selectedPathIndex].duration = e.target.value;
+    function changeDurationAnimation(e: Event): void {
+        providedPaths[selectedPathIndex].duration = parseInt((e!.target! as HTMLInputElement).value);
         drawShapesAndSave();
     }
 
-    function changePathImageWidth(e) {
-        providedPaths[selectedPathIndex].width = e.target.value;
+    function changePathImageWidth(e: Event): void {
+        providedPaths[selectedPathIndex].width = parseInt((e!.target! as HTMLInputElement).value);
         drawShapesAndSave();
     }
 
-    function changePathImageHeight(e) {
-        providedPaths[selectedPathIndex].height = e.target.value;
+    function changePathImageHeight(e: Event): void {
+        providedPaths[selectedPathIndex].height = parseInt((e!.target! as HTMLInputElement).value);
         drawShapesAndSave();
     }
 
-    function changeMarker(markerName) {
+    function changeMarker(markerName: MarkerName | "delete"): void {
         closeMenu();
         menuStates.chosingMarker = false;
         if (markerName === "delete") delete providedPaths[selectedPathIndex].marker;
@@ -1478,43 +1600,42 @@
         drawShapesAndSave();
     }
 
-    function deleteImage() {
+    function deleteImage(): void {
         delete providedPaths[selectedPathIndex].image;
         providedPaths[selectedPathIndex] = providedPaths[selectedPathIndex];
         drawShapesAndSave();
     }
 
-    function drawShapesAndSave() {
-        drawCustomPaths(providedPaths, svg, projection, inlineStyles, path);
+    function drawShapesAndSave(): void {
+        drawCustomPaths(providedPaths, svg, projection, inlineStyles);
         applyInlineStyles();
         saveDebounced();
     }
 
-    function getFirstDataRow(zonesDataDef) {
+    function getFirstDataRow(zonesDataDef: ZoneData): ZoneDataRow | null {
         if (!zonesData) return null;
         const row = { ...zonesDataDef.data[0] };
         zonesDataDef.numericCols.forEach((colDef) => {
             const col = colDef.column;
-            row[col] = zonesDataDef.formatters[col](row[col]);
+            row[col] = zonesDataDef.formatters![col](row[col] as number);
         });
         return row;
     }
 
     let currentTemplateHasNumeric = false;
-    function templateHasNumeric(layerName) {
+    function templateHasNumeric(layerName: string): boolean {
         const toFind = zonesData[layerName]?.numericCols.map((colDef) => `{${colDef.column}}`);
         const template = tooltipDefs[layerName]?.template;
         return toFind?.some((str) => template.includes(str));
     }
 
-    $: cssFonts = fontsToCss(providedFonts);
-
-    function handleInputFont(e) {
+    function handleInputFont(e: Event): void {
+        // @ts-expect-error
         const file = e.target.files[0];
         const fileName = file.name.split(".")[0];
         const reader = new FileReader();
         reader.addEventListener("load", () => {
-            const newFont = { name: fileName, content: reader.result };
+            const newFont: ProvidedFont = { name: fileName, content: reader.result as string };
             providedFonts.push(newFont);
             providedFonts = providedFonts;
             save();
@@ -1522,11 +1643,11 @@
         reader.readAsDataURL(file);
     }
 
-    function addPath() {
+    function addPath(): void {
         closeMenu();
         detachListeners();
         isDrawingPath = true;
-        freeHandDrawPath(svg, (finishedElem) => {
+        freeHandDrawPath(svg.node() as SVGSVGElement, (finishedElem) => {
             console.log("finishedElem", finishedElem);
             const d = finishedElem.getAttribute("d");
             if (!d) return;
@@ -1542,15 +1663,15 @@
         });
     }
 
-    function drawFreeHand() {
+    function drawFreeHand(): void {
         isDrawingFreeHand = true;
         closeMenu();
         detachListeners();
-        freeHandDrawer.start(svg.node());
+        freeHandDrawer.start(svg.node() as SVGSVGElement);
     }
 
-    let freeHandDrawings = [];
-    function stopDrawFreeHand() {
+    let freeHandDrawings: ParsedPath[][] = [];
+    function stopDrawFreeHand(): void {
         if (!isDrawingFreeHand) return;
         attachListeners();
         isDrawingFreeHand = false;
@@ -1567,7 +1688,7 @@
         //     break;
         // }
 
-        const unprojected = [];
+        const unprojected: ParsedPath[] = [];
         paths.forEach((pathElem) => {
             const d = pathElem.getAttribute("d");
             if (!d) return;
@@ -1578,10 +1699,11 @@
         if (unprojected.length) freeHandDrawings.push(unprojected);
     }
 
-    function handleChangeProp(event) {
+    function handleChangeProp(event: CustomEvent<{ prop: string; value: unknown }>): void {
         if (firstDraw) return;
         const { prop, value } = event.detail;
         if (positionVars.includes(prop)) {
+            // @ts-expect-error
             inlineProps[prop] = value;
         }
         if (prop === "projection" || prop === "fieldOfView") {
@@ -1593,13 +1715,13 @@
         }
         if (prop === "height") {
             Object.keys(legendDefs).forEach((tab) => {
-                legendDefs[tab].y = value - 100;
+                legendDefs[tab].y = (value as number) - 100;
             });
         }
         redrawThrottle(prop);
     }
 
-    function closeMenu() {
+    function closeMenu(): void {
         contextualMenu.style.display = "none";
         contextualMenu.opened = false;
         menuStates.chosingPoint = false;
@@ -1610,15 +1732,15 @@
         editedLabelId = null;
     }
 
-    function editStyles() {
+    function editStyles(): void {
         closeMenu();
         styleEditor.open(openContextMenuInfo.target, openContextMenuInfo.event.pageX, openContextMenuInfo.event.pageY);
     }
-    function addPoint() {
+    function addPoint(): void {
         menuStates.chosingPoint = true;
     }
 
-    async function addLabel(e) {
+    async function addLabel(): Promise<void> {
         menuStates.addingLabel = true;
         await tick();
         textInput.focus();
@@ -1629,10 +1751,10 @@
         });
     }
 
-    function validateLabel() {
+    function validateLabel(): void {
         if (typedText.length) {
             if (editedLabelId) {
-                const labelDef = providedShapes.find((def) => def.id === editedLabelId);
+                const labelDef = providedShapes.find((def) => def.id === editedLabelId)!;
                 labelDef.text = typedText;
             } else {
                 const labelId = `label-${shapeCount++}`;
@@ -1650,25 +1772,25 @@
         closeMenu();
     }
 
-    function drawAndSetupShapes() {
+    function drawAndSetupShapes(): void {
         const container = document.getElementById("points-labels");
         if (!container) return;
         drawShapes(providedShapes, container, projection, save);
-        d3.select(container).on("dblclick", (e) => {
+        select(container).on("dblclick", (e) => {
             const target = e.target;
             let targetId = target.getAttribute("id");
             if (target.tagName == "tspan") targetId = target.parentNode.getAttribute("id");
             if (targetId.includes("label")) {
                 editedLabelId = targetId;
-                const labelDef = providedShapes.find((def) => def.id === editedLabelId);
-                typedText = labelDef.text;
+                const labelDef = providedShapes.find((def) => def.id === editedLabelId)!;
+                typedText = labelDef.text!;
                 addLabel();
                 showMenu(e);
             }
             e.preventDefault();
             e.stopPropagation();
         });
-        d3.select(container).on(
+        select(container).on(
             "contextmenu",
             function (e) {
                 e.stopPropagation();
@@ -1682,19 +1804,19 @@
         applyInlineStyles();
     }
 
-    function showMenu(e, target = null) {
+    function showMenu(e: MouseEvent, target: EventTarget | null = null): void {
         openContextMenuInfo = {
             event: e,
-            position: projection.invert(d3.pointer(e)),
+            position: projection.invert!(pointer(e))!,
+            target: (target ? target : e.target) as SVGPathElement,
         };
-        openContextMenuInfo.target = target ? target : e.target;
         contextualMenu.opened = true;
         contextualMenu.style.display = "block";
         contextualMenu.style.left = e.pageX + "px";
         contextualMenu.style.top = e.pageY + "px";
     }
 
-    async function addShape(shapeName) {
+    async function addShape(shapeName: ShapeName): Promise<void> {
         const shapeId = `${shapeName}-${shapeCount++}`;
         providedShapes.push({
             name: shapeName,
@@ -1711,14 +1833,14 @@
         }, 0);
     }
 
-    function copySelection() {
+    function copySelection(): void {
         let objectId = openContextMenuInfo.target.getAttribute("id");
         if (openContextMenuInfo.target.tagName === "tspan") {
-            objectId = openContextMenuInfo.target.parentNode.getAttribute("id");
+            objectId = (openContextMenuInfo.target.parentNode as HTMLElement).getAttribute("id");
         }
-        const newDef = { ...providedShapes.find((def) => def.id === objectId) };
-        const projected = projection(newDef.pos);
-        newDef.pos = projection.invert([projected[0] - 10, projected[1]]);
+        const newDef: ShapeDefinition = { ...providedShapes.find((def) => def.id === objectId)! };
+        const projected = projection(newDef.pos)!;
+        newDef.pos = projection.invert!([projected[0] - 10, projected[1]])!;
         const newShapeId = `${newDef.name ? newDef.name : "label"}-${shapeCount++}`;
         inlineStyles[newShapeId] = { ...inlineStyles[newDef.id] };
         newDef.id = newShapeId;
@@ -1727,11 +1849,11 @@
         closeMenu();
     }
 
-    function deleteSelection() {
-        let pointId = openContextMenuInfo.target.getAttribute("id");
+    function deleteSelection(): void {
+        let pointId = openContextMenuInfo.target.getAttribute("id")!;
         delete inlineStyles[pointId];
         if (openContextMenuInfo.target.tagName === "tspan") {
-            pointId = openContextMenuInfo.target.parentNode.getAttribute("id");
+            pointId = (openContextMenuInfo.target.parentNode as HTMLElement).getAttribute("id")!;
             delete inlineStyles[pointId];
         }
         providedShapes = providedShapes.filter((def) => def.id !== pointId);
@@ -1743,19 +1865,19 @@
         showModal = false;
     };
 
-    function exportJson(data) {
+    function exportJson(data: any): void {
         download(JSON.stringify(data, null, "\t"), "text/json", "data.json");
     }
 
-    function getZonesDataFormatters() {
+    function getZonesDataFormatters(): void {
         Object.entries(zonesData).forEach(([name, def]) => {
             const locale = tooltipDefs[name].locale;
-            const formatters = {};
+            const formatters: FormatterObject = {};
             if (def.numericCols.length) {
                 def.numericCols.forEach((colDef) => {
                     const col = colDef.column;
                     formatters[col] = getBestFormatter(
-                        def.data.map((row) => row[col]),
+                        def.data.map((row) => row[col] as number),
                         resolvedLocales[locale],
                     );
                 });
@@ -1764,13 +1886,15 @@
         });
     }
 
-    function handleDataImport(e) {
-        const file = e.target.files[0];
+    function handleDataImport(e: Event): void {
+        const file = (e.target as HTMLInputElement).files![0];
         const reader = new FileReader();
         reader.addEventListener("load", () => {
             try {
-                let parsed = JSON.parse(reader.result);
-                const currentNames = new Set(zonesData[currentTab].data.map((line) => line.name));
+                let parsed = JSON.parse(reader.result as string);
+                const currentNames = new Set<string | undefined>(
+                    zonesData[currentMacroLayerTab].data.map((line) => line.name),
+                );
                 currentNames.delete(undefined);
                 if (!Array.isArray(parsed)) {
                     return window.alert("JSON should be a list of objects, each object reprensenting a line.");
@@ -1789,7 +1913,7 @@
                 if (difference.size) {
                     return window.alert(`Missing names ${[...difference]}`);
                 }
-                zonesData[currentTab] = {
+                zonesData[currentMacroLayerTab] = {
                     data: parsed,
                     provided: true,
                     numericCols: getNumericCols(parsed),
@@ -1805,64 +1929,65 @@
         reader.readAsText(file);
     }
 
-    function defaultTooltipContent(isCountry) {
+    function defaultTooltipContent(isCountry: boolean): string {
         return `<div>
     <span> ${isCountry ? "Country" : "Region"}: {name}</span>
 </div>
     `;
     }
 
-    function defaultTooltipFull(template) {
+    function defaultTooltipFull(template: string): string {
         return `<div id="tooltip-preview" style="${defaultTooltipStyle}">
         ${template}
     </div>`;
     }
 
-    function editTooltip(e) {
-        const rect = e.target.getBoundingClientRect();
+    function editTooltip(e: MouseEvent): void {
+        const rect = (e.target as HTMLElement).getBoundingClientRect();
         styleEditor.open(e.target, rect.right, rect.bottom);
     }
 
-    let templateErrorMessages = {};
-    function onTemplateChange() {
-        const parsed = DOM_PARSER.parseFromString(tooltipDefs[currentTab].template, "application/xml");
+    let templateErrorMessages: Record<string, boolean> = {};
+    function onTemplateChange(): void {
+        const parsed = DOM_PARSER.parseFromString(tooltipDefs[currentMacroLayerTab].template, "application/xml");
         const errorNode = parsed.querySelector("parsererror");
         if (errorNode) {
-            templateErrorMessages[currentTab] = true;
+            templateErrorMessages[currentMacroLayerTab] = true;
         } else {
-            tooltipDefs[currentTab].content = htmlTooltipElem.outerHTML;
-            currentTemplateHasNumeric = templateHasNumeric(currentTab);
-            templateErrorMessages[currentTab] = null;
+            tooltipDefs[currentMacroLayerTab].content = htmlTooltipElem.outerHTML;
+            currentTemplateHasNumeric = templateHasNumeric(currentMacroLayerTab);
+            delete templateErrorMessages[currentMacroLayerTab];
         }
         save();
     }
 
-    function changeNumericFormatter() {
+    function changeNumericFormatter(): void {
         getZonesDataFormatters();
         colorizeAndLegend();
     }
 
-    async function onTabChanged(newTabTitle) {
-        currentTab = newTabTitle;
-        currentTemplateHasNumeric = templateHasNumeric(currentTab) === true;
+    async function onTabChanged(newTabTitle: string): Promise<void> {
+        currentMacroLayerTab = newTabTitle;
+        currentTemplateHasNumeric = templateHasNumeric(currentMacroLayerTab) === true;
         await tick();
         initTooltips();
         applyStylesToTemplate();
     }
 
-    function applyStylesToTemplate() {
-        if (htmlTooltipElem && tooltipDefs[currentTab]?.enabled) {
-            const tmpElem = htmlToElement(tooltipDefs[currentTab].content);
+    function applyStylesToTemplate(): void {
+        if (htmlTooltipElem && tooltipDefs[currentMacroLayerTab]?.enabled) {
+            const tmpElem = htmlToElement(tooltipDefs[currentMacroLayerTab].content!)!;
             reportStyle(tmpElem, htmlTooltipElem);
         }
-        if (legendSample && colorDataDefs[currentTab]?.legendEnabled) {
-            const tmpElem = htmlToElement(legendDefs[currentTab].sampleHtml);
+        if (legendSample && colorDataDefs[currentMacroLayerTab]?.legendEnabled) {
+            const tmpElem = htmlToElement(legendDefs[currentMacroLayerTab].sampleHtml!)!;
             reportStyle(tmpElem, legendSample);
         }
     }
 
-    async function addNewCountry(e) {
-        const newLayerName = e.target.value;
+    async function addNewCountry(e: Event): Promise<void> {
+        const target = e.target as HTMLSelectElement;
+        const newLayerName = target.value;
         if (chosenCountriesAdm.includes(newLayerName)) return;
         let searchedAdm;
         if (newLayerName.slice(-1) === "1") searchedAdm = newLayerName.replace("ADM1", "ADM2");
@@ -1875,15 +2000,15 @@
         orderedTabs.push(newLayerName);
         chosenCountriesAdm = chosenCountriesAdm;
         orderedTabs = orderedTabs;
-        e.target.selectedIndex = null;
+        target.selectedIndex = 0;
         await draw();
         onTabChanged(newLayerName);
     }
 
-    function deleteCountry(country, drawAfter = true) {
+    function deleteCountry(country: string, drawAfter = true): void {
         chosenCountriesAdm = chosenCountriesAdm.filter((x) => x !== country);
         orderedTabs = orderedTabs.filter((x) => x !== country);
-        currentTab = orderedTabs[0];
+        currentMacroLayerTab = orderedTabs[0];
         delete tooltipDefs[country];
         delete legendDefs[country];
         delete colorDataDefs[country];
@@ -1893,11 +2018,11 @@
 
     // === Drag and drop behaviour ===
 
-    let hoveringTab = false;
+    let hoveringTab: number | null = null;
     let dragStartIndex = 0;
 
-    function drop(event, target) {
-        event.dataTransfer.dropEffect = "move";
+    function drop(event: DragEvent, target: number): void {
+        event.dataTransfer!.dropEffect = "move";
         const newList = orderedTabs;
 
         if (dragStartIndex < target) {
@@ -1912,16 +2037,16 @@
         draw();
     }
 
-    function dragstart(event, i, prevent = false) {
+    function dragstart(event: DragEvent, i: number, prevent = false): void {
         if (prevent) {
             return event.preventDefault();
         }
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.dropEffect = "move";
+        event.dataTransfer!.effectAllowed = "move";
+        event.dataTransfer!.dropEffect = "move";
         dragStartIndex = i;
     }
 
-    function validateExport() {
+    function validateExport(): void {
         const formData = Object.fromEntries(new FormData(exportForm).entries());
         if (currentMode === "macro") {
             exportSvg(
@@ -1961,7 +2086,7 @@
 
     let inlineFontUsed = false;
     function onExportSvgClicked() {
-        const usedFonts = getUsedInlineFonts(svg.node());
+        const usedFonts = getUsedInlineFonts(svg.node()!);
         const usedProvidedFonts = providedFonts.filter((font) => usedFonts.has(font.name));
         inlineFontUsed = usedProvidedFonts.length > 0;
         if (currentMode === "micro" && !inlineFontUsed) {
@@ -1972,105 +2097,61 @@
     }
     // === Colorize by data behaviour ===
 
-    const numericPalettes = [
-        "Blues",
-        "Greens",
-        "Greys",
-        "Oranges",
-        "Purples",
-        "BuGn",
-        "BuPu",
-        "GnBu",
-        "OrRd",
-        "PuBuGn",
-        "PuBu",
-        "PuRd",
-        "RdPu",
-        "YlGnBu",
-        "YlGn",
-        "YlOrBr",
-        "YlOrRd",
-        "BrBG",
-        "PRGn",
-        "PiYG",
-        "PuOr",
-        "RdBu",
-        "RdGy",
-        "RdYlBu",
-        "RdYlGn",
-        "Spectral",
-    ];
-
-    const categoricalPalettes = [
-        "Category10",
-        "Custom",
-        "Accent",
-        "Dark2",
-        "Paired",
-        "Pastel1",
-        "Pastel2",
-        "Set1",
-        "Set2",
-        "Set3",
-        "Tableau10",
-    ];
-
     // --- Computed ---
-    let availableColumns = [],
-        availablePalettes = [];
-    $: availableColorTypes = zonesData?.[currentTab]?.numericCols?.length
+    let availableColumns: string[] = [],
+        availablePalettes: string[] = [];
+    $: availableColorTypes = zonesData?.[currentMacroLayerTab]?.numericCols?.length
         ? ["category", "quantile", "quantize"]
         : ["category"];
-    $: curDataDefs = colorDataDefs?.[currentTab];
+    $: curDataDefs = colorDataDefs?.[currentMacroLayerTab];
     let currentIsColorByNumeric = ["quantile", "quantize"].includes(curDataDefs?.colorScale);
 
     function autoSelectColors() {
-        if (!zonesData[currentTab]) return;
+        if (!zonesData[currentMacroLayerTab]) return;
         if (curDataDefs.colorScale === null) {
             if (curDataDefs.colorColumn !== null) {
-                if (zonesData[currentTab].numericCols.find((x) => x.column === curDataDefs.colorColumn)) {
+                if (zonesData[currentMacroLayerTab].numericCols.find((x) => x.column === curDataDefs.colorColumn)) {
                     curDataDefs.colorScale = "quantile";
                 } else curDataDefs.colorScale = "category";
             } else curDataDefs.colorScale = "category";
         }
         availableColumns =
             curDataDefs.colorScale === "category"
-                ? getColumns(zonesData[currentTab].data)
-                : zonesData?.[currentTab]?.numericCols.map((x) => x.column);
-        availablePalettes = curDataDefs.colorScale === "category" ? categoricalPalettes : numericPalettes;
+                ? getColumns(zonesData[currentMacroLayerTab].data)
+                : zonesData?.[currentMacroLayerTab]?.numericCols.map((x) => x.column);
+        availablePalettes =
+            curDataDefs.colorScale === "category" ? Object.keys(CATEGORICAL_SCHEMES) : Object.keys(CONTINUOUS_SCHEMES);
         if (!availableColumns.includes(curDataDefs.colorColumn)) {
             curDataDefs.colorColumn = availableColumns[0];
         }
-        if (!availablePalettes.includes(curDataDefs.colorPalette)) curDataDefs.colorPalette = availablePalettes[0];
+        if (!availablePalettes.includes(curDataDefs.colorPalette!))
+            curDataDefs.colorPalette = availablePalettes[0] as AnyScaleKey;
         if (svg) colorizeAndLegend();
     }
 
-    $: if (colorDataDefs[currentTab]) {
-        autoSelectColors(
-            colorDataDefs[currentTab].colorScale,
-            colorDataDefs[currentTab].colorColumn,
-            colorDataDefs[currentTab].colorPalette,
-            colorDataDefs[currentTab].nbBreaks,
-        );
+    $: if (colorDataDefs[currentMacroLayerTab]) {
+        const x = { ...colorDataDefs[currentMacroLayerTab] };
+        // TODO: test this works
+        autoSelectColors();
     }
 
-    const colorsCss = {};
-    let legendSample;
-    let displayedLegend = {};
+    const colorsCssByTab: Record<string, string> = {};
+    let legendSample: SVGGElement;
+    let displayedLegend: Record<string, SvgGSelection> = {};
     let sampleLegend = {
         color: "black",
         text: "test",
     };
     let showCustomPalette = false;
     // tab => {x => color} used for custom palette
-    const ordinalMapping = {};
-    async function colorizeAndLegend(e) {
+    const ordinalMapping: OrdinalMapping = {};
+    async function colorizeAndLegend(e?: Event): Promise<void> {
         await tick();
         initTooltips();
         legendDefs = legendDefs;
-        const legendEntries = d3.select("#svg-map-legend");
+        const legendEntries = select("#svg-map-legend");
         if (!legendEntries.empty()) legendEntries.remove();
-        const legendSelection = svg.select("svg").append("g").attr("id", "svg-map-legend");
+        const legendSelection = svg.select("svg").append("g").attr("id", "svg-map-legend") as SvgGSelection;
         Object.entries(colorDataDefs).forEach(([tab, dataColorDef], tabIndex) => {
             if (!zonesData[tab]) return;
             if (!legendDefs[tab].noData.manual) legendDefs[tab].noData.active = false;
@@ -2082,7 +2163,7 @@
             });
             if (!dataColorDef.enabled) {
                 dataColorDef.legendEnabled = false;
-                colorsCss[tab] = "";
+                colorsCssByTab[tab] = "";
                 if (displayedLegend[tab]) displayedLegend[tab].remove();
                 zonesData[tab].data.forEach((row) => {
                     const d = row[dataColorDef.colorColumn];
@@ -2097,7 +2178,7 @@
             }
             const paletteName = `scheme${dataColorDef.colorPalette}`;
             // filter out undef or null data
-            const data = zonesData[tab].data.reduce((acc, row) => {
+            const data = zonesData[tab].data.reduce<(string | number)[]>((acc, row) => {
                 const d = row[dataColorDef.colorColumn];
                 if (d === null || d === undefined) {
                     if (!legendDefs[tab].noData.manual) legendDefs[tab].noData.active = true;
@@ -2106,31 +2187,37 @@
                 acc.push(d);
                 return acc;
             }, []);
-            let scale;
+            let scale: ColorScale;
             if (dataColorDef.colorScale === "category") {
                 if (dataColorDef.colorPalette === "Custom") {
                     ordinalMapping[tab] = {};
-                    scale = d3.scaleOrdinal(customCategoricalPalette);
-                } else scale = d3.scaleOrdinal(d3[paletteName]);
+                    scale = scaleOrdinal(customCategoricalPalette);
+                } else scale = scaleOrdinal(CATEGORICAL_SCHEMES[paletteName as CategoricalScaleKey]);
             } else if (dataColorDef.colorScale === "quantile") {
-                scale = d3.scaleQuantile().domain(data).range(d3[paletteName][dataColorDef.nbBreaks]);
+                scale = scaleQuantile<string, number>()
+                    .domain(data as number[])
+                    .range(CONTINUOUS_SCHEMES[paletteName as ContinuousScaleKey][dataColorDef.nbBreaks]);
             } else if (dataColorDef.colorScale === "quantize") {
-                scale = d3.scaleQuantile().domain(d3.extent(data)).range(d3[paletteName][dataColorDef.nbBreaks]);
+                const dataExtent = extent(data as number[]) as [number, number];
+                scale = scaleQuantize<string, number>()
+                    .domain(dataExtent)
+                    .range(CONTINUOUS_SCHEMES[paletteName as ContinuousScaleKey][dataColorDef.nbBreaks]);
             }
-            const usedColors = [];
+            const usedColors: Color[] = [];
             zonesData[tab].data.forEach((row) => {
                 const d = row[dataColorDef.colorColumn];
                 const key = row.name;
                 const elem = document.querySelector(`g[id="${tab}"] [id="${key}"]`);
                 if (!elem) return;
-                let color;
+                let color: Color;
                 if (d === null || d === undefined) {
                     color = legendDefs[tab].noData.color;
                 } else {
-                    color = scale(d);
+                    // @ts-expect-error
+                    color = scale(d) as Color;
                     if (ordinalMapping[tab]) {
-                        if (!ordinalMapping[tab][color]) ordinalMapping[tab][color] = new Set([d]);
-                        else ordinalMapping[tab][color].add(d);
+                        if (!ordinalMapping[tab][color]) ordinalMapping[tab][color] = new Set([d as string]);
+                        else ordinalMapping[tab][color].add(d as string);
                     }
                 }
                 if (!usedColors.includes(color)) usedColors.push(color);
@@ -2141,17 +2228,17 @@
             let newCss = "";
             usedColors.forEach((color, i) => {
                 newCss += `path.ssc-${tabIndex}-${i}{fill:${color};}
-            path.ssc-${tabIndex}-${i}.hovered{fill:${d3.color(color).brighter(0.2).hex()};}`;
+            path.ssc-${tabIndex}-${i}.hovered{fill:${d3Color(color)!.brighter(0.2).hex()};}`;
             });
-            colorsCss[tab] = newCss;
-            const legendColors = getLegendColors(dataColorDef, tab, scale, data);
+            colorsCssByTab[tab] = newCss;
+            const legendColors = getLegendColors(dataColorDef, tab, scale!, data);
             if (!legendColors) return;
-            if (tab === currentTab)
+            if (tab === currentMacroLayerTab)
                 sampleLegend = {
                     color: legendColors[0][0],
                     text: legendColors[0][1],
                 };
-            const sampleElem = htmlToElement(legendDefs[tab].sampleHtml);
+            const sampleElem = htmlToElement<SVGSVGElement>(legendDefs[tab].sampleHtml!)!;
             displayedLegend[tab] = drawLegend(
                 legendSelection,
                 legendDefs[tab],
@@ -2170,30 +2257,39 @@
 
     // ==== Legend ===
 
-    function getLegendColors(dataColorDef, tab, scale, data) {
+    function getLegendColors(
+        dataColorDef: ColorDef,
+        tab: string,
+        scale: ColorScale,
+        data: (string | number)[],
+    ): LegendColor[] | undefined {
         if (!dataColorDef.legendEnabled) {
             if (displayedLegend[tab]) displayedLegend[tab].remove();
             return;
         }
         if (legendSample && legendDefs[tab].sampleHtml === null) legendDefs[tab].sampleHtml = legendSample.outerHTML;
         if (legendDefs[tab].title === null) legendDefs[tab].title = dataColorDef.colorColumn;
-        let threshValues;
-        let formatter = (x) => x;
+        let threshValues: number[];
+        let formatter = (x: number | string) => x;
         if (dataColorDef.colorScale === "category") {
-            threshValues = [...new Set(data)];
+            threshValues = [...new Set(data as number[])];
         } else {
+            // @ts-expect-error
             formatter = d3
                 .formatLocale(resolvedLocales[tooltipDefs[tab].locale])
                 .format(`,.${legendDefs[tab].significantDigits}r`);
-            const minValue = Math.min(...data);
-            if (scale.quantiles) threshValues = scale.quantiles();
-            else if (scale.thresholds) threshValues = scale.thresholds();
-            threshValues.unshift(minValue);
+            const minValue = Math.min(...(data as number[]));
+            const scaleQuantile = scale as d3.ScaleQuantile<string, number>;
+            const scaleQuantize = scale as d3.ScaleQuantize<string, number>;
+            if (scaleQuantile.quantiles) threshValues = scaleQuantile.quantiles();
+            else if (scaleQuantize.thresholds) threshValues = scaleQuantize.thresholds();
+            threshValues!.unshift(minValue);
         }
-        const legendColors = threshValues.reduce((acc, cur) => {
-            acc.push([scale(cur), formatter(cur)]);
+        const legendColors = threshValues!.reduce((acc, cur) => {
+            // @ts-expect-error
+            acc.push([scale(cur) as Color, formatter(cur)]);
             return acc;
-        }, []);
+        }, [] as LegendColor[]);
         if (legendDefs[tab].direction === "v") return legendColors.reverse();
         return legendColors;
     }
@@ -2209,7 +2305,7 @@
 <div id="contextmenu" class="border rounded" bind:this={contextualMenu} class:hidden={!contextualMenu?.opened}>
     {#if menuStates.chosingPoint}
         {#each Object.keys(shapes) as shapeName (shapeName)}
-            <div role="button" class="px-2 py-1" on:click={() => addShape(shapeName)}>
+            <div role="button" class="px-2 py-1" on:click={() => addShape(shapeName as ShapeName)}>
                 {shapeName}
             </div>
         {/each}
@@ -2231,7 +2327,7 @@
                 <Icon fillColor="red" svg={icons["trash"]} />
             </div>
             {#each Object.entries(markers) as [markerName, markerDef] (markerName)}
-                <div role="button" class="px-2 py-1" on:click={() => changeMarker(markerName)}>
+                <div role="button" class="px-2 py-1" on:click={() => changeMarker(markerName as MarkerName)}>
                     <svg width="30" height="30" viewBox={`0 0 ${markerDef.width} ${markerDef.height}`}>
                         <path d={markerDef.d} />
                     </svg>
@@ -2304,7 +2400,7 @@
                     class="btn-check"
                     name="mainModeSwitch"
                     id="switchMacro"
-                    on:change={(e) => switchMode(e.currentTarget.value)}
+                    on:change={(e) => switchMode(e.currentTarget.value as Mode)}
                     value="macro"
                     autocomplete="off"
                 />
@@ -2319,7 +2415,7 @@
                     name="mainModeSwitch"
                     id="switchMicro"
                     autocomplete="off"
-                    on:change={(e) => switchMode(e.currentTarget.value)}
+                    on:change={(e) => switchMode(e.currentTarget.value as Mode)}
                     value="micro"
                 />
                 <label class="btn btn-outline-primary fs-3" for="switchMicro" class:active={currentMode === "micro"}>
@@ -2355,7 +2451,7 @@
             <div id="main-menu" class="mt-4">
                 {#if mainMenuSelection === "general"}
                     <Accordions
-                        sections={currentParams}
+                        sections={currentParams as unknown as Record<string, Record<string, number>>}
                         {paramDefs}
                         {helpParams}
                         otherParams={accordionVisiblityParams}
@@ -2396,7 +2492,7 @@
                                     draggable={isLand}
                                     on:dragstart={(event) => dragstart(event, index, tabTitle !== "land")}
                                     on:drop|preventDefault={(event) => drop(event, index)}
-                                    ondragover="return false"
+                                    on:dragover={() => false}
                                     on:dragenter={() => (hoveringTab = index)}
                                     class:is-dnd-hovering-right={hoveringTab === index && index > dragStartIndex}
                                     class:is-dnd-hovering-left={hoveringTab === index && index < dragStartIndex}
@@ -2404,7 +2500,7 @@
                                 >
                                     <a
                                         href="javascript:;"
-                                        class:active={currentTab === tabTitle}
+                                        class:active={currentMacroLayerTab === tabTitle}
                                         class="nav-link d-flex align-items-center position-relative"
                                         on:click={() => onTabChanged(tabTitle)}
                                     >
@@ -2437,13 +2533,13 @@
                             </li>
                         </ul>
                         <div class="p-2">
-                            {#if currentTab !== "countries"}
+                            {#if currentMacroLayerTab !== "countries"}
                                 <div class="d-flex m-1 align-items-center">
                                     <div class="form-floating flex-grow-1">
                                         <select
                                             id="choseFilter"
                                             class="form-select form-select-sm"
-                                            bind:value={zonesFilter[currentTab]}
+                                            bind:value={zonesFilter[currentMacroLayerTab]}
                                             on:change={() => draw()}
                                         >
                                             <option value={null}> None </option>
@@ -2460,7 +2556,7 @@
                                     >
                                 </div>
                             {/if}
-                            {#if currentTab === "land"}
+                            {#if currentMacroLayerTab === "land"}
                                 <div>
                                     <div class="field">
                                         <RangeInput
@@ -2510,11 +2606,11 @@
                                     {/if}
                                 </div>
                             {/if}
-                            {#if zonesData?.[currentTab]?.["data"]}
+                            {#if zonesData?.[currentMacroLayerTab]?.["data"]}
                                 <div class="d-flex align-items-center">
                                     <div>
                                         <label for="data-input-json" class="m-2 btn btn-light">
-                                            Import data for {currentTab}
+                                            Import data for {currentMacroLayerTab}
                                         </label>
                                         <input
                                             id="data-input-json"
@@ -2531,13 +2627,13 @@
                                     >
                                     <div
                                         class="mx-2 ms-auto btn btn-outline-primary"
-                                        on:click={() => exportJson(zonesData?.[currentTab]?.["data"])}
+                                        on:click={() => exportJson(zonesData?.[currentMacroLayerTab]?.["data"])}
                                     >
                                         Export JSON
                                     </div>
                                 </div>
                                 <div class="data-table border rounded-2 mb-2" on:click={() => (showModal = true)}>
-                                    <DataTable data={zonesData?.[currentTab]?.["data"]}></DataTable>
+                                    <DataTable data={zonesData?.[currentMacroLayerTab]?.["data"]}></DataTable>
                                 </div>
                                 <div class="mx-2 form-check form-switch">
                                     <input
@@ -2545,7 +2641,7 @@
                                         role="switch"
                                         class="form-check-input"
                                         id="showTooltip"
-                                        bind:checked={tooltipDefs[currentTab].enabled}
+                                        bind:checked={tooltipDefs[currentMacroLayerTab].enabled}
                                         on:click={() =>
                                             setTimeout(() => {
                                                 initTooltips();
@@ -2555,7 +2651,7 @@
                                     />
                                     <label for="showTooltip" class="form-check-label"> Show tooltip on hover </label>
                                 </div>
-                                {#if tooltipDefs[currentTab].enabled}
+                                {#if tooltipDefs[currentMacroLayerTab].enabled}
                                     <div class="m-2 has-validation">
                                         <label for="templatetooltip" class="form-label">
                                             Tooltip template
@@ -2568,13 +2664,13 @@
                                         </label>
                                         <textarea
                                             class="form-control"
-                                            class:is-invalid={templateErrorMessages[currentTab]}
+                                            class:is-invalid={templateErrorMessages[currentMacroLayerTab]}
                                             id="templatetooltip"
                                             rows="7"
-                                            bind:value={tooltipDefs[currentTab].template}
+                                            bind:value={tooltipDefs[currentMacroLayerTab].template}
                                             on:change={onTemplateChange}
                                         />
-                                        {#if templateErrorMessages[currentTab]}
+                                        {#if templateErrorMessages[currentMacroLayerTab]}
                                             <div class="invalid-feedback">
                                                 <span> Malformed HTML. Please fix the template </span> <br />
                                                 <!-- {templateErrorMessages[currentTab]} -->
@@ -2582,7 +2678,7 @@
                                         {/if}
                                     </div>
                                     <div class="mx-2 d-flex align-items-center">
-                                        <label for="tooltip-preview-{currentTab}">
+                                        <label for="tooltip-preview-{currentMacroLayerTab}">
                                             Example tooltip:
                                             <span
                                                 class="help-tooltip"
@@ -2593,14 +2689,17 @@
                                         </label>
                                         <div class="tooltip-preview">
                                             <div
-                                                id="tooltip-preview-{currentTab}"
+                                                id="tooltip-preview-{currentMacroLayerTab}"
                                                 bind:this={htmlTooltipElem}
                                                 on:click={editTooltip}
                                                 style="${defaultTooltipStyle}"
                                             >
                                                 {@html formatUnicorn(
-                                                    tooltipDefs[currentTab].template,
-                                                    getFirstDataRow(zonesData?.[currentTab]),
+                                                    tooltipDefs[currentMacroLayerTab].template,
+                                                    getFirstDataRow(zonesData[currentMacroLayerTab]) as Record<
+                                                        string,
+                                                        string
+                                                    >,
                                                 )}
                                             </div>
                                         </div>
@@ -2634,11 +2733,8 @@
                                             </select>
                                             <label for="choseColorType">Color type</label>
                                         </div>
-                                        <span
-                                            class="help-tooltip"
-                                            data-bs-toggle="tooltip"
-                                            allow-html="true"
-                                            data-bs-title={scalesHelp}>?</span
+                                        <span class="help-tooltip" data-bs-toggle="tooltip" data-bs-title={scalesHelp}
+                                            >?</span
                                         >
                                     </div>
 
@@ -2648,7 +2744,10 @@
                                                 class="form-select form-select-sm"
                                                 id="choseColorColumn"
                                                 bind:value={curDataDefs.colorColumn}
-                                                on:change={(e) => (legendDefs[currentTab].title = e.target.value)}
+                                                on:change={(e) =>
+                                                    (legendDefs[currentMacroLayerTab].title = (
+                                                        e.target as HTMLSelectElement
+                                                    ).value)}
                                             >
                                                 {#each availableColumns as colorColumn}
                                                     <option value={colorColumn}>
@@ -2698,7 +2797,7 @@
                                             class="form-check-input"
                                             id="showLegend"
                                             role="switch"
-                                            bind:checked={colorDataDefs[currentTab].legendEnabled}
+                                            bind:checked={colorDataDefs[currentMacroLayerTab].legendEnabled}
                                             on:change={colorizeAndLegend}
                                         />
                                         <label for="showLegend" class="form-check-label">
@@ -2714,24 +2813,24 @@
                                 {/if}
                                 {#if curDataDefs.legendEnabled}
                                     <Legend
-                                        definition={legendDefs[currentTab]}
+                                        definition={legendDefs[currentMacroLayerTab]}
                                         on:change={colorizeAndLegend}
-                                        categorical={colorDataDefs[currentTab].colorScale === "category"}
+                                        categorical={colorDataDefs[currentMacroLayerTab].colorScale === "category"}
                                     />
-                                    <svg width="75%" height={legendDefs[currentTab].rectHeight + 20}>
+                                    <svg width="75%" height={legendDefs[currentMacroLayerTab].rectHeight + 20}>
                                         <g bind:this={legendSample}>
                                             <rect
                                                 x="10"
                                                 y="10"
-                                                width={legendDefs[currentTab].rectWidth}
-                                                height={legendDefs[currentTab].rectHeight}
+                                                width={legendDefs[currentMacroLayerTab].rectWidth}
+                                                height={legendDefs[currentMacroLayerTab].rectHeight}
                                                 fill={sampleLegend.color}
                                                 stroke="black"
                                                 on:click={openEditor}
                                             ></rect>
                                             <text
-                                                x={legendDefs[currentTab].rectWidth + 15}
-                                                y={legendDefs[currentTab].rectHeight / 2 + 10}
+                                                x={legendDefs[currentMacroLayerTab].rectWidth + 15}
+                                                y={legendDefs[currentMacroLayerTab].rectHeight / 2 + 10}
                                                 text-anchor="start"
                                                 dominant-baseline="middle"
                                                 on:click={openEditor}
@@ -2753,10 +2852,10 @@
                                     <select
                                         class="form-select form-select-sm"
                                         id="choseFormatLocale"
-                                        bind:value={tooltipDefs[currentTab].locale}
+                                        bind:value={tooltipDefs[currentMacroLayerTab].locale}
                                         on:change={changeNumericFormatter}
                                     >
-                                        {#each availableFormatLocales as locale}
+                                        {#each Object.keys(resolvedLocales) as locale}
                                             <option value={locale}>
                                                 {locale}
                                             </option>
@@ -2873,7 +2972,7 @@
     </div>
 </div>
 <Modal open={showModal} onClosed={() => onModalClose()}>
-    <DataTable slot="content" data={zonesData?.[currentTab]?.["data"]}></DataTable>
+    <DataTable slot="content" data={zonesData?.[currentMacroLayerTab]?.["data"]}></DataTable>
 </Modal>
 
 <Modal open={showExportConfirm} onClosed={() => (showExportConfirm = false)} modalWidth="35%">
@@ -3010,7 +3109,8 @@
 
 <Modal open={showCustomPalette} onClosed={() => (showCustomPalette = false)}>
     <div slot="content">
-        <PaletteEditor {customCategoricalPalette} mapping={ordinalMapping[currentTab]} onChange={draw}></PaletteEditor>
+        <PaletteEditor {customCategoricalPalette} mapping={ordinalMapping[currentMacroLayerTab]} onChange={draw}
+        ></PaletteEditor>
     </div>
 </Modal>
 

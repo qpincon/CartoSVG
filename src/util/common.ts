@@ -1,6 +1,6 @@
 import { Tooltip } from 'bootstrap';
 import { formatLocale } from "d3";
-
+import type { ActionReturn } from 'svelte/action';
 export function download(content: string, mimeType: string, filename: string): void {
     const a = document.createElement('a');
     const blob = new Blob([content], { type: mimeType });
@@ -28,12 +28,12 @@ export function camelCaseToSentence(str: string): string {
     return capitalizeFirstLetter(splitted);
 }
 
-export function htmlToElement(html: string): Element | null {
+export function htmlToElement<T = Element>(html: string): T | null {
     if (!html) return null;
     const template = document.createElement('template');
     html = html.trim(); // Never return a text node of whitespace as the result
     template.innerHTML = html;
-    return template.content.firstChild as Element;
+    return template.content.firstChild as T;
 }
 
 export function nbDecimals(num: number): number {
@@ -56,9 +56,9 @@ export function pick<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
     }, {} as Pick<T, K>);
 }
 
-export function sortBy<T>(data: T[], key: keyof T): T[] | undefined {
+export function sortBy<T>(data: T[], key: keyof T) {
     if (!data) return;
-    return data.sort((a, b) => {
+    data.sort((a, b) => {
         if (!a || Object.keys(a).length === 0) return 1;
         if (!b || Object.keys(b).length === 0) return -1;
         if (a[key] < b[key]) return -1;
@@ -124,12 +124,12 @@ export function getBestFormatter(values: number[], locale: any): (n: number) => 
     return loc.format(',~d');
 }
 
-export function tapHold(node: HTMLElement, threshold = 300): { destroy: () => void } {
+export function tapHold(node: Element, callback: () => void, threshold = 300): ActionReturn {
     const handleMouseDown = () => {
-        let intervalTimeout: NodeJS.Timeout | undefined;
+        let intervalTimeout: number | undefined;
         const tapTimeout = setTimeout(() => {
             intervalTimeout = setInterval(() => {
-                node.dispatchEvent(new CustomEvent('hold'));
+                callback();
             }, 50);
         }, threshold);
         const cancel = () => {

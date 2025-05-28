@@ -3,7 +3,7 @@ import { formatUnicorn, htmlToElement } from './util/common';
 import type { Tooltip, TooltipDefs, ZonesData } from './types';
 
 export function addTooltipListener(
-    map: SVGElement,
+    map: SVGSVGElement,
     tooltipDefs: TooltipDefs,
     zonesData: ZonesData
 ): void {
@@ -94,7 +94,7 @@ function onMouseMove(
         const data = { ...zonesData[groupId].data.find(row => row.name === shapeId) };
         zonesData[groupId].numericCols.forEach(colDef => {
             const col = colDef.column;
-            data[col] = zonesData[groupId].formatters[col](data[col]);
+            data[col] = zonesData[groupId].formatters![col](data[col]);
         });
         if (!data) {
             tooltip.element.style.display = 'none';

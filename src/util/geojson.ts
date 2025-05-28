@@ -1,8 +1,8 @@
-import type { FeatureCollection } from "geojson";
+import type { Feature, FeatureCollection, MultiPolygon, Polygon } from "geojson";
 
 
-export function splitMultiPolygons(geojson: FeatureCollection, id_prefix = null) {
-    const newGeojson: FeatureCollection = { type: 'FeatureCollection', features: [] };
+export function splitMultiPolygons(geojson: FeatureCollection<MultiPolygon | Polygon>, id_prefix = null): FeatureCollection<Polygon> {
+    const newGeojson: FeatureCollection<Polygon> = { type: 'FeatureCollection', features: [] };
     geojson.features.forEach(feat => {
         if (feat.geometry.type == 'MultiPolygon') {
             feat.geometry.coordinates.map((coords, i) => {
@@ -15,10 +15,10 @@ export function splitMultiPolygons(geojson: FeatureCollection, id_prefix = null)
                         geometry: {
                             type: 'Polygon', coordinates: coords
                         }
-                    });
+                    } as Feature<Polygon>);
             });
         }
-        else newGeojson.features.push(feat);
+        else newGeojson.features.push(feat as Feature<Polygon>);
     });
     return newGeojson;
 }
