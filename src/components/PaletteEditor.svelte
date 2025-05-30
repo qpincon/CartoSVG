@@ -3,7 +3,7 @@
     import ColorPicker from "./ColorPicker.svelte";
     import addIcon from "../assets/img/add.svg?raw";
     import { debounce } from "lodash-es";
-    import { type Color } from "src/types";
+    import type { Color } from "src/types";
 
     export let customCategoricalPalette: string[] = [];
     export let onChange: (force?: boolean) => void = () => {};

@@ -1,11 +1,8 @@
 import parsePath from 'parse-svg-path';
-import { closestDistance } from './svg';
+import { closestDistance, type DistanceQueryResult } from './svg';
 import { pointer } from 'd3';
 import type { Point } from 'src/types';
 
-interface DistanceResult {
-    advancement: number;
-}
 
 interface ExtendedSVGCircleElement extends SVGCircleElement {
     coordIndex: number;
@@ -145,7 +142,7 @@ export default class PathEditor {
     addPoint(e: MouseEvent): void {
         const [x, y] = pointer(e) as [number, number];
         const point: Point = { x, y };
-        const dist: DistanceResult = closestDistance(point, this.pathElem);
+        const dist: DistanceQueryResult = closestDistance(point, this.pathElem);
         const middlePoints = this.pointElems.filter((p, i) => p.isOnCurve && i != 0 && i != this.pointElems.length - 1);
         let clickedSegment = 0;
         let found = false;

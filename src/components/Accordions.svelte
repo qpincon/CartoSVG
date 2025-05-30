@@ -6,7 +6,7 @@
   import RangeInput from "./RangeInput.svelte";
   import { camelCaseToSentence } from "../util/common";
   import type { OtherParams, ParamDefinitions, ParamKey } from "src/params";
-  import { type Color } from "src/types";
+  import type { Color } from "src/types";
   export let sections: Record<string, Record<string, number | Color>>;
   export let paramDefs: ParamDefinitions;
   export let level = 0;

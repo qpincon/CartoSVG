@@ -1,11 +1,12 @@
-import * as CSS from 'csstype';
-import type { MicroBorderParams } from './params';
+import type { DataType } from 'csstype';
+import type { MacroParams, MicroBorderParams, MicroParams } from './params';
 import * as markers from './svg/markerDefs';
 import * as shapes from './svg/shapeDefs';
 import type { Feature, FeatureCollection, Geometry, MultiLineString, Polygon } from 'geojson';
 import type { AnyScaleKey } from './util/color-scales';
 
 export type SvgSelection = d3.Selection<SVGSVGElement, any, SVGSVGElement, any>;
+export type DefsSelection = d3.Selection<SVGDefsElement, any, SVGDefsElement, any>;
 export type D3Selection<T extends d3.BaseType> = d3.Selection<T, any, T, any>;
 export type SvgGSelection = d3.Selection<SVGGElement, unknown, SVGGElement, undefined>;
 export type FrameSelection = d3.Selection<SVGRectElement, unknown, SVGSVGElement, unknown>;
@@ -23,7 +24,7 @@ type RGB = `rgb(${number}, ${number}, ${number})`;
 type RGBA = `rgba(${number}, ${number}, ${number}, ${number})`;
 export type HEX = `#${string}`;
 
-export type Color = RGB | RGBA | HEX | CSS.DataType.NamedColor | 'none' | 'currentColor';
+export type Color = RGB | RGBA | HEX | DataType.NamedColor | 'none' | 'currentColor';
 export type Coords = [number, number];
 export interface Point {
     x: number;
@@ -74,7 +75,7 @@ export interface MacroGroupData {
     containerClass?: string;
 }
 
-export type InlineProps = Prettify<Pick<ProjectionParams, 'longitude' | 'latitude' | 'translateX' | 'translateY' | 'altitude' | 'rotation' | 'tilt'> & {
+export type InlinePropsMacro = Prettify<Pick<ProjectionParams, 'longitude' | 'latitude' | 'translateX' | 'translateY' | 'altitude' | 'rotation' | 'tilt'> & {
     showLand: boolean;
     showCountries: boolean;
 }>
@@ -128,21 +129,9 @@ export interface ZoneData {
 }
 
 export interface ZonesData {
-    [groupId: string]: ZoneData;
+    [admId: string]: ZoneData;
 }
 
-export enum ExportFontChoice {
-    noExport = 0,
-    convertToPath = 1,
-    embedFont = 2,
-    smallest = 3,
-}
-
-export interface ExportOptions {
-    exportFonts?: ExportFontChoice;
-    hideOnResize?: boolean;
-    minifyJs?: boolean;
-}
 
 export type LegendColor = [Color, string];
 
@@ -266,3 +255,62 @@ export type InlinePropsMicro = {
     pitch: number;
     bearing: number;
 }
+
+
+export interface StateMacro {
+    macroParams: MacroParams;
+    inlinePropsMacro: InlinePropsMacro;
+    chosenCountriesAdm: string[];
+    zonesData: ZonesData;
+    zonesFilter: Record<string, string>;
+    // TODO: remove and compute from last shape
+    lastUsedLabelProps: CssDict;
+    // Use for land contour
+    contourParams: ContourParams;
+    // TODO: check what this is actually
+    colorDataDefs: Record<string, ColorDef>;
+    legendDefs: LegendDef[];
+    customCategoricalPalette: Color[];
+}
+
+export interface StateMicro {
+    microParams: MicroParams;
+    inlinePropsMicro: InlinePropsMicro;
+    microLayerDefinitions: MicroPalette;
+}
+
+export interface StateCommon {
+    baseCss: string;
+    providedFonts: ProvidedFont[];
+    providedShapes: ShapeDefinition[];
+    providedPaths: PathDef[];
+    orderedTabs: string[];
+    inlineStyles: InlineStyles;
+    // TODO: remove and compute from shape + label size
+    shapeCount: number;
+    tooltipDefs: TooltipDefs;
+    currentMode: Mode;
+}
+
+// macroParams,
+// microParams,
+// inlineProps,
+// inlinePropsMicro,
+// baseCss,
+// providedFonts,
+// providedShapes,
+// providedPaths,
+// chosenCountriesAdm,
+// orderedTabs,
+// inlineStyles,
+// shapeCount,
+// zonesData,
+// zonesFilter,
+// lastUsedLabelProps,
+// tooltipDefs,
+// contourParams,
+// colorDataDefs,
+// legendDefs,
+// customCategoricalPalette,
+// currentMode,
+// microLayerDefinitions,

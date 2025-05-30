@@ -7,18 +7,17 @@ import { DOM_PARSER, findStyleSheet, fontsToCss, getUsedInlineFonts, updateStyle
 import { HatchPatternGenerator } from "./svg/patternGenerator";
 import { appendClip } from "./svg/svgDefs";
 import { discriminateCssForExport, download, findProp } from "./util/common";
-import { additionnalCssExport, changeIdAndReferences, exportFontChoices, getIntersectionObservingPart, inlineFontVsPath, rgb2hex } from "./svg/export";
+import { additionnalCssExport, changeIdAndReferences, exportFontChoices, getIntersectionObservingPart, inlineFontVsPath, rgb2hex, type ExportOptions } from "./svg/export";
 import { createRoundedRectangleGeoJSON } from './util/geometry';
 import bboxPolygon from '@turf/bbox-polygon';
 import booleanDisjoint from '@turf/boolean-disjoint';
-import { type Feature, type Geometry, type Polygon } from 'geojson';
-import type { MicroGeneralParams, MicroParams } from './params';
-import { type Color, type ExportOptions, type MicroLayerId, type MicroPalette, type PatternDefinition, type ProvidedFont, type SvgSelection } from './types';
+import type { Feature, Geometry, Polygon } from 'geojson';
+import type { MicroParams } from './params';
+import { type Color, type MicroLayerId, type MicroPalette, type PatternDefinition, type ProvidedFont, type SvgSelection } from './types';
 import type { Config } from 'svgo/browser';
 import type { Map } from 'maplibre-gl';
 
 
-type D3Selection = Selection<SVGElement, unknown, null, undefined>;
 type D3PathFunction = (geometry: Geometry) => string | null;
 
 export const interestingBasicV2Layers: string[] = [
@@ -126,7 +125,7 @@ export async function drawPrettyMap(
             else classes.push(d.geometry.type.includes("Line") ? 'line' : 'poly');
             const state = layerDefinitions[layerIdKebab];
             if (!state) classes.push('other');
-            if (state.fills) {
+            if (state?.fills) {
                 classes.push(`${layerIdKebab}-${random(0, state.fills.length - 1)}`);
             }
             return classes.join(' ');

@@ -1,6 +1,7 @@
-import * as d3 from "d3";
+import { rgb} from 'd3-color';
+import { select} from 'd3-selection';
 import bg from '../assets/img/bg.png?inline';
-import type {Color, SvgSelection} from '../types';
+import type {Color, DefsSelection, SvgSelection} from '../types';
 import type { GlowParams } from "src/params";
 // import plaid from '../assets/img/plaid.jpg';
 
@@ -10,12 +11,12 @@ export function appendGlow(selection: SvgSelection, id = "glows", displaySource 
         outerBlur, outerStrength, outerColor,
     } : GlowParams
 ) {
-    const colorInner = d3.rgb(innerColor);
-    const colorOuter = d3.rgb(outerColor);
-    const existing = d3.select(`#${id}`);
+    const colorInner = rgb(innerColor);
+    const colorOuter = rgb(outerColor);
+    const existing = select(`#${id}`);
     if (!existing.empty()) existing.remove();
-    let defs = selection.select('defs');
-    if (defs.empty()) defs = selection.append('defs') as unknown as SvgSelection;
+    let defs: DefsSelection = selection.select('defs');
+    if (defs.empty()) defs = selection.append('defs');
     const filter = defs.append('filter').attr('id', id).attr('filterUnits', 'userSpaceOnUse');
 
     // OUTER GLOW
@@ -89,9 +90,9 @@ export function appendGlow(selection: SvgSelection, id = "glows", displaySource 
 }
 
 export function appendBgPattern(selection: SvgSelection, id: string, seaColor: Color, backgroundNoise = false, imageSize = 60) {
-    let defs = selection.select('defs');
-    if (defs.empty()) defs = selection.append('defs') as unknown as SvgSelection;
-    const existing = d3.select(`#${id}`);
+    let defs: DefsSelection = selection.select('defs');
+    if (defs.empty()) defs = selection.append('defs');
+    const existing = select(`#${id}`);
     if (!existing.empty()) existing.remove();
 
     const pattern = defs.append('pattern')
@@ -115,9 +116,9 @@ export function appendBgPattern(selection: SvgSelection, id: string, seaColor: C
 
 
 export function appendClip(selection: SvgSelection, width: number, height: number, rectRadius: number, x=0, y=0) {
-    let defs = selection.select('defs');
-    if (defs.empty()) defs = selection.append('defs') as unknown as SvgSelection;
-    const existing = d3.select('#clipMapBorder');
+    let defs:DefsSelection = selection.select('defs');
+    if (defs.empty()) defs = selection.append('defs') ;
+    const existing = select('#clipMapBorder');
     if (!existing.empty()) existing.remove();
     const clip = defs.append('clipPath')
         .attr('id', "clipMapBorder")

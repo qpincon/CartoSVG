@@ -133,7 +133,7 @@
         </div>
     </div>
     {#if open}
-        <div class="modal-backdrop show" transition:fade={{ duration: 150 }} />
+        <div class="modal-backdrop show" transition:fade={{ duration: 150 }}></div>
     {/if}
 {/if}
 

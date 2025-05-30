@@ -166,7 +166,7 @@ export function parseAndUnprojectPath(
             transformed.push(...inverted);
         }
         return transformed;
-    });
+    }) as ParsedPath;
 
     return toCoords;
 }

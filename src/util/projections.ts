@@ -114,6 +114,7 @@ export function geoSatelliteCustom(params: ProjectionParams): any {
         .scale(scale)
         .translate([((width / 2)), (yShift + height / 2)])
         .rotate([-longitude, -latitude, rotation])
+        // @ts-expect-error
         .tilt(tilt)
         .distance(snyderP)
         .preclip(preclip)

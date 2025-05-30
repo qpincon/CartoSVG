@@ -5,11 +5,22 @@ import { imageFromSpecialGElemStr, encodeSVGDataImageStr } from './contourMethod
 import { htmlToElement } from '../util/common';
 import { indexBy, pick, download, discriminateCssForExport } from '../util/common';
 import { reportStyle, reportStyleElem, fontsToCss, getUsedInlineFonts, DOM_PARSER } from '../util/dom';
-import { type Selection } from 'd3-selection';
 import type { Config } from 'svgo/browser';
-import { ExportFontChoice, type ExportOptions, type ProvidedFont, type SvgSelection, type TooltipDefs, type ZonesData } from 'src/types';
+import type { ProvidedFont, SvgSelection, TooltipDefs, ZonesData } from 'src/types';
 
 
+export enum ExportFontChoice {
+    noExport = 0,
+    convertToPath = 1,
+    embedFont = 2,
+    smallest = 3,
+}
+
+export interface ExportOptions {
+    exportFonts?: ExportFontChoice;
+    hideOnResize?: boolean;
+    minifyJs?: boolean;
+}
 
 interface Position {
     x: number;

@@ -197,3 +197,13 @@ export function formatUnicorn(str: string, args: Record<string, string>): string
     }
     return str;
 };
+
+export function extractFileName(filePath: string): string {
+    // Get the last part after the last slash
+    const fileName = filePath.split('/').pop() || '';
+
+    // Remove the file extension by splitting on the last dot
+    const nameWithoutExtension = fileName.split('.').slice(0, -1).join('.');
+
+    return nameWithoutExtension;
+}

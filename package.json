@@ -5,14 +5,15 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 5174",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "author": "Quentin Pinçon",
-  "license": "ISC",
+  "license": "AGPL-3.0-only",
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@tsconfig/svelte": "^5.0.4",
     "@types/bootstrap": "^5.2.10",
     "@types/d3": "^7.4.3",
@@ -22,13 +23,13 @@
     "@types/text-to-svg": "^3.1.4",
     "@types/topojson-client": "^3.1.5",
     "@types/topojson-simplify": "^3.0.3",
-    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "csstype": "^3.1.3",
+    "prettier": "3.5.3",
+    "sass-embedded": "^1.89.0",
     "svelte": "^5.28.1",
     "svelte-check": "^4.1.6",
     "typescript": "~5.8.3",
-    "vite": "^6.3.5",
-    "csstype": "^3.1.3",
-    "prettier": "3.5.3"
+    "vite": "^6.3.5"
   },
   "dependencies": {
     "@mapbox/tile-cover": "^3.0.2",

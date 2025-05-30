@@ -1,6 +1,6 @@
 import type { GeoProjection } from "d3-geo";
-import type { Coords, ParsedPath, Point } from "src/types";
-import { DOM_PARSER } from "src/util/dom";
+import type { Coords, ParsedPath, Point } from "../types";
+import { DOM_PARSER } from "../util/dom";
 
 // remove buggy paths, covering the whole svg element
 export function removeCoveringAll(groupElement: SVGGElement | null): void {
@@ -32,7 +32,7 @@ export function distance(p1: Point, p2: Point): number {
 export interface DistanceQueryResult {
     distance?: number;
     point?: Point;
-    advancement?: number;
+    advancement: number;
     elem?: SVGPathElement;
 }
 

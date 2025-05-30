@@ -1,9 +1,9 @@
-import { select, create, type Selection } from 'd3-selection';
+import { select, create } from 'd3-selection';
 import { drag, type D3DragEvent } from 'd3-drag';
 import { createSvgFromPart, setTransformTranslate, getTranslateFromTransform } from './svg';
 import * as shapes from './shapeDefs';
-import type { Projection } from './paths';
 import type { Coords, ShapeDefinition } from 'src/types';
+import type { GeoProjection } from 'd3-geo';
 
 
 
@@ -15,7 +15,7 @@ let currentlyDragging: SVGElement | null = null;
 export function drawShapes(
     shapeDefinitions: ShapeDefinition[],
     container: HTMLElement | null,
-    projection: Projection,
+    projection: GeoProjection,
     dragCb: DragCallback
 ): void {
     if (!container) return;
@@ -24,7 +24,7 @@ export function drawShapes(
 
     shapeDefinitions.forEach((shapeDef: ShapeDefinition) => {
         // shape is a symbol
-        const projectedPos: Coords = projection(shapeDef.pos);
+        const projectedPos: Coords = projection(shapeDef.pos)!;
         let svgShape: SVGElement;
 
         if (shapeDef.name) {
@@ -80,7 +80,7 @@ export function drawShapes(
             }
 
             const [x, y]: Coords = getTranslateFromTransform(currentlyDragging)!;
-            pointDef.pos = projection.invert ? projection.invert([x, y]) : [x, y];
+            pointDef.pos = projection.invert ? projection.invert([x, y])! : [x, y];
             currentlyDragging = null;
             dragCb();
         })

@@ -9,7 +9,7 @@
     import { drag } from "d3-drag";
     import { zoom } from "d3-zoom";
     import { extent } from "d3-array";
-    import InlineStyleEditor from "../node_modules/inline-style-editor/dist/inline-style-editor.mjs";
+    import InlineStyleEditor from "inline-style-editor";
     import "bootstrap/js/dist/dropdown";
     import { debounce, throttle } from "lodash-es";
     import dataExplanation from "./assets/dataColor.svg";
@@ -33,6 +33,7 @@
         getColumns,
         findProp,
         formatUnicorn,
+        extractFileName,
     } from "./util/common";
     import * as shapes from "./svg/shapeDefs";
     import * as markers from "./svg/markerDefs";
@@ -60,7 +61,7 @@
     import Instructions from "./components/Instructions.svelte";
     import Icon from "./components/Icon.svelte";
     import RangeInput from "./components/RangeInput.svelte";
-    import { reportStyle, fontsToCss, exportStyleSheet, getUsedInlineFonts, applyStyles, DOM_PARSER } from "./util/dom";
+    import { reportStyle, exportStyleSheet, getUsedInlineFonts, applyStyles, DOM_PARSER } from "./util/dom";
     import { saveState, getState } from "./util/save";
     import { exportSvg, exportFontChoices } from "./svg/export";
     import { addTooltipListener } from "./tooltip";
@@ -82,7 +83,6 @@
     import { cancelStitch } from "./util/geometryStitch";
     import type {
         SvgSelection,
-        D3Selection,
         InlineStyles,
         ZonesData,
         TooltipDefs,
@@ -91,15 +91,12 @@
         ShapeDefinition,
         MicroPalette,
         MicroPaletteWithBorder,
-        ProjectionParams,
         ContourParams,
-        ExportFontChoice,
-        ExportOptions,
         LegendColor,
         ProvidedFont,
         CssDict,
         Color,
-        InlineProps,
+        InlinePropsMacro,
         InlinePropsMicro,
         MicroLayerId,
         MacroGroupData,
@@ -112,7 +109,6 @@
         ZoneDataRow,
         ZoneData,
         ShapeName,
-        Formatter,
         FormatterObject,
         ColorDef,
         SvgGSelection,
@@ -130,6 +126,8 @@
         type CategoricalScaleKey,
         type ContinuousScaleKey,
     } from "./util/color-scales";
+    // import test from "./assets/layers/world_land_very_simplified.json";
+    // console.log(test);
     const microPalettes = _microPalettes as Record<string, MicroPaletteWithBorder>;
     const scalesHelp: string = `
 <div class="inline-tooltip">  
@@ -144,24 +142,23 @@
 `;
     const defaultTooltipStyle: string = `color:black; will-change: opacity; font-size: 14px; padding: 5px; background-color: #FFFFFF; border: 1px solid black; max-width: 15rem; width: max-content; border-radius:7px;`;
 
-    const icons: Record<string, string> = import.meta.glob("./assets/img/*.svg", { eager: true, query: "?raw" });
+    const icons: Record<string, string> = import.meta.glob("./assets/img/*.svg", {
+        eager: true,
+        query: "?raw",
+        import: "default",
+    });
     Object.keys(icons).forEach((iconName) => {
-        const name = iconName.match(/\w+/)![0]; // remove extension
+        const name = extractFileName(iconName); // remove extension
         icons[name] = icons[iconName];
         delete icons[iconName];
     });
-    // const icons: Record<string, string> = Object.keys(iconsReq).reduce<Record<string, string>>((acc, iconFile) => {
-    //     const name = iconFile.match(/\w+/)![0]; // remove extension
-    //     acc[name] = iconsReq[iconFile];
-    //     return acc;
-    // }, {});
 
-    let params: MacroParams = JSON.parse(JSON.stringify(defaultParams));
+    let macroParams: MacroParams = JSON.parse(JSON.stringify(defaultParams));
     let microParams: MicroParams = JSON.parse(JSON.stringify(microDefaultParams));
-    let currentParams: MacroParams | MicroParams = params;
-    $: if (params || microParams || currentMode) {
+    let currentParams: MacroParams | MicroParams = macroParams;
+    $: if (macroParams || microParams || currentMode) {
         let prevParams = currentParams;
-        currentParams = currentMode === "micro" ? microParams : params;
+        currentParams = currentMode === "micro" ? microParams : macroParams;
         if (prevParams !== currentParams) projectAndDraw();
     }
 
@@ -171,7 +168,7 @@
     const iso3DataById = indexBy(iso3Data, "alpha-3");
     const resolvedAdm: Record<string, any> = {};
     const resolvedAdmTopo: Record<string, any> = {};
-    const availableCountriesAdm1 = import.meta.glob("./assets/layers/adm1/*.json");
+    const availableCountriesAdm1 = import.meta.glob("./assets/layers/adm1/*.json", { import: "default" });
     Object.keys(availableCountriesAdm1).forEach((adm1FileName) => {
         const name = adm1FileName.match(/[-a-zA-Z-_]+/)![0]; // remove extension
         const resolvedName = iso3DataById[name]?.name;
@@ -188,7 +185,7 @@
     //     return acc;
     // }, {});
 
-    const availableCountriesAdm2 = import.meta.glob("./assets/layers/adm2/*.json");
+    const availableCountriesAdm2 = import.meta.glob("./assets/layers/adm2/*.json", { import: "default" });
     Object.keys(availableCountriesAdm2).forEach((adm1FileName) => {
         const name = adm1FileName.match(/[-a-zA-Z-_]+/)![0]; // remove extension
         const resolvedName = iso3DataById[name]?.name;
@@ -211,8 +208,9 @@
         ...Object.keys(availableCountriesAdm2),
     ].sort();
 
-    const resolvedLocales = import.meta.glob<d3.FormatLocaleDefinition>("../node_modules/d3-format/locale/", {
+    const resolvedLocales = import.meta.glob<d3.FormatLocaleDefinition>("../node_modules/d3-format/locale/*.json", {
         eager: true,
+        import: "default",
     });
     Object.keys(resolvedLocales).forEach((localeFileName) => {
         const name = localeFileName.match(/\w+/)![0]; // remove extension
@@ -230,7 +228,7 @@
         return availableCountriesAdm2[name]();
     }
 
-    const p = (propName: string, obj: MacroParams | MicroParams = currentParams ?? params): any =>
+    const p = (propName: string, obj: MacroParams | MicroParams = currentParams ?? macroParams): any =>
         findProp(propName, obj);
 
     const positionVars: string[] = [
@@ -252,12 +250,11 @@
     let simpleLand: Feature | null = null;
     let openContextMenuInfo: ContextMenuInfo;
 
-    const adm0LandTopoPromise = import("./assets/layers/world_adm0_simplified.topojson").then(
-        ({ default: topoAdm0 }) => {
-            // @ts-expect-error
-            adm0Topo = presimplify(topoAdm0);
-        },
-    );
+    const adm0LandTopoPromise = import("./assets/layers/world_adm0_simplified_topo.json").then((topoAdm0) => {
+        console.log(topoAdm0);
+        // @ts-expect-error
+        adm0Topo = presimplify(topoAdm0);
+    });
 
     function updateLayerSimplification(): void {
         updateAdm0LandAndCountries();
@@ -291,7 +288,9 @@
         );
     }
 
-    const verySimpleLand = import("./assets/layers/world_land_very_simplified.topojson").then(({ default: land }) => {
+    // const verySimpleLand = {};
+    const verySimpleLand = import("./assets/layers/world_land_very_simplified.json").then((l) => {
+        const land = l as unknown as TopoJSON.Topology;
         const firstKey = Object.keys(land.objects)[0];
         simpleLand = topojson.feature(land, land.objects[firstKey]) as Feature;
     });
@@ -333,7 +332,7 @@
         legendEnabled: false,
     };
 
-    const defaultInlineProps: InlineProps = {
+    const defaultInlineProps: InlinePropsMacro = {
         longitude: 15,
         latitude: 42.5,
         translateX: 0,
@@ -360,15 +359,17 @@
     let providedPaths: PathDef[] = [];
     let providedShapes: ShapeDefinition[] = []; // {name, coords, scale, id}
     let chosenCountriesAdm: string[] = [];
-    let inlineProps: InlineProps = JSON.parse(JSON.stringify(defaultInlineProps));
+    let inlinePropsMacro: InlinePropsMacro = JSON.parse(JSON.stringify(defaultInlineProps));
     let inlinePropsMicro: InlinePropsMicro = JSON.parse(JSON.stringify(defaultInlinePropsMicro));
 
     let providedFonts: ProvidedFont[] = [];
+    // TODO: remove and compute from shape + label size
     let shapeCount = 0;
     let inlineStyles: InlineStyles = {}; // elemID -> prop -> value
     let zonesData: ZonesData = {};
-    /** For each */
+    /** For each layer / admId, the filter selected */
     let zonesFilter: Record<string, string> = { land: "firstGlow" };
+    // TODO: remove and compute from last shape
     let lastUsedLabelProps: CssDict = { "font-size": "14px" };
     let contourParams: ContourParams = {
         strokeWidth: 1,
@@ -385,7 +386,7 @@
         },
     };
 
-    let colorDataDefs: Record<string, typeof defaultColorDef> = {
+    let colorDataDefs: Record<string, ColorDef> = {
         countries: { ...defaultColorDef },
     };
     let legendDefs: Record<string, LegendDef> = {
@@ -409,7 +410,7 @@
     let editedLabelId: string | null;
     let textInput: HTMLInputElement;
     let typedText = "";
-    let styleEditor: InlineStyleEditor | null = null;
+    let styleEditor: InlineStyleEditor;
     let contextualMenu: HTMLDivElement & {
         opened?: boolean;
     };
@@ -779,36 +780,36 @@
         let newAltitude = Math.round(altScale(event.transform.k));
         // Ensure that zooming at max of scale actlually decreases altitude
         if (event.transform.k === 1) {
-            if (p("projection") === "satellite") newAltitude = inlineProps.altitude - 30;
-            else newAltitude = inlineProps.altitude + 30;
+            if (p("projection") === "satellite") newAltitude = inlinePropsMacro.altitude - 30;
+            else newAltitude = inlinePropsMacro.altitude + 30;
             newAltitude = Math.max(newAltitude, 30);
         }
         visibleArea = threshScale(event.transform.k);
-        params["General"].altitude = newAltitude;
-        inlineProps.altitude = newAltitude;
+        macroParams["General"].altitude = newAltitude;
+        inlinePropsMacro.altitude = newAltitude;
         redrawThrottle("altitude");
     }
 
     const sensitivity = 75;
     function dragged(event: d3.D3DragEvent<SVGSVGElement, unknown, unknown>): void {
-        inlineProps.translateX += event.dx;
-        inlineProps.translateY += event.dy;
-        const isSatellite = params["General"].projection === "satellite";
+        inlinePropsMacro.translateX += event.dx;
+        inlinePropsMacro.translateY += event.dy;
+        const isSatellite = macroParams["General"].projection === "satellite";
         if (isSatellite && event.sourceEvent.shiftKey) {
-            inlineProps.tilt += event.dy / 10;
+            inlinePropsMacro.tilt += event.dy / 10;
         } else if (isSatellite && (event.sourceEvent.metaKey || event.sourceEvent.ctrlKey)) {
-            inlineProps.rotation -= event.dx / 10;
+            inlinePropsMacro.rotation -= event.dx / 10;
         } else if (projection.rotate) {
             const rotate = projection.rotate();
-            let rotRad = (inlineProps.rotation / 180) * Math.PI;
+            let rotRad = (inlinePropsMacro.rotation / 180) * Math.PI;
             if (!isSatellite) rotRad = 0;
             const [xPartX, xPartY] = [Math.cos(rotRad), Math.sin(rotRad)];
             const [yPartX, yPartY] = [-Math.sin(rotRad), Math.cos(rotRad)];
             const k = sensitivity / projection.scale();
             const adjustedDx = (event.dx * xPartX + event.dy * yPartX) * k;
             const adjustedDy = (event.dy * yPartY + event.dx * xPartX) * k;
-            inlineProps.longitude = -rotate[0] - adjustedDx;
-            inlineProps.latitude = -rotate[1] + adjustedDy;
+            inlinePropsMacro.longitude = -rotate[0] - adjustedDx;
+            inlinePropsMacro.latitude = -rotate[1] + adjustedDy;
         }
         redraw("longitude");
     }
@@ -824,7 +825,7 @@
         } else {
             altScale = scaleLinear().domain([0, 1]).range([90, 2000]);
         }
-        const altitude = inlineProps.altitude || params["General"].altitude;
+        const altitude = inlinePropsMacro.altitude || macroParams["General"].altitude;
         const originalScale = altScale.invert(altitude);
         visibleArea = threshScale(originalScale);
         if (!autoAdjustAltitude) return;
@@ -832,15 +833,15 @@
         const firstScaleVal = altScale(invertAlt ? 1 : 0);
         const secondScaleVal = altScale(invertAlt ? 0 : 1);
         if (altitude < firstScaleVal) {
-            inlineProps.altitude = firstScaleVal;
+            inlinePropsMacro.altitude = firstScaleVal;
             altChanged = true;
         }
         if (altitude > secondScaleVal) {
-            inlineProps.altitude = secondScaleVal;
+            inlinePropsMacro.altitude = secondScaleVal;
             altChanged = true;
         }
         if (altChanged) {
-            params["General"].altitude = inlineProps.altitude;
+            macroParams["General"].altitude = inlinePropsMacro.altitude;
         }
     }
 
@@ -850,19 +851,19 @@
         if (projName !== "satellite") {
             accordionVisiblityParams = noSatelliteParams;
         } else accordionVisiblityParams = {};
-        const alt = inlineProps.altitude || params["General"].altitude;
+        const alt = inlinePropsMacro.altitude || macroParams["General"].altitude;
         const projectionParams = {
             projectionName: projName,
             fov: p("fieldOfView"),
             width: p("width"),
             height: p("height"),
-            translateX: inlineProps.translateX,
-            translateY: inlineProps.translateY,
-            longitude: inlineProps.longitude,
-            latitude: inlineProps.latitude,
-            rotation: inlineProps.rotation,
+            translateX: inlinePropsMacro.translateX,
+            translateY: inlinePropsMacro.translateY,
+            longitude: inlinePropsMacro.longitude,
+            latitude: inlinePropsMacro.latitude,
+            rotation: inlinePropsMacro.rotation,
             altitude: alt,
-            tilt: inlineProps.tilt,
+            tilt: inlinePropsMacro.tilt,
             borderWidth: p("borderWidth"),
         };
         projection = getProjection(projectionParams);
@@ -871,8 +872,8 @@
 
     function computeCurrentTab(): void {
         computedOrderedTabs = orderedTabs.filter((x) => {
-            if (x === "countries") return inlineProps.showCountries;
-            if (x === "land") return inlineProps.showLand;
+            if (x === "countries") return inlinePropsMacro.showCountries;
+            if (x === "land") return inlinePropsMacro.showLand;
             return true;
         });
         if (!computedOrderedTabs.length || (computedOrderedTabs.length === 1 && computedOrderedTabs[0] === "land"))
@@ -988,11 +989,11 @@
                 const pathsElement = document.getElementById("paths");
                 if (!pathsElement) return;
                 const paths = Array.from(pathsElement.children) as SVGPathElement[];
-                const closestPoint = paths.reduce<DistanceQueryResult>((prev: DistanceQueryResult, curElem) => {
+                const closestPoint = paths.reduce((prev: DistanceQueryResult, curElem) => {
                     const curDist = closestDistance(point, curElem);
                     curDist.elem = curElem;
                     return prev.distance! < curDist.distance! ? prev : curDist;
-                }, {});
+                }, {} as DistanceQueryResult);
                 if (closestPoint.distance && closestPoint.distance < 6) {
                     menuStates.pathSelected = true;
                     target = closestPoint.elem;
@@ -1128,7 +1129,7 @@
         });
         computedOrderedTabs.forEach((layer, i) => {
             const filter = zonesFilter[layer] ? zonesFilter[layer] : null;
-            if (layer === "countries" && inlineProps.showCountries && countries) {
+            if (layer === "countries" && inlinePropsMacro.showCountries && countries) {
                 if (!("countries" in zonesData) && !zonesData?.["countries"]?.provided) {
                     const countryProps = countries.features.map((f) => f.properties);
                     sortBy(countryProps, "name")!;
@@ -1148,7 +1149,7 @@
                     filter: filter,
                 });
             }
-            if (layer === "land" && inlineProps.showLand) groupData.push({ type: "landImg", showSource: i === 0 });
+            if (layer === "land" && inlinePropsMacro.showLand) groupData.push({ type: "landImg", showSource: i === 0 });
             // selected country
             else if (layer !== "countries") {
                 groupData.push({
@@ -1326,9 +1327,9 @@
     function save(): void {
         baseCss = exportStyleSheet("#outline")!;
         saveState({
-            params,
+            macroParams,
             microParams,
-            inlineProps,
+            inlineProps: inlinePropsMacro,
             inlinePropsMicro,
             baseCss,
             providedFonts,
@@ -1352,7 +1353,7 @@
     }
 
     function resetState(): void {
-        params = JSON.parse(JSON.stringify(defaultParams));
+        macroParams = JSON.parse(JSON.stringify(defaultParams));
         microParams = JSON.parse(JSON.stringify(microDefaultParams));
         baseCss = defaultBaseCssMacro;
         commonStyleSheetElemMacro.innerHTML = baseCss;
@@ -1361,7 +1362,7 @@
         chosenCountriesAdm = [];
         orderedTabs = ["countries", "land"];
         currentMacroLayerTab = "countries";
-        inlineProps = JSON.parse(JSON.stringify(defaultInlineProps));
+        inlinePropsMacro = JSON.parse(JSON.stringify(defaultInlineProps));
         inlinePropsMicro = JSON.parse(JSON.stringify(defaultInlinePropsMicro));
         microLayerDefinitions = initLayersState(microPalettes["peach"]);
         if (currentMode === "micro") {
@@ -1414,8 +1415,8 @@
         } else state = getState();
         if (!state) return resetState();
         ({
-            params,
-            inlineProps,
+            params: macroParams,
+            inlineProps: inlinePropsMacro,
             baseCss,
             providedFonts,
             providedShapes,
@@ -1458,9 +1459,9 @@
     function saveProject(): void {
         baseCss = exportStyleSheet("#outline")!;
         const state = {
-            params,
+            params: macroParams,
             microParams,
-            inlineProps,
+            inlineProps: inlinePropsMacro,
             baseCss,
             providedFonts,
             providedShapes,
@@ -1516,7 +1517,7 @@
     }
 
     function openEditor(e: MouseEvent): void {
-        styleEditor.open(e.target, e.pageX, e.pageY);
+        styleEditor.open(e.target as HTMLElement, e.pageX, e.pageY);
     }
     let selectedPathIndex: number;
 
@@ -1704,14 +1705,14 @@
         const { prop, value } = event.detail;
         if (positionVars.includes(prop)) {
             // @ts-expect-error
-            inlineProps[prop] = value;
+            inlinePropsMacro[prop] = value;
         }
         if (prop === "projection" || prop === "fieldOfView") {
             changeAltitudeScale();
         }
         if (prop === "projection") {
-            inlineProps.translateX = 0;
-            inlineProps.translateY = 0;
+            inlinePropsMacro.translateX = 0;
+            inlinePropsMacro.translateY = 0;
         }
         if (prop === "height") {
             Object.keys(legendDefs).forEach((tab) => {
@@ -1828,7 +1829,7 @@
         closeMenu();
         await tick();
         setTimeout(() => {
-            const lastShape = document.getElementById(providedShapes[providedShapes.length - 1].id);
+            const lastShape = document.getElementById(providedShapes[providedShapes.length - 1].id)!;
             styleEditor.open(lastShape, openContextMenuInfo.event.pageX, openContextMenuInfo.event.pageY);
         }, 0);
     }
@@ -1944,7 +1945,7 @@
 
     function editTooltip(e: MouseEvent): void {
         const rect = (e.target as HTMLElement).getBoundingClientRect();
-        styleEditor.open(e.target, rect.right, rect.bottom);
+        styleEditor.open(e.target as HTMLElement, rect.right, rect.bottom);
     }
 
     let templateErrorMessages: Record<string, boolean> = {};
@@ -2466,7 +2467,7 @@
                                     type="checkbox"
                                     role="switch"
                                     id="showLand"
-                                    bind:checked={inlineProps.showLand}
+                                    bind:checked={inlinePropsMacro.showLand}
                                     on:change={() => draw()}
                                 />
                                 <label class="form-check-label" for="showLand"> Show land</label>
@@ -2477,7 +2478,7 @@
                                     type="checkbox"
                                     role="switch"
                                     id="showCountries"
-                                    bind:checked={inlineProps.showCountries}
+                                    bind:checked={inlinePropsMacro.showCountries}
                                     on:change={() => draw()}
                                 />
                                 <label class="form-check-label" for="showCountries"> Show countries</label>
@@ -2669,7 +2670,7 @@
                                             rows="7"
                                             bind:value={tooltipDefs[currentMacroLayerTab].template}
                                             on:change={onTemplateChange}
-                                        />
+                                        ></textarea>
                                         {#if templateErrorMessages[currentMacroLayerTab]}
                                             <div class="invalid-feedback">
                                                 <span> Malformed HTML. Please fix the template </span> <br />

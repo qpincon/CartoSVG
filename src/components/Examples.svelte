@@ -4,7 +4,7 @@
     import examplesDesc from "../../examples.json";
     import { createEventDispatcher } from "svelte";
 
-    const exampleProjects = import.meta.glob("../examples/*.cartosvg");
+    const exampleProjects = import.meta.glob("../examples/*.cartosvg", { import: "default" });
     Object.keys(exampleProjects).forEach((fileName) => {
         const name = fileName.match(/[-a-zA-Z-_]+/)![0]; // remove extension
         exampleProjects[name] = exampleProjects[fileName];
