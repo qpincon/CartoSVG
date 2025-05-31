@@ -28,6 +28,11 @@ export function camelCaseToSentence(str: string): string {
     return capitalizeFirstLetter(splitted);
 }
 
+export function pascalCaseToSentence(str: string) {
+    const splitted = str.replace(/-/g, ' ').trim().toLowerCase();
+    return capitalizeFirstLetter(splitted);
+}
+
 export function htmlToElement<T = Element>(html: string): T | null {
     if (!html) return null;
     const template = document.createElement('template');
@@ -56,9 +61,9 @@ export function pick<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
     }, {} as Pick<T, K>);
 }
 
-export function sortBy<T>(data: T[], key: keyof T) {
-    if (!data) return;
-    data.sort((a, b) => {
+export function sortBy<T>(data: T[], key: keyof T): T[] {
+    if (!data) return data;
+    return data.sort((a, b) => {
         if (!a || Object.keys(a).length === 0) return 1;
         if (!b || Object.keys(b).length === 0) return -1;
         if (a[key] < b[key]) return -1;
@@ -98,12 +103,12 @@ export function getColumns(data: Record<string, any>[]): string[] {
     return [...cols];
 }
 
-export function findProp<T>(propName: string, obj: Object): any {
+export function findProp<T>(propName: string, obj: Object): T {
     if (propName in obj) return (obj as any)[propName];
     for (const v of Object.values(obj)) {
         if (typeof v === 'object' && v !== null) {
             const found = findProp(propName, v);
-            if (found !== undefined) return found;
+            if (found !== undefined) return found as T;
         }
     }
 }

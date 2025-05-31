@@ -135,7 +135,6 @@
 - [ ] Double click text edit prevent ISE
 - [ ] Micro: 3d elements (see maplibre 3D model demo)
 - [ ] Micro: Use protomaps (upload tiles and configure nginx to serve it, using the pm plugin in the front)
-- [ ] Self-hosting
 - [ ] Show tooltip conditionnaly
 - [ ] Tooltip creation: Use WYSIWYG editor
 - [ ] Allow tooltip creation on single element
@@ -158,24 +157,26 @@
 - [ ] Geoboundaries: remove job (or just send an alert)
 - [ ] "No data color" should be available in "color using data"
 - [ ] ISE: 
-  - clearer wording (stroke-width -> Stroke Width)
-  - stroke / fill -> "Stroke / Fill color"
-  - Color picker below, not to side
-  - Allow text mapping ('inline' -> "France", ".country" -> "All countries", ".country:hover": "Countries hover)
-  - Change "rule" to dropdown select
-  - Allow parametrization of modal width
-  - Callback function to allow to go up the DOM tree of selected element
+  - [x] clearer wording (stroke-width -> Stroke Width)
+  - [x] stroke / fill -> "Stroke / Fill color"
+  - [-] Color picker below, not to side
+  - [x] Allow text mapping ('inline' -> "France", ".country" -> "All countries", ".country:hover": "Countries hover)
+  - [x] Change "rule" to dropdown select
+  - [-] Allow parametrization of modal width
+  - [ ] Callback function to allow to go up the DOM tree of selected element
+  - [x] Export type declarations
+  - [ ] Svelte 5
 
 - [ ] Separate (lazy-load) micro and macro
 - [ ] Migrate to svelte 5
-- [ ] Use typescript
+- [x] Use typescript
 - [ ] Use svelte/kit
     - [x] Disable cloudflare deployment
     - [ ] Deploy on VPS
 - [ ] Use vite
-  - require.context => import.meta.glob
-  - HtmlWebpackPlugin -> new FrontPage component
-  - Inline imports -> ?raw (https://vite.dev/guide/assets)
+  - [x] require.context => import.meta.glob
+  - [ ] HtmlWebpackPlugin -> new FrontPage component
+  - [x] Inline imports -> ?raw (https://vite.dev/guide/assets)
 
 
 

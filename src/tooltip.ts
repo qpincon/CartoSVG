@@ -25,9 +25,9 @@ export function addTooltipListener(
             }
             if (e.target !== parent.lastElementChild) {
                 parent.append(e.target);
-                /** Firefox bug: the :hover selector is not applied when we move the DOM node, we have to apply a class */
-                e.target.classList.add('hovered');
             }
+            /** Firefox bug: the :hover selector is not applied when we move the DOM node, we have to apply a class */
+            e.target.classList.add('hovered');
         }
     });
 

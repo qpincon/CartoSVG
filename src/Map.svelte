@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, tick } from "svelte";
+    import { mount, onMount, tick } from "svelte";
     import * as topojson from "topojson-client";
     import { presimplify, simplify } from "topojson-simplify";
     import { scaleLinear, scalePow, scaleOrdinal, scaleQuantize, scaleQuantile } from "d3-scale";
@@ -10,7 +10,6 @@
     import { zoom } from "d3-zoom";
     import { extent } from "d3-array";
     import InlineStyleEditor from "inline-style-editor";
-    import "bootstrap/js/dist/dropdown";
     import { debounce, throttle } from "lodash-es";
     import dataExplanation from "./assets/dataColor.svg";
     import { drawCustomPaths, parseAndUnprojectPath } from "./svg/paths";
@@ -34,6 +33,7 @@
         findProp,
         formatUnicorn,
         extractFileName,
+        pascalCaseToSentence,
     } from "./util/common";
     import * as shapes from "./svg/shapeDefs";
     import * as markers from "./svg/markerDefs";
@@ -126,8 +126,8 @@
         type CategoricalScaleKey,
         type ContinuousScaleKey,
     } from "./util/color-scales";
-    // import test from "./assets/layers/world_land_very_simplified.json";
-    // console.log(test);
+    import { Dropdown } from "bootstrap";
+
     const microPalettes = _microPalettes as Record<string, MicroPaletteWithBorder>;
     const scalesHelp: string = `
 <div class="inline-tooltip">  
@@ -148,7 +148,7 @@
         import: "default",
     });
     Object.keys(icons).forEach((iconName) => {
-        const name = extractFileName(iconName); // remove extension
+        const name = extractFileName(iconName);
         icons[name] = icons[iconName];
         delete icons[iconName];
     });
@@ -166,43 +166,26 @@
         tick().then(() => initTooltips());
     }
     const iso3DataById = indexBy(iso3Data, "alpha-3");
-    const resolvedAdm: Record<string, any> = {};
+    const resolvedAdmGeometry: Record<string, any> = {};
     const resolvedAdmTopo: Record<string, any> = {};
     const availableCountriesAdm1 = import.meta.glob("./assets/layers/adm1/*.json", { import: "default" });
     Object.keys(availableCountriesAdm1).forEach((adm1FileName) => {
-        const name = adm1FileName.match(/[-a-zA-Z-_]+/)![0]; // remove extension
+        const name = extractFileName(adm1FileName);
         const resolvedName = iso3DataById[name]?.name;
         const finalName = resolvedName ? `${resolvedName} ADM1` : name;
         availableCountriesAdm1[finalName] = availableCountriesAdm1[adm1FileName];
         delete availableCountriesAdm1[adm1FileName];
     });
-    // const availableCountriesAdm1: Record<string, string> = Object.keys(countriesAdm1Resolve).reduce<
-    //     Record<string, string>
-    // >((acc, file) => {
-    //     const name = file.match(/[-a-zA-Z-_]+/)![0]; // remove extension
-    //     const resolvedName = iso3DataById[name]?.name;
-    //     if (resolvedName) acc[`${resolvedName} ADM1`] = file;
-    //     return acc;
-    // }, {});
 
     const availableCountriesAdm2 = import.meta.glob("./assets/layers/adm2/*.json", { import: "default" });
-    Object.keys(availableCountriesAdm2).forEach((adm1FileName) => {
-        const name = adm1FileName.match(/[-a-zA-Z-_]+/)![0]; // remove extension
+    Object.keys(availableCountriesAdm2).forEach((adm2FileName) => {
+        const name = extractFileName(adm2FileName);
         const resolvedName = iso3DataById[name]?.name;
         const finalName = resolvedName ? `${resolvedName} ADM2` : name;
-        availableCountriesAdm2[finalName] = availableCountriesAdm2[adm1FileName];
-        delete availableCountriesAdm2[adm1FileName];
+        availableCountriesAdm2[finalName] = availableCountriesAdm2[adm2FileName];
+        delete availableCountriesAdm2[adm2FileName];
     });
 
-    // const countriesAdm2Resolve = import.meta.glob("./assets/layers/adm2/*.json");
-    // const availableCountriesAdm2: Record<string, string> = Object.keys(countriesAdm2Resolve).reduce<
-    //     Record<string, string>
-    // >((acc, file) => {
-    //     const name = file.match(/[-a-zA-Z-_]+/)![0]; // remove extension
-    //     const resolvedName = iso3DataById[name]?.name;
-    //     if (resolvedName) acc[`${resolvedName} ADM2`] = file;
-    //     return acc;
-    // }, {});
     const allAvailableAdm: string[] = [
         ...Object.keys(availableCountriesAdm1),
         ...Object.keys(availableCountriesAdm2),
@@ -217,19 +200,15 @@
         icons[name] = icons[localeFileName];
         delete icons[localeFileName];
     });
-    // const availableFormatLocales: string[] = Object.keys(formatLocaleResolve).map((file) => {
-    //     const name = file.match(/[-a-zA-Z-_]+/)![0]; // remove extension
-    //     resolvedLocales[name] = formatLocaleResolve[file];
-    //     return name;
-    // }, {});
 
     function resolveAdm(name: string): Promise<any> {
         if (name.includes("ADM1")) return availableCountriesAdm1[name]();
         return availableCountriesAdm2[name]();
     }
 
-    const p = (propName: string, obj: MacroParams | MicroParams = currentParams ?? macroParams): any =>
-        findProp(propName, obj);
+    const p = (propName: string, obj: MacroParams | MicroParams = currentParams ?? macroParams): any => {
+        return findProp(propName, obj);
+    };
 
     const positionVars: string[] = [
         "longitude",
@@ -251,7 +230,6 @@
     let openContextMenuInfo: ContextMenuInfo;
 
     const adm0LandTopoPromise = import("./assets/layers/world_adm0_simplified_topo.json").then((topoAdm0) => {
-        console.log(topoAdm0);
         // @ts-expect-error
         adm0Topo = presimplify(topoAdm0);
     });
@@ -261,7 +239,7 @@
         Object.keys(resolvedAdmTopo).forEach((countryAdm) => {
             const simplified = simplify(resolvedAdmTopo[countryAdm], visibleArea);
             const firstKey = Object.keys(simplified.objects)[0];
-            resolvedAdm[countryAdm] = topojson.feature(simplified, simplified.objects[firstKey]);
+            resolvedAdmGeometry[countryAdm] = topojson.feature(simplified, simplified.objects[firstKey]);
         });
     }
 
@@ -426,6 +404,7 @@
     $: if (true || mainMenuSelection) {
         tick().then(() => initTooltips());
     }
+    // TODO: move in menuStates
     let editingPath = false;
     let isDrawingFreeHand = false;
     let isDrawingPath = false;
@@ -447,6 +426,11 @@
     let mapLoadedPromise: Promise<unknown>;
     let microLocked = false;
     onMount(async () => {
+        console.log("onmount");
+
+        Array.from(document.querySelectorAll(".dropdown-toggle")).forEach((dropdownToggleEl) => {
+            new Dropdown(dropdownToggleEl);
+        });
         commonStyleSheetElemMacro = document.createElement("style");
         commonStyleSheetElemMacro.setAttribute("id", "common-style-sheet-elem-macro");
         document.head.appendChild(commonStyleSheetElemMacro);
@@ -469,130 +453,157 @@
         await mapLoadedPromise;
 
         projectAndDraw();
-        styleEditor = new InlineStyleEditor({
-            onStyleChanged: (
-                target: HTMLElement,
-                eventType: "inline" | CSSStyleRule,
-                cssProp: string,
-                value: string,
-            ) => {
-                const elemId = target.getAttribute("id")!;
-                const eventAsRule = eventType as CSSStyleRule;
-                if (currentMode === "micro") {
-                    if (eventType === "inline" && target.hasAttribute("id")) {
-                        handleInlineStyleChange(elemId, target, cssProp, value);
+        // @ts-expect-error
+        styleEditor = mount(InlineStyleEditor, {
+            target: document.body,
+            props: {
+                onStyleChanged: (
+                    target: HTMLElement,
+                    eventType: "inline" | CSSStyleRule,
+                    cssProp: string,
+                    value: string,
+                ) => {
+                    const elemId = target.getAttribute("id")!;
+                    const eventAsRule = eventType as CSSStyleRule;
+                    if (currentMode === "micro") {
+                        if (eventType === "inline" && target.hasAttribute("id")) {
+                            handleInlineStyleChange(elemId, target, cssProp, value);
+                        }
+                        const layerDefChanged = syncLayerStateWithCss(eventType, cssProp, value, microLayerDefinitions);
+                        if (layerDefChanged) microLayerDefinitions = microLayerDefinitions;
+                        save();
+                        return;
                     }
-                    const layerDefChanged = syncLayerStateWithCss(eventType, cssProp, value, microLayerDefinitions);
-                    if (layerDefChanged) microLayerDefinitions = microLayerDefinitions;
-                    save();
-                    return;
-                }
-                /**
-                 * Due to a Firefox bug (the :hover selector is not applied when we move the DOM node when hovering a polygon)
-                 * we need to apply the :hover style to a custom class selector .hovered, that will be applied programatically
-                 */
-                if (eventAsRule.selectorText?.includes?.(":hover")) {
-                    const selectorTextToModify = eventAsRule.selectorText.replace(":hover", ".hovered");
-                    const rule = Array.from(eventAsRule.parentStyleSheet!.cssRules)
-                        .filter((r) => r instanceof CSSStyleRule)
-                        .find((r: CSSStyleRule) => r.selectorText === selectorTextToModify);
-                    if (rule) {
-                        for (const propName of eventAsRule.style) {
-                            rule.style.setProperty(propName, eventAsRule.style.getPropertyValue(propName));
+                    /**
+                     * Due to a Firefox bug (the :hover selector is not applied when we move the DOM node when hovering a polygon)
+                     * we need to apply the :hover style to a custom class selector .hovered, that will be applied programatically
+                     */
+                    if (eventAsRule.selectorText?.includes?.(":hover")) {
+                        const selectorTextToModify = eventAsRule.selectorText.replace(":hover", ".hovered");
+                        const rule = Array.from(eventAsRule.parentStyleSheet!.cssRules)
+                            .filter((r) => r instanceof CSSStyleRule)
+                            .find((r: CSSStyleRule) => r.selectorText === selectorTextToModify);
+                        if (rule) {
+                            for (const propName of eventAsRule.style) {
+                                rule.style.setProperty(propName, eventAsRule.style.getPropertyValue(propName));
+                            }
                         }
                     }
-                }
 
-                if (legendSample && legendSample.contains(target) && cssProp !== "fill") {
-                    legendDefs[currentMacroLayerTab].sampleHtml = legendSample.outerHTML;
-                    colorizeAndLegend();
-                } else if (htmlTooltipElem && htmlTooltipElem.contains(target)) {
-                    tooltipDefs[currentMacroLayerTab].content = htmlTooltipElem.outerHTML;
-                } else if (eventType === "inline") {
-                    if (target.hasAttribute("id")) {
-                        handleInlineStyleChange(elemId, target, cssProp, value);
-                    }
-                }
-                /** Update <image> tag corresponding to changed element */
-                if (
-                    (eventType === "inline" && target.classList.contains("country")) ||
-                    eventAsRule?.selectorText === ".country"
-                ) {
-                    computedOrderedTabs.forEach((tab) => {
-                        if (tab.substring(0, tab.length - 5) !== elemId) return;
-                        const filter = zonesFilter[tab];
-                        const countryData = countries.features.find((country) => country.properties?.name === elemId)!;
-                        appendCountryImageNew.call(
-                            select(`[id='${elemId}-img']`).node() as SVGGElement,
-                            countryData,
-                            filter,
-                            applyInlineStyles,
-                            path,
-                            inlineStyles,
-                            false,
-                            true,
-                        );
-                        svg.selectAll("g[image-class]").classed("hidden-after", true);
-                    });
-                }
-                save();
-            },
-            getElems: (el: HTMLElement) => {
-                if (el.classList.contains("freehand")) {
-                    return [[el.parentElement, "Clicked"]];
-                }
-                if (el.classList.contains("adm")) {
-                    const parent = el.parentNode as HTMLElement;
-                    const parentCountry = parent?.getAttribute("id")?.replace(/ ADM(1|2)/, "") || "";
-                    const parentCountryIso3 = iso3Data.find((row) => row.name === parentCountry)?.["name"];
-                    if (!parentCountryIso3) return [[el, "Clicked"]];
-                    const countryElem = document.getElementById(parentCountryIso3);
-                    if (!countryElem) return [[el, "Clicked"]];
-                    return [
-                        [el, "Clicked"],
-                        [countryElem, parentCountryIso3],
-                    ];
-                }
-                if (el.tagName === "tspan") {
-                    return [
-                        [el.parentNode, "text"],
-                        [el, "text part"],
-                    ];
-                }
-                return [[el, "Clicked"]];
-            },
-            customProps: {
-                scale: {
-                    type: "slider",
-                    min: 0.5,
-                    max: 5,
-                    step: 0.1,
-                    getter: (el: HTMLElement) => {
-                        if (el.closest("#points-labels") == null) return null;
-                        const transform = el.getAttribute("transform");
-                        if (!transform) return 1;
-                        else {
-                            const scaleValue = transform.match(/scale\(([0-9\.]+)\)/);
-                            if (scaleValue && scaleValue.length > 1) return parseFloat(scaleValue[1]);
+                    if (legendSample && legendSample.contains(target) && cssProp !== "fill") {
+                        legendDefs[currentMacroLayerTab].sampleHtml = legendSample.outerHTML;
+                        colorizeAndLegend();
+                    } else if (htmlTooltipElem && htmlTooltipElem.contains(target)) {
+                        tooltipDefs[currentMacroLayerTab].content = htmlTooltipElem.outerHTML;
+                    } else if (eventType === "inline") {
+                        if (target.hasAttribute("id")) {
+                            handleInlineStyleChange(elemId, target, cssProp, value);
                         }
-                        return 1;
-                    },
-                    setter: (el: SVGElement, val: number) => {
-                        const scaleStr = `scale(${val})`;
-                        setTransformScale(el, scaleStr);
+                    }
+                    /** Update <image> tag corresponding to changed element */
+                    if (
+                        (eventType === "inline" && target.classList.contains("country")) ||
+                        eventAsRule?.selectorText === ".country"
+                    ) {
+                        computedOrderedTabs.forEach((tab) => {
+                            if (tab.substring(0, tab.length - 5) !== elemId) return;
+                            const filter = zonesFilter[tab];
+                            const countryData = countries.features.find(
+                                (country) => country.properties?.name === elemId,
+                            )!;
+                            appendCountryImageNew.call(
+                                select(`[id='${elemId}-img']`).node() as SVGGElement,
+                                countryData,
+                                filter,
+                                applyInlineStyles,
+                                path,
+                                inlineStyles,
+                                false,
+                                true,
+                            );
+                            svg.selectAll("g[image-class]").classed("hidden-after", true);
+                        });
+                    }
+                    save();
+                },
+                getElems: (el: HTMLElement) => {
+                    if (el.classList.contains("freehand")) {
+                        return [[el.parentElement, "Clicked"]];
+                    }
+                    if (el.classList.contains("adm")) {
+                        const parent = el.parentNode as HTMLElement;
+                        const parentCountry = parent?.getAttribute("id")?.replace(/ ADM(1|2)/, "") || "";
+                        const parentCountryIso3 = iso3Data.find((row) => row.name === parentCountry)?.["name"];
+                        if (!parentCountryIso3) return [[el, "Clicked"]];
+                        const countryElem = document.getElementById(parentCountryIso3);
+                        if (!countryElem) return [[el, "Clicked"]];
+                        return [
+                            [el, "Clicked"],
+                            [countryElem, parentCountryIso3],
+                        ];
+                    }
+                    if (el.tagName === "tspan") {
+                        return [
+                            [el.parentNode, "text"],
+                            [el, "text part"],
+                        ];
+                    }
+                    return [[el, "Clicked"]];
+                },
+                customProps: {
+                    scale: {
+                        type: "slider",
+                        min: 0.5,
+                        max: 5,
+                        step: 0.1,
+                        getter: (el: HTMLElement) => {
+                            if (el.closest("#points-labels") == null) return null;
+                            const transform = el.getAttribute("transform");
+                            if (!transform) return 1;
+                            else {
+                                const scaleValue = transform.match(/scale\(([0-9\.]+)\)/);
+                                if (scaleValue && scaleValue.length > 1) return parseFloat(scaleValue[1]);
+                            }
+                            return 1;
+                        },
+                        setter: (el: SVGElement, val: number) => {
+                            const scaleStr = `scale(${val})`;
+                            setTransformScale(el, scaleStr);
+                        },
                     },
                 },
+                cssRuleFilter: (el: HTMLElement, cssSelector: string) => {
+                    console.log(cssSelector);
+                    if (cssSelector.includes("#static-svg-map")) return false;
+                    // if (cssSelector.includes(".hovered")) return false;
+                    if (cssSelector.includes("ssc-")) return false;
+                    if (cssSelector.includes("#micro path")) return false;
+                    if (cssSelector.includes("#micro .poly")) return false;
+                    if (cssSelector.includes("#micro .line")) return false;
+                    return true;
+                },
+                inlineDeletable: () => false,
+                getCssRuleName: (ruleName: string, el: HTMLElement) => {
+                    let isHover = ruleName.includes(":hover") || ruleName.includes(".hovered");
+                    let finalStr = "";
+                    if (ruleName.includes("#micro .building-1")) finalStr = "Building type 1";
+                    else if (ruleName.includes("#micro .building-2")) finalStr = "Building type 2";
+                    else if (ruleName.includes("#micro .building-3")) finalStr = "Building type 3";
+                    else if (ruleName.includes("#micro")) {
+                        const layerId = ruleName.match(/#micro \.(.*?)(\:|$)/)![1];
+                        finalStr = pascalCaseToSentence(layerId);
+                    } else if (ruleName.includes("#micro .building")) finalStr = "Buildings";
+                    else if (ruleName.includes(".adm")) finalStr = "Region";
+                    if (finalStr.length) {
+                        if (isHover) return `${finalStr} hover`;
+                        return finalStr;
+                    }
+                    if (ruleName === "inline") return "Selected element";
+                    return ruleName;
+                },
             },
-            cssRuleFilter: (el: HTMLElement, cssSelector: string) => {
-                if (cssSelector.includes(".hovered")) return false;
-                if (cssSelector.includes("ssc-")) return false;
-                if (cssSelector.includes("#micro path")) return false;
-                if (cssSelector.includes("#micro .poly")) return false;
-                if (cssSelector.includes("#micro .line")) return false;
-                return true;
-            },
-            inlineDeletable: () => false,
         });
+        console.log(styleEditor);
         document.body.append(contextualMenu);
         contextualMenu.style.display = "none";
         contextualMenu.style.position = "absolute";
@@ -807,7 +818,7 @@
             const [yPartX, yPartY] = [-Math.sin(rotRad), Math.cos(rotRad)];
             const k = sensitivity / projection.scale();
             const adjustedDx = (event.dx * xPartX + event.dy * yPartX) * k;
-            const adjustedDy = (event.dy * yPartY + event.dx * xPartX) * k;
+            const adjustedDy = (event.dy * yPartY + event.dx * xPartY) * k;
             inlinePropsMacro.longitude = -rotate[0] - adjustedDx;
             inlinePropsMacro.latitude = -rotate[1] + adjustedDy;
         }
@@ -847,6 +858,7 @@
 
     let accordionVisiblityParams = {};
     function changeProjection(): void {
+        console.log(currentMode, currentParams);
         const projName = p("projection");
         if (projName !== "satellite") {
             accordionVisiblityParams = noSatelliteParams;
@@ -887,7 +899,7 @@
 
     async function initializeAdms(simplified: boolean): Promise<void> {
         for (const countryAdm of chosenCountriesAdm) {
-            if (!(countryAdm in resolvedAdm)) {
+            if (!(countryAdm in resolvedAdmGeometry)) {
                 const resolved = await resolveAdm(countryAdm);
                 resolvedAdmTopo[countryAdm] = presimplify(resolved);
                 updateLayerSimplification();
@@ -906,8 +918,9 @@
                 legendDefs[countryAdm] = JSON.parse(JSON.stringify(defaultLegendDef));
             }
             if (!(countryAdm in zonesData) && !zonesData?.[countryAdm]?.provided) {
-                const data = sortBy(
-                    resolvedAdm[countryAdm].features.map((f: Feature) => f.properties),
+                console.log(resolvedAdmGeometry[countryAdm].features.map((f: Feature) => f.properties));
+                const data: ZoneDataRow[] = sortBy(
+                    resolvedAdmGeometry[countryAdm].features.map((f: Feature) => f.properties),
                     "name",
                 )!;
                 zonesData[countryAdm] = {
@@ -924,8 +937,8 @@
     // without 'countries' if unchecked
     let computedOrderedTabs: string[] = [];
     async function draw(simplified = false) {
-        const width = p("width"),
-            height = p("height");
+        const width = p("width");
+        const height = p("height");
         const container = select("#map-container");
         const mapLibreContainer = select("#maplibre-map");
         const animated = p("animate");
@@ -946,12 +959,14 @@
             context.rect(0, 0, width, height);
             context.fillStyle = "#cdb396";
             path = geoPath(projection, context);
-            context.beginPath(), path(simplified ? simpleLand : land), context.fill();
-            context.beginPath(),
-                path(graticule),
-                (context.strokeStyle = "#ddf"),
-                (context.globalAlpha = 0.8),
-                context.stroke();
+            context.beginPath();
+            path(simplified ? simpleLand : land);
+            context.fill();
+            context.beginPath();
+            path(graticule);
+            context.strokeStyle = "#ddf";
+            context.globalAlpha = 0.8;
+            context.stroke();
             return;
         }
         svg = container.select("svg") as unknown as SvgSelection;
@@ -978,7 +993,6 @@
         svg.on(
             "contextmenu",
             function (e) {
-                console.log("contextmenu!", e);
                 if (editingPath) return;
                 stopDrawFreeHand();
                 e.preventDefault();
@@ -1154,7 +1168,7 @@
             else if (layer !== "countries") {
                 groupData.push({
                     name: layer,
-                    data: resolvedAdm[layer],
+                    data: resolvedAdmGeometry[layer],
                     id: "name",
                     props: [],
                     containerClass: "choro",
@@ -1415,7 +1429,7 @@
         } else state = getState();
         if (!state) return resetState();
         ({
-            params: macroParams,
+            macroParams,
             inlineProps: inlinePropsMacro,
             baseCss,
             providedFonts,

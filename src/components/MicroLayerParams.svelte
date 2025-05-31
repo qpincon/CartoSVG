@@ -1,7 +1,7 @@
 <script lang="ts">
     import ColorPickerPreview from "./ColorPickerPreview.svelte";
     import RangeInput from "./RangeInput.svelte";
-    import { camelCaseToSentence, initTooltips } from "../util/common";
+    import { initTooltips, pascalCaseToSentence } from "../util/common";
     import type { Color, MicroLayerId, MicroPalette, MicroPaletteWithBorder } from "src/types";
 
     export let layerDefinitions: MicroPalette;
@@ -55,7 +55,7 @@
         >
             <option hidden selected>Chose a preset palette</option>
             {#each Object.keys(availablePalettes) as paletteId}
-                <option value={paletteId}> {camelCaseToSentence(paletteId)} </option>
+                <option value={paletteId}> {pascalCaseToSentence(paletteId)} </option>
             {/each}
         </select>
     </div>
@@ -73,7 +73,7 @@
                     on:change={() => updated(title as MicroLayerId, ["active"], def.active!)}
                 />
                 <label for={title} class="form-check-label">
-                    {camelCaseToSentence(title)}
+                    {pascalCaseToSentence(title)}
                 </label>
             </div>
             {#if def.active}
