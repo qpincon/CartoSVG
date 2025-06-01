@@ -29,7 +29,8 @@
     "svelte": "^5.28.1",
     "svelte-check": "^4.1.6",
     "typescript": "~5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vite-plugin-node-polyfills": "^0.23.0"
   },
   "dependencies": {
     "@mapbox/tile-cover": "^3.0.2",

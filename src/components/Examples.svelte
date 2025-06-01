@@ -3,18 +3,22 @@
     import htmlIcon from "../assets/img/html.svg?raw";
     import examplesDesc from "../../examples.json";
     import { createEventDispatcher } from "svelte";
+    import { extractFileName } from "../util/common";
 
-    const exampleProjects = import.meta.glob("../examples/*.cartosvg", { import: "default" });
+    const exampleProjects = import.meta.glob("../examples/*.cartosvg", {
+        import: "default",
+        query: "?raw",
+    }) as Record<string, () => Promise<string>>;
     Object.keys(exampleProjects).forEach((fileName) => {
-        const name = fileName.match(/[-a-zA-Z-_]+/)![0]; // remove extension
+        const name = extractFileName(fileName); // remove extension
         exampleProjects[name] = exampleProjects[fileName];
         delete exampleProjects[fileName];
-    }, {});
+    });
 
     const dispatch = createEventDispatcher();
 
     async function loadExample(project: string) {
-        const jsonProject = await exampleProjects[project]();
+        const jsonProject = JSON.parse(await exampleProjects[project]());
         dispatch("example", {
             projectParams: jsonProject,
         });

@@ -61,7 +61,7 @@
     import Instructions from "./components/Instructions.svelte";
     import Icon from "./components/Icon.svelte";
     import RangeInput from "./components/RangeInput.svelte";
-    import { reportStyle, exportStyleSheet, getUsedInlineFonts, applyStyles, DOM_PARSER } from "./util/dom";
+    import { reportStyle, exportStyleSheet, getUsedInlineFonts, applyStyles, DOM_PARSER, fontsToCss } from "./util/dom";
     import { saveState, getState } from "./util/save";
     import { exportSvg, exportFontChoices } from "./svg/export";
     import { addTooltipListener } from "./tooltip";
@@ -426,7 +426,12 @@
     let mapLoadedPromise: Promise<unknown>;
     let microLocked = false;
     onMount(async () => {
-        console.log("onmount");
+        console.log("onmount", styleEditor);
+        // already mounted
+        if (mapLoadedPromise !== undefined) {
+            console.log("already mounted");
+            return;
+        }
 
         Array.from(document.querySelectorAll(".dropdown-toggle")).forEach((dropdownToggleEl) => {
             new Dropdown(dropdownToggleEl);
@@ -603,7 +608,6 @@
                 },
             },
         });
-        console.log(styleEditor);
         document.body.append(contextualMenu);
         contextualMenu.style.display = "none";
         contextualMenu.style.position = "absolute";
@@ -858,7 +862,6 @@
 
     let accordionVisiblityParams = {};
     function changeProjection(): void {
-        console.log(currentMode, currentParams);
         const projName = p("projection");
         if (projName !== "satellite") {
             accordionVisiblityParams = noSatelliteParams;
@@ -1644,6 +1647,7 @@
         return toFind?.some((str) => template.includes(str));
     }
 
+    $: cssFonts = fontsToCss(providedFonts);
     function handleInputFont(e: Event): void {
         // @ts-expect-error
         const file = e.target.files[0];
@@ -2063,6 +2067,7 @@
 
     function validateExport(): void {
         const formData = Object.fromEntries(new FormData(exportForm).entries());
+        console.log("formData", formData);
         if (currentMode === "macro") {
             exportSvg(
                 svg,

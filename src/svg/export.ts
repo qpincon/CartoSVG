@@ -10,10 +10,10 @@ import type { ProvidedFont, SvgSelection, TooltipDefs, ZonesData } from 'src/typ
 
 
 export enum ExportFontChoice {
-    noExport = 0,
-    convertToPath = 1,
-    embedFont = 2,
-    smallest = 3,
+    noExport = "0",
+    convertToPath = "1",
+    embedFont = "2",
+    smallest = "3",
 }
 
 export interface ExportOptions {
@@ -164,6 +164,8 @@ export async function inlineFontVsPath(
     let nbPathChars = 0;
     const transformedTexts: TransformedTexts = {};
     const SVGO = await import('svgo/browser');
+    // @ts-expect-error
+    window["process"] = {}; window["__dirname"] = '';
     const TextToSVG = (await import('text-to-svg')).default;
     const defaultStyles = getComputedStyle(document.body);
 
