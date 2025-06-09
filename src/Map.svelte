@@ -1,5 +1,7 @@
 <script lang="ts">
     import { mount, onMount, tick } from "svelte";
+    import type { GlobalState } from "./types";
+    import { defaultColorDef, defaultLegendDef, defaultState } from "./stateDefaults";
     import * as topojson from "topojson-client";
     import { presimplify, simplify } from "topojson-simplify";
     import { scaleLinear, scalePow, scaleOrdinal, scaleQuantize, scaleQuantile } from "d3-scale";
@@ -266,7 +268,6 @@
         );
     }
 
-    // const verySimpleLand = {};
     const verySimpleLand = import("./assets/layers/world_land_very_simplified.json").then((l) => {
         const land = l as unknown as TopoJSON.Topology;
         const firstKey = Object.keys(land.objects)[0];
@@ -280,98 +281,34 @@
     let projection: d3.GeoProjection;
     let projectionLarger: d3.GeoProjection;
     let svg: SvgSelection;
-    const defaultLegendDef: LegendDef = {
-        title: "",
-        x: 20,
-        y: Math.max(0, p("height") - 200),
-        lineWidth: 100,
-        rectWidth: 30,
-        rectHeight: 30,
-        significantDigits: 3,
-        maxWidth: 200,
-        direction: "v",
-        labelOnLeft: false,
-        // title: null,
-        // sampleHtml: null,
-        noData: {
-            active: false,
-            manual: false,
-            text: "N/A",
-            color: "#AAAAAA",
-        },
-        changes: {},
-    };
-    const defaultColorDef: ColorDef = {
-        enabled: false,
-        colorScale: "category",
-        colorColumn: "name",
-        colorPalette: "Pastel1",
-        nbBreaks: 5,
-        legendEnabled: false,
-    };
-
-    const defaultInlineProps: InlinePropsMacro = {
-        longitude: 15,
-        latitude: 42.5,
-        translateX: 0,
-        translateY: 0,
-        altitude: 3200,
-        rotation: 0,
-        tilt: 0,
-        showLand: true,
-        showCountries: true,
-    };
-
-    const defaultInlinePropsMicro: InlinePropsMicro = {
-        center: [2.3468, 48.8548],
-        zoom: 13.8,
-        pitch: 0,
-        bearing: 0,
-    };
 
     // ====== State micro ====
     let microLayerDefinitions: MicroPalette = initLayersState(microPalettes["peach"]);
 
     // ====== State macro =======
     let baseCss = defaultBaseCssMacro;
-    let providedPaths: PathDef[] = [];
-    let providedShapes: ShapeDefinition[] = []; // {name, coords, scale, id}
-    let chosenCountriesAdm: string[] = [];
-    let inlinePropsMacro: InlinePropsMacro = JSON.parse(JSON.stringify(defaultInlineProps));
-    let inlinePropsMicro: InlinePropsMicro = JSON.parse(JSON.stringify(defaultInlinePropsMicro));
+    let providedPaths: PathDef[];
+    let providedShapes: ShapeDefinition[];
+    let chosenCountriesAdm: string[];
+    let inlinePropsMacro: InlinePropsMacro;
+    let inlinePropsMicro: InlinePropsMicro;
 
     let providedFonts: ProvidedFont[] = [];
     // TODO: remove and compute from shape + label size
     let shapeCount = 0;
-    let inlineStyles: InlineStyles = {}; // elemID -> prop -> value
-    let zonesData: ZonesData = {};
+    let inlineStyles: InlineStyles;
+    let zonesData: ZonesData;
     /** For each layer / admId, the filter selected */
-    let zonesFilter: Record<string, string> = { land: "firstGlow" };
+    let zonesFilter: Record<string, string>;
     // TODO: remove and compute from last shape
-    let lastUsedLabelProps: CssDict = { "font-size": "14px" };
-    let contourParams: ContourParams = {
-        strokeWidth: 1,
-        strokeColor: "#a0a0a07d",
-        strokeDash: 0,
-        fillColor: "#ffffff",
-    };
-    let tooltipDefs: TooltipDefs = {
-        countries: {
-            template: defaultTooltipContent(true),
-            content: defaultTooltipFull(defaultTooltipContent(true)),
-            enabled: false,
-            locale: "en-US",
-        },
-    };
+    let lastUsedLabelProps: CssDict;
+    let contourParams: ContourParams;
+    let tooltipDefs: TooltipDefs;
 
-    let colorDataDefs: Record<string, ColorDef> = {
-        countries: { ...defaultColorDef },
-    };
-    let legendDefs: Record<string, LegendDef> = {
-        countries: JSON.parse(JSON.stringify(defaultLegendDef)),
-    };
-    let orderedTabs: string[] = ["countries", "land"];
-    let customCategoricalPalette: Color[] = ["#ff0000ff", "#00ff00ff", "#0000ffff"];
+    let colorDataDefs: Record<string, ColorDef>;
+    let legendDefs: Record<string, LegendDef>;
+    let orderedTabs: string[];
+    let customCategoricalPalette: Color[];
 
     // ==== End state =====
 
@@ -401,6 +338,96 @@
 
     let mainMenuSelection: string = "general";
     let currentMode: Mode = "macro";
+
+    // Helper function to convert from flat structure to GlobalState
+    function toGlobalState(): GlobalState {
+        return {
+            stateMacro: {
+                macroParams,
+                inlinePropsMacro,
+                chosenCountriesAdm,
+                zonesData,
+                zonesFilter,
+                lastUsedLabelProps,
+                contourParams,
+                colorDataDefs,
+                legendDefs,
+                customCategoricalPalette,
+            },
+            stateMicro: {
+                microParams,
+                inlinePropsMicro,
+                microLayerDefinitions,
+            },
+            stateCommon: {
+                baseCss,
+                providedFonts,
+                providedShapes,
+                providedPaths,
+                orderedTabs,
+                inlineStyles,
+                shapeCount,
+                tooltipDefs,
+                currentMode,
+            },
+        };
+    }
+
+    // Helper function to convert from GlobalState to flat structure
+    function fromGlobalState(state: GlobalState): void {
+        console.log("fromGlobalState", state);
+        macroParams = state.stateMacro.macroParams;
+        microParams = state.stateMicro.microParams;
+        inlinePropsMacro = state.stateMacro.inlinePropsMacro;
+        inlinePropsMicro = state.stateMicro.inlinePropsMicro;
+        chosenCountriesAdm = state.stateMacro.chosenCountriesAdm;
+        zonesData = state.stateMacro.zonesData;
+        zonesFilter = state.stateMacro.zonesFilter;
+        lastUsedLabelProps = state.stateMacro.lastUsedLabelProps;
+        contourParams = state.stateMacro.contourParams;
+        colorDataDefs = state.stateMacro.colorDataDefs;
+        legendDefs = state.stateMacro.legendDefs;
+        customCategoricalPalette = state.stateMacro.customCategoricalPalette;
+        microLayerDefinitions = state.stateMicro.microLayerDefinitions;
+        baseCss = state.stateCommon.baseCss;
+        providedFonts = state.stateCommon.providedFonts;
+        providedShapes = state.stateCommon.providedShapes;
+        providedPaths = state.stateCommon.providedPaths;
+        orderedTabs = state.stateCommon.orderedTabs;
+        inlineStyles = state.stateCommon.inlineStyles;
+        shapeCount = state.stateCommon.shapeCount;
+        tooltipDefs = state.stateCommon.tooltipDefs;
+        currentMode = state.stateCommon.currentMode;
+    }
+
+    function applyState(state: GlobalState): void {
+        fromGlobalState(state);
+        changeAltitudeScale();
+        updateLayerSimplification();
+        projectAndDraw();
+        getZonesDataFormatters();
+        if (currentMode === "micro") {
+            updateSvgPatterns(
+                document.getElementById("static-svg-map") as unknown as SVGElement,
+                microLayerDefinitions,
+            );
+            replaceCssSheetContent(microLayerDefinitions);
+        }
+        setTimeout(() => {
+            if (maplibreMap) maplibreMap.jumpTo(inlinePropsMicro);
+        }, 500);
+        commonStyleSheetElemMacro.innerHTML = baseCss;
+    }
+
+    function restoreStateToDefault() {
+        applyState(defaultState);
+    }
+
+    function restoreStateFromSave() {
+        const savedState = getState();
+        applyState(savedState ?? defaultState);
+    }
+
     $: if (true || mainMenuSelection) {
         tick().then(() => initTooltips());
     }
@@ -427,22 +454,18 @@
     let microLocked = false;
     onMount(async () => {
         console.log("onmount", styleEditor);
-        // already mounted
-        if (mapLoadedPromise !== undefined) {
-            console.log("already mounted");
-            return;
-        }
-
-        Array.from(document.querySelectorAll(".dropdown-toggle")).forEach((dropdownToggleEl) => {
-            new Dropdown(dropdownToggleEl);
-        });
         commonStyleSheetElemMacro = document.createElement("style");
         commonStyleSheetElemMacro.setAttribute("id", "common-style-sheet-elem-macro");
         document.head.appendChild(commonStyleSheetElemMacro);
+
+        /** Init bootstrap dropdowns */
+        Array.from(document.querySelectorAll(".dropdown-toggle")).forEach((dropdownToggleEl) => {
+            new Dropdown(dropdownToggleEl);
+        });
+        await layerPromises;
+        restoreStateFromSave();
         commonStyleSheetElemMacro.innerHTML = baseCss;
 
-        await layerPromises;
-        restoreState();
         createMaplibreMap();
 
         const microCss = generateCssFromState(microLayerDefinitions);
@@ -921,7 +944,6 @@
                 legendDefs[countryAdm] = JSON.parse(JSON.stringify(defaultLegendDef));
             }
             if (!(countryAdm in zonesData) && !zonesData?.[countryAdm]?.provided) {
-                console.log(resolvedAdmGeometry[countryAdm].features.map((f: Feature) => f.properties));
                 const data: ZoneDataRow[] = sortBy(
                     resolvedAdmGeometry[countryAdm].features.map((f: Feature) => f.properties),
                     "name",
@@ -1343,135 +1365,75 @@
 
     function save(): void {
         baseCss = exportStyleSheet("#outline")!;
-        saveState({
-            macroParams,
-            microParams,
-            inlineProps: inlinePropsMacro,
-            inlinePropsMicro,
-            baseCss,
-            providedFonts,
-            providedShapes,
-            providedPaths,
-            chosenCountriesAdm,
-            orderedTabs,
-            inlineStyles,
-            shapeCount,
-            zonesData,
-            zonesFilter,
-            lastUsedLabelProps,
-            tooltipDefs,
-            contourParams,
-            colorDataDefs,
-            legendDefs,
-            customCategoricalPalette,
-            currentMode,
-            microLayerDefinitions,
-        });
+        saveState(toGlobalState());
     }
 
-    function resetState(): void {
-        macroParams = JSON.parse(JSON.stringify(defaultParams));
-        microParams = JSON.parse(JSON.stringify(microDefaultParams));
-        baseCss = defaultBaseCssMacro;
-        commonStyleSheetElemMacro.innerHTML = baseCss;
-        providedPaths = [];
-        providedShapes = [];
-        chosenCountriesAdm = [];
-        orderedTabs = ["countries", "land"];
-        currentMacroLayerTab = "countries";
-        inlinePropsMacro = JSON.parse(JSON.stringify(defaultInlineProps));
-        inlinePropsMicro = JSON.parse(JSON.stringify(defaultInlinePropsMicro));
-        microLayerDefinitions = initLayersState(microPalettes["peach"]);
-        if (currentMode === "micro") {
-            updateSvgPatterns(
-                document.getElementById("static-svg-map") as unknown as SVGElement,
-                microLayerDefinitions,
-            );
-            replaceCssSheetContent(microLayerDefinitions);
-        }
-        setTimeout(() => {
-            if (maplibreMap) maplibreMap.jumpTo(inlinePropsMicro);
-        }, 500);
-        providedFonts = [];
-        shapeCount = 0;
-        inlineStyles = {};
-        zonesData = {};
-        zonesFilter = { land: "firstGlow" };
-        lastUsedLabelProps = { "font-size": "14px" };
-        tooltipDefs = {
-            countries: {
-                template: defaultTooltipContent(true),
-                content: defaultTooltipFull(defaultTooltipContent(true)),
-                locale: "en-US",
-                enabled: false,
-            },
-        };
-        contourParams = {
-            strokeWidth: 1,
-            strokeColor: "#a0a0a07d",
-            strokeDash: 0,
-            fillColor: "#ffffff",
-        };
-        colorDataDefs = {
-            countries: { ...defaultColorDef },
-        };
-        legendDefs = {
-            countries: JSON.parse(JSON.stringify(defaultLegendDef)),
-        };
-        customCategoricalPalette = ["#ff0000ff", "#00ff00ff", "#0000ffff"];
-        // auto adjust altitude when reseting
-        changeAltitudeScale();
-        updateLayerSimplification();
-        projectAndDraw();
-    }
+    // function resetState(): void {
+    //     baseCss = defaultBaseCssMacro;
+    //     commonStyleSheetElemMacro.innerHTML = baseCss;
+    //     if (currentMode === "micro") {
+    //         updateSvgPatterns(
+    //             document.getElementById("static-svg-map") as unknown as SVGElement,
+    //             microLayerDefinitions,
+    //         );
+    //         replaceCssSheetContent(microLayerDefinitions);
+    //     }
+    //     setTimeout(() => {
+    //         if (maplibreMap) maplibreMap.jumpTo(inlinePropsMicro);
+    //     }, 500);
+    //     // auto adjust altitude when reseting
+    //     changeAltitudeScale();
+    //     updateLayerSimplification();
+    //     projectAndDraw();
+    // }
 
-    function restoreState(givenState?: any): void {
-        let state;
-        if (givenState) {
-            state = givenState;
-        } else state = getState();
-        if (!state) return resetState();
-        ({
-            macroParams,
-            inlineProps: inlinePropsMacro,
-            baseCss,
-            providedFonts,
-            providedShapes,
-            providedPaths,
-            chosenCountriesAdm,
-            orderedTabs,
-            inlineStyles,
-            shapeCount,
-            zonesData,
-            zonesFilter,
-            lastUsedLabelProps,
-            tooltipDefs,
-            contourParams,
-            colorDataDefs,
-            legendDefs,
-        } = JSON.parse(JSON.stringify(state)));
-        if (state.microParams) microParams = state.microParams;
-        if (state.currentMode) switchMode(state.currentMode);
-        if (state.microLayerDefinitions) microLayerDefinitions = state.microLayerDefinitions;
-        inlinePropsMicro = state.inlinePropsMicro ?? defaultInlinePropsMicro;
-        if (currentMode === "micro") {
-            updateSvgPatterns(
-                document.getElementById("static-svg-map") as unknown as SVGElement,
-                microLayerDefinitions,
-            );
-            replaceCssSheetContent(microLayerDefinitions);
-        }
-        setTimeout(() => {
-            if (maplibreMap) maplibreMap.jumpTo(inlinePropsMicro);
-        }, 500);
-        if (!baseCss) baseCss = defaultBaseCssMacro;
-        commonStyleSheetElemMacro.innerHTML = baseCss;
-        const tabsWoLand = orderedTabs.filter((x) => x !== "land");
-        if (tabsWoLand.length) onTabChanged(tabsWoLand[0]);
-        getZonesDataFormatters();
-        changeAltitudeScale(false);
-        updateLayerSimplification();
-    }
+    // function restoreState(givenState?: any): void {
+    //     let state;
+    //     if (givenState) {
+    //         state = givenState;
+    //     } else state = getState();
+    //     if (!state) return resetState();
+    //     ({
+    //         macroParams,
+    //         inlineProps: inlinePropsMacro,
+    //         baseCss,
+    //         providedFonts,
+    //         providedShapes,
+    //         providedPaths,
+    //         chosenCountriesAdm,
+    //         orderedTabs,
+    //         inlineStyles,
+    //         shapeCount,
+    //         zonesData,
+    //         zonesFilter,
+    //         lastUsedLabelProps,
+    //         tooltipDefs,
+    //         contourParams,
+    //         colorDataDefs,
+    //         legendDefs,
+    //     } = JSON.parse(JSON.stringify(state)));
+    //     if (state.microParams) microParams = state.microParams;
+    //     if (state.currentMode) switchMode(state.currentMode);
+    //     if (state.microLayerDefinitions) microLayerDefinitions = state.microLayerDefinitions;
+    //     inlinePropsMicro = state.inlinePropsMicro ?? defaultInlinePropsMicro;
+    //     if (currentMode === "micro") {
+    //         updateSvgPatterns(
+    //             document.getElementById("static-svg-map") as unknown as SVGElement,
+    //             microLayerDefinitions,
+    //         );
+    //         replaceCssSheetContent(microLayerDefinitions);
+    //     }
+    //     setTimeout(() => {
+    //         if (maplibreMap) maplibreMap.jumpTo(inlinePropsMicro);
+    //     }, 500);
+    //     if (!baseCss) baseCss = defaultBaseCssMacro;
+    //     commonStyleSheetElemMacro.innerHTML = baseCss;
+    //     const tabsWoLand = orderedTabs.filter((x) => x !== "land");
+    //     if (tabsWoLand.length) onTabChanged(tabsWoLand[0]);
+    //     getZonesDataFormatters();
+    //     changeAltitudeScale(false);
+    //     updateLayerSimplification();
+    // }
 
     function saveProject(): void {
         baseCss = exportStyleSheet("#outline")!;
@@ -1505,8 +1467,8 @@
         const reader = new FileReader();
         reader.addEventListener("load", () => {
             try {
-                const providedState = JSON.parse(reader.result as string);
-                restoreState(providedState);
+                const providedState: GlobalState = JSON.parse(reader.result as string);
+                applyState(providedState);
                 save();
                 projectAndDraw();
             } catch (e) {
@@ -1523,7 +1485,7 @@
             )
         )
             return;
-        restoreState(e.detail.projectParams);
+        applyState(e.detail.projectParams);
         save();
         projectAndDraw();
     }
@@ -2092,18 +2054,6 @@
         showExportConfirm = false;
     }
 
-    // === Export as PNG behaviour ===
-    // import * as saveSvgAsPng from 'save-svg-as-png';
-    // async function exportRaster() {
-    //     const optimized = await exportSvg(svg, p('width'), p('height'), tooltipDefs, chosenCountriesAdm, zonesData, providedFonts, false, totalCommonCss, {});
-    //     const elem = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    //     document.body.append(elem);
-    //     elem.outerHTML = optimized;
-    //     saveSvgAsPng.saveSvgAsPng(document.body.lastChild, 'test.png');
-    //     document.body.lastChild.remove();
-    //     fetch('/exportRaster');
-    // }
-
     let inlineFontUsed = false;
     function onExportSvgClicked() {
         const usedFonts = getUsedInlineFonts(svg.node()!);
@@ -2149,8 +2099,9 @@
         if (svg) colorizeAndLegend();
     }
 
-    $: if (colorDataDefs[currentMacroLayerTab]) {
+    $: if (colorDataDefs?.[currentMacroLayerTab]) {
         const x = { ...colorDataDefs[currentMacroLayerTab] };
+        console.log(x);
         // TODO: test this works
         autoSelectColors();
     }
@@ -2196,7 +2147,7 @@
                 });
                 return;
             }
-            const paletteName = `scheme${dataColorDef.colorPalette}`;
+            const paletteName = dataColorDef.colorPalette;
             // filter out undef or null data
             const data = zonesData[tab].data.reduce<(string | number)[]>((acc, row) => {
                 const d = row[dataColorDef.colorColumn];
@@ -2775,7 +2726,7 @@
                                                     </option>
                                                 {/each}
                                             </select>
-                                            <label for="choseColorColumn"> Value color</label>
+                                            <label for="choseColorColumn"> Color on:</label>
                                         </div>
                                         <div class="flex-grow-1 m-1 form-floating">
                                             <select
@@ -2962,7 +2913,7 @@
                     </button>
                     <ul class="dropdown-menu">
                         <li>
-                            <a class="dropdown-item" href="#" on:click={resetState}>
+                            <a class="dropdown-item" href="#" on:click={() => restoreStateToDefault()}>
                                 <Icon svg={icons["reset"]} />Reset
                             </a>
                         </li>

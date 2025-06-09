@@ -269,7 +269,7 @@ export interface StateMacro {
     contourParams: ContourParams;
     // TODO: check what this is actually
     colorDataDefs: Record<string, ColorDef>;
-    legendDefs: LegendDef[];
+    legendDefs: Record<string, LegendDef>;
     customCategoricalPalette: Color[];
 }
 
@@ -292,25 +292,8 @@ export interface StateCommon {
     currentMode: Mode;
 }
 
-// macroParams,
-// microParams,
-// inlineProps,
-// inlinePropsMicro,
-// baseCss,
-// providedFonts,
-// providedShapes,
-// providedPaths,
-// chosenCountriesAdm,
-// orderedTabs,
-// inlineStyles,
-// shapeCount,
-// zonesData,
-// zonesFilter,
-// lastUsedLabelProps,
-// tooltipDefs,
-// contourParams,
-// colorDataDefs,
-// legendDefs,
-// customCategoricalPalette,
-// currentMode,
-// microLayerDefinitions,
+export interface GlobalState {
+    stateMacro: StateMacro;
+    stateMicro: StateMicro;
+    stateCommon: StateCommon;
+}

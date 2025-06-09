@@ -1,3 +1,4 @@
+// TODO: remove this file
 const path = require('path');
 const sveltePreprocess = require('svelte-preprocess');
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
