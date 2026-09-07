@@ -118,7 +118,12 @@ export function imageFromSpecialGElem(gElem: SVGGElement) {
     imageElem.setAttribute('href', optimized);
     return imageElem;
 }
-export const imageFromSpecialGElemStr = imageFromSpecialGElem.toString();
+// Wrapped in an explicit `const imageFromSpecialGElem = ...` assignment rather than relying on
+// bare `.toString()`: production minification is free to rename this function (it's never
+// referenced by name from within the app bundle itself), but gElemsToImages.js is loaded via
+// `?raw` and always calls the literal name `imageFromSpecialGElem` — without this wrapper the
+// injected script and the raw script would disagree on the name only in production builds.
+export const imageFromSpecialGElemStr = `const imageFromSpecialGElem = ${imageFromSpecialGElem.toString()};`;
 
 /**
  * Clones an existing host element (by id) into `gElem`'s own `<defs>`, under a fixed local id,

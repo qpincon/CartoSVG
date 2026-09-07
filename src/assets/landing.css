@@ -1,10 +1,16 @@
-/* Reset */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* Reset — scoped to .landing-page so it doesn't leak into the app once the
+   user navigates client-side to /app (landing.css stays imported/injected for
+   the whole SPA session even after this layout unmounts). */
+html, body { margin: 0; padding: 0; }
 html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
-body { line-height: 1.6; }
-img, svg { display: block; max-width: 100%; }
-a { text-decoration: none; color: inherit; }
-button { cursor: pointer; border: none; background: none; font: inherit; }
+.landing-page,
+.landing-page *,
+.landing-page *::before,
+.landing-page *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.landing-page { line-height: 1.6; }
+.landing-page img, .landing-page svg { display: block; max-width: 100%; }
+.landing-page a { text-decoration: none; color: inherit; }
+.landing-page button { cursor: pointer; border: none; background: none; font: inherit; }
 
 /* Design tokens */
 :root {
@@ -67,7 +73,7 @@ button { cursor: pointer; border: none; background: none; font: inherit; }
 }
 
 /* Font */
-body {
+.landing-page {
   font-family: var(--font-body);
   color: var(--color-text-on-light);
 }

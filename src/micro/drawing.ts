@@ -74,6 +74,21 @@ export function orderFeaturesByLayer(features: RenderedFeature[]): void {
 const BACKGROUND_LAYERS = ['landuse_pedestrian', 'landuse_pier'];
 // Layers that receive the cutouts.
 const CUTOUT_TARGET_LAYERS = ['water', 'grass', 'forest'];
+// Some logical MICRO_LAYERS are backed by more than one MapLibre style layer
+// (e.g. "water" is a fill layer plus separate "water_stream"/"water_river" line
+// layers, since a style layer can't mix the fill and line types, and MapLibre
+// disallows combining stream's and river's differing zoom-based line-width
+// curves into a single "water_line" layer via match()).
+// Extra style-layer ids to query for a given logical layer are listed here;
+// their features get their mapLayerId remapped back to the logical id below.
+const EXTRA_STYLE_LAYERS: Partial<Record<MicroLayerId, string[]>> = {
+    water: ['water_stream', 'water_river'],
+};
+const STYLE_LAYER_TO_LOGICAL: Record<string, MicroLayerId> = Object.fromEntries(
+    Object.entries(EXTRA_STYLE_LAYERS).flatMap(([logical, styleLayers]) =>
+        styleLayers!.map(styleLayer => [styleLayer, logical as MicroLayerId])
+    )
+);
 
 let cutoutProcessId = 0;
 let pendingCutout: Promise<void> | null = null;
@@ -107,6 +122,9 @@ async function applyCutoutsDeferred(
         for (let i = mainFeatures.length - 1; i >= 0; i--) {
             const f = mainFeatures[i];
             if (!CUTOUT_TARGET_LAYERS.includes(f.properties.mapLayerId!)) continue;
+            // Skip line geometries (e.g. water's streams/rivers): turf's difference()
+            // below is Polygon-only, and cutouts only make sense against filled areas.
+            if (f.geometry.type !== 'Polygon') continue;
             const featureBbox = bbox(f);
 
             const relevant: Feature<Polygon>[] = [];
@@ -169,9 +187,10 @@ export async function drawPrettyMap(
     log('layerDefinitions=', layerDefinitions);
     select("#map-container").style("width", null).style('height', null);
     const mapLibreContainer = select('#maplibre-map');
-    const layersToQuery = MICRO_LAYERS.filter(layer => {
+    const activeLogicalLayers = MICRO_LAYERS.filter(layer => {
         return layerDefinitions[kebabCase(layer) as MicroLayerId]?.active !== false;
     });
+    const layersToQuery = activeLogicalLayers.flatMap(layer => [layer, ...(EXTRA_STYLE_LAYERS[layer] ?? [])]);
     updateSvgPatterns(svg.node() as SVGElement, layerDefinitions);
     const width = generalParams.General.width;
     const height = generalParams.General.height;
@@ -191,10 +210,15 @@ export async function drawPrettyMap(
     logTimeEnd('getRenderedFeatures')
         if (geometries == null) return;
 
+    geometries.forEach(geom => {
+        const logicalLayer = STYLE_LAYER_TO_LOGICAL[geom.properties.mapLayerId!];
+        if (logicalLayer) geom.properties.mapLayerId = logicalLayer;
+    });
+
     const presentLayers = new Set<MicroLayerId>(
         geometries.map(g => kebabCase(g.properties.mapLayerId) as MicroLayerId),
     );
-    appState.microEmptyLayers = layersToQuery.filter(
+    appState.microEmptyLayers = activeLogicalLayers.filter(
         l => !presentLayers.has(kebabCase(l) as MicroLayerId),
     );
 
@@ -266,7 +290,11 @@ export async function drawPrettyMap(
             d.properties.class = classes.join(' ');
             return classes.join(' ');
         })
-        .attr("stroke-width", d => d.properties.paint!['line-width'] ?? null)
+        // Inline style, not an attribute: attribute-level stroke-width is a
+        // presentation attribute and gets overridden by any CSS class rule
+        // (e.g. the per-layer "#micro .water { stroke-width }" rule), which
+        // would otherwise clobber this per-feature MapLibre-computed width.
+        .style("stroke-width", d => d.properties.paint!['line-width'] ?? null)
         .attr("id", d => d.properties.uuid!)
         .attr("mask", d =>
             cutoutFeatures.length > 0 && CUTOUT_TARGET_LAYERS.includes(d.properties.mapLayerId!)
@@ -779,8 +807,11 @@ export function generateCssFromState(state: MicroPalette): string | null {
         stroke-linecap: round;
         stroke-linejoin: round;
     }
-    #micro .poly { 
+    #micro .poly {
         stroke-linejoin: round;
+    }
+    #micro .water.line {
+        fill: none;
     }
     #paths path {
         stroke: ${state['roads']?.stroke ?? '#6D4C41'};

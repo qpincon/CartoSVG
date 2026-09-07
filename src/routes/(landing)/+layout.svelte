@@ -4,5 +4,7 @@
   let { children } = $props();
 </script>
 
-<SiteNav />
-{@render children()}
+<div class="landing-page">
+  <SiteNav />
+  {@render children()}
+</div>

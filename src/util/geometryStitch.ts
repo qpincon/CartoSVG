@@ -186,8 +186,13 @@ function computeFeatureUuid(feature: RenderedFeature): void {
 // Get bounds by calling map.unproject() on each corner of the viewport
 export function getMapRealBounds(map: MaplibreMap): Feature<Polygon> {
   const canvas = map.getCanvas();
-  const w = canvas.width;
-  const h = canvas.height;
+  // map.unproject() takes CSS-pixel screen coordinates, not the canvas's device-pixel
+  // drawing-buffer size (canvas.width/height = clientWidth * devicePixelRatio). Browser
+  // zoom changes devicePixelRatio (zoom <100% shrinks it, >100% grows it), so using
+  // canvas.width/height here shrank or grew the computed viewport bounds along with zoom,
+  // silently dropping (or over-including) features near the far edge of the map.
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
   const cUL = map.unproject([0, 0]).toArray();
   const cUR = map.unproject([w, 0]).toArray();
   const cLR = map.unproject([w, h]).toArray();
@@ -353,8 +358,9 @@ export async function stitch(renderedFeatures: RenderedFeature[], tiles: Tiles, 
   let finalPolygons = explodeGeometry(stichedPolygons, "Polygon") as RenderedFeature<Polygon>[];
 
   const canvas = maplibreMap.getCanvas();
-  const p1 = maplibreMap.unproject([canvas.width - 1, canvas.height - 1]);
-  const p2 = maplibreMap.unproject([canvas.width - 2, canvas.height - 2]);
+  // Same CSS-pixel vs. device-pixel distinction as getMapRealBounds() above.
+  const p1 = maplibreMap.unproject([canvas.clientWidth - 1, canvas.clientHeight - 1]);
+  const p2 = maplibreMap.unproject([canvas.clientWidth - 2, canvas.clientHeight - 2]);
 
   /** Get 1px distance in km */
   const dist = distance([p1.lng, p1.lat], [p2.lng, p2.lat]);

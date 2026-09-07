@@ -110,7 +110,7 @@
       id: "greece-trip",
       title: "Greece — Travel Map",
       description:
-        "A parchment-styled map of a trip across Greece, with curved routes linking each stop. Click a city label for a popover with trip notes.",
+        "A parchment-styled map of a trip across Greece, with curved routes linking each stop. Click a city pin for a popover with trip notes.",
       highlights: ["Parchment palette", "Curved routes", "City popovers"],
       animated: true,
       src: "/showcase/macro/greece-trip.svg",
