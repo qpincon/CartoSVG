@@ -28,6 +28,7 @@
         ZoneData,
         ZoneDataRow,
     } from "src/types";
+    import Svelecte from "svelecte";
     import { color as d3Color } from "d3-color";
     import { formatLocale } from "d3-format";
     import { paramDefs, type RangeDefinition } from "../../params";
@@ -79,8 +80,6 @@
 </div>
 `;
 
-    let hoveringTab = $state<number>(-1);
-    let dragStartIndex = $state<number>(-1);
     let currentMacroLayerTab = $state<string>("land");
     let currentTemplateHasNumeric = $state<boolean>(false);
     let showDataManager = $state<boolean>(false);
@@ -113,6 +112,14 @@
             return true;
         }),
     );
+    let landOnTop = $derived(macroState.orderedTabs.indexOf("land") === macroState.orderedTabs.length - 1);
+
+    function setLandPlacement(onTop: boolean): void {
+        const rest = macroState.orderedTabs.filter((x) => x !== "land");
+        macroState.orderedTabs = onTop ? [...rest, "land"] : ["land", ...rest];
+        drawMacroTotal();
+    }
+
     let curDataDefs = $derived(macroState.colorDataDefs[currentMacroLayerTab]);
     let currentIsColorByNumeric = $derived(["quantile", "quantize"].includes(curDataDefs?.colorScale));
     let availableColorTypes = $derived(
@@ -262,10 +269,18 @@
             if (x === "land") return macroState.inlinePropsMacro.showLand;
             return true;
         });
-        if (newTabs.length > 0 && !newTabs.includes(currentMacroLayerTab)) {
+        if (currentMacroLayerTab && newTabs.length > 0 && !newTabs.includes(currentMacroLayerTab)) {
             onTabChanged(newTabs[0]);
         }
         drawMacroTotal();
+    }
+
+    function toggleLayerRow(tabTitle: string): void {
+        if (currentMacroLayerTab === tabTitle) {
+            currentMacroLayerTab = "";
+            return;
+        }
+        onTabChanged(tabTitle);
     }
 
     function handleShowRoadsToggle(): void {
@@ -305,31 +320,6 @@
         return toFind?.some((str) => template.includes(str));
     }
 
-    function drop(event: DragEvent, target: number): void {
-        event.dataTransfer!.dropEffect = "move";
-        const newList = macroState.orderedTabs;
-
-        if (dragStartIndex < target) {
-            newList.splice(target + 1, 0, newList[dragStartIndex]);
-            newList.splice(dragStartIndex, 1);
-        } else {
-            newList.splice(target, 0, newList[dragStartIndex]);
-            newList.splice(dragStartIndex + 1, 1);
-        }
-        macroState.orderedTabs = newList;
-        hoveringTab = -1;
-        drawMacroTotal();
-    }
-
-    function tabDragStart(event: DragEvent, i: number, prevent = false): void {
-        if (prevent) {
-            return event.preventDefault();
-        }
-        event.dataTransfer!.effectAllowed = "move";
-        event.dataTransfer!.dropEffect = "move";
-        dragStartIndex = i;
-    }
-
     function deleteCountry(country: string, drawAfter = true, event?: MouseEvent): void {
         if (event) event.stopPropagation();
         macroState.chosenCountriesAdm = macroState.chosenCountriesAdm.filter((x) => x !== country);
@@ -343,9 +333,7 @@
         if (drawAfter) draw();
     }
 
-    async function addNewCountry(e: Event): Promise<void> {
-        const target = e.target as HTMLSelectElement;
-        const newLayerName = target.value;
+    async function addNewCountry(newLayerName: string): Promise<void> {
         if (macroState.chosenCountriesAdm.includes(newLayerName)) return;
         track('layer_add', { kind: newLayerName.includes('ADM2') ? 'adm2' : 'adm1' });
         let searchedAdm;
@@ -357,10 +345,37 @@
         }
         macroState.chosenCountriesAdm.push(newLayerName);
         macroState.orderedTabs.push(newLayerName);
-        target.selectedIndex = 0;
         await onTabChanged(newLayerName);
         draw();
     }
+
+    let countrySelectValue: string | null = $state(null);
+    $effect(() => {
+        if (countrySelectValue) {
+            const newLayerName = countrySelectValue;
+            countrySelectValue = null;
+            addNewCountry(newLayerName);
+        }
+    });
+
+    // Svelecte's virtual list keeps its previous scroll offset when the filtered
+    // option count shrinks, which can leave the dropdown looking empty until the
+    // user scrolls back up. Snap it to the top whenever the search text changes.
+    let countrySelectWrapper: HTMLDivElement;
+    function resetCountryDropdownScroll(e: Event): void {
+        if (!(e.target as HTMLElement).matches(".sv-input--text")) return;
+        // With virtualList, the actual scrollable node is the <svelecte-list-viewport>
+        // custom element rendered inside .sv-dropdown-scroll, not .sv-dropdown-scroll itself.
+        // querySelector with a comma-list returns document order, so .sv-dropdown-scroll
+        // (the ancestor) would win over it — query them separately instead.
+        const scrollEl = (countrySelectWrapper.querySelector("svelecte-list-viewport") ??
+            countrySelectWrapper.querySelector(".sv-dropdown-scroll")) as HTMLElement | null;
+        if (scrollEl) scrollEl.scrollTop = 0;
+    }
+    onMount(() => {
+        countrySelectWrapper.addEventListener("input", resetCountryDropdownScroll);
+        return () => countrySelectWrapper.removeEventListener("input", resetCountryDropdownScroll);
+    });
 
     function getGeoNames(layerTab: string): string[] {
         if (layerTab === "countries") {
@@ -760,68 +775,74 @@
                 </div>
             </div>
 
-            <div class="nav-tabs-wrapper d-flex align-items-end m-1">
-                <ul class="nav nav-tabs flex-nowrap tabs-scroll">
-                    {#each computedOrderedTabs as tabTitle, index (tabTitle)}
-                        {@const isLand = tabTitle === "land"}
-                        <li
-                            class="nav-item d-flex align-items-center mx-1"
-                            draggable={isLand}
-                            ondragstart={(event) => tabDragStart(event, index, tabTitle !== "land")}
-                            ondrop={(event) => {
-                                event.preventDefault;
-                                drop(event, index);
-                            }}
-                            ondragover={(ev) => {
-                                ev.preventDefault();
-                            }}
-                            ondragenter={() => (hoveringTab = index)}
-                            class:is-dnd-hovering-right={hoveringTab === index && index > dragStartIndex}
-                            class:is-dnd-hovering-left={hoveringTab === index && index < dragStartIndex}
-                            class:grabbable={isLand}
-                        >
-                            <a
-                                href="javascript:;"
-                                class:active={currentMacroLayerTab === tabTitle}
-                                class="nav-link d-flex align-items-center position-relative"
-                                onclick={() => onTabChanged(tabTitle)}
-                            >
-                                {#if isLand}
-                                    <Icon svg={icons["draggable"]} />
-                                {/if}
-                                {tabTitle}
-                                {#if tabTitle !== "countries" && !isLand}
-                                    <span
-                                        role="button"
-                                        class="delete-tab"
-                                        onclick={(e) => deleteCountry(tabTitle, true, e)}
-                                    >
-                                        ✕
-                                    </span>
-                                {/if}
-                            </a>
-                        </li>{/each}
-                </ul>
-
-                <ul class="nav nav-tabs flex-shrink-0">
-                    <li class="nav-item icon-add d-flex align-items-center position-relative">
-                        <select role="button" id="country-select" onchange={addNewCountry}>
-                            <option disabled selected value> -- select a country -- </option>
-                            {#each allAvailableAdm as country}
-                                <option value={country}>{country}</option>
-                            {/each}
-                        </select>
-                        <span class="nav-link d-flex align-items-center gap-1">
-                            <Icon fillColor="none" svg={icons["add"]} />
-                            <span class="add-country-label">Add regions</span>
-                        </span>
-                    </li>
-                </ul>
+            <div class="layer-item-add d-flex align-items-center p-1" bind:this={countrySelectWrapper}>
+                <Svelecte
+                    class="country-select-svelecte"
+                    options={allAvailableAdm}
+                    bind:value={countrySelectValue}
+                    placeholder="Add regions"
+                    virtualList
+                >
+                    {#snippet prepend()}
+                        <Icon fillColor="none" svg={icons["add"]} />
+                    {/snippet}
+                </Svelecte>
             </div>
-            {#if computedOrderedTabs.length > 0}
-            <div class="p-2">
+
+            <div class="layers-list m-1">
+                {#each computedOrderedTabs as tabTitle (tabTitle)}
+                    {@const isLand = tabTitle === "land"}
+                    {@const isActive = currentMacroLayerTab === tabTitle}
+                    <div class="layer-item" class:active={isActive}>
+                        <div
+                            class="layer-item-header d-flex align-items-center"
+                            role="button"
+                            tabindex="0"
+                            onclick={() => toggleLayerRow(tabTitle)}
+                            onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") toggleLayerRow(tabTitle); }}
+                        >
+                            <div class="toggle layer-item-chevron" class:opened={isActive}></div>
+                            <span class="layer-item-title flex-grow-1">{tabTitle}</span>
+                            {#if tabTitle !== "countries" && !isLand}
+                                <span
+                                    role="button"
+                                    class="delete-tab"
+                                    title="Delete this layer"
+                                    onclick={(e) => deleteCountry(tabTitle, true, e)}
+                                >
+                                    <Icon svg={icons["trash"]} width="0.95rem" marginRight="0" />
+                                </span>
+                            {/if}
+                        </div>
+                        {#if isActive}
+                        <div class="layer-item-body p-2">
                 {#if currentMacroLayerTab === "land"}
                     <div>
+                        <div class="field field-column">
+                            <label class="form-label mb-1">Land placement</label>
+                            <div class="form-check">
+                                <input
+                                    class="form-check-input"
+                                    type="radio"
+                                    name="landPlacement"
+                                    id="landBelow"
+                                    checked={!landOnTop}
+                                    onclick={() => setLandPlacement(false)}
+                                />
+                                <label class="form-check-label" for="landBelow">Below other layers</label>
+                            </div>
+                            <div class="form-check">
+                                <input
+                                    class="form-check-input"
+                                    type="radio"
+                                    name="landPlacement"
+                                    id="landAbove"
+                                    checked={landOnTop}
+                                    onclick={() => setLandPlacement(true)}
+                                />
+                                <label class="form-check-label" for="landAbove">Above other layers</label>
+                            </div>
+                        </div>
                         <div class="field">
                             <RangeInput
                                 id="contourwidth"
@@ -1216,8 +1237,11 @@
                         </div>
                     {/if}
                 {/if}
+                        </div>
+                        {/if}
+                    </div>
+                {/each}
             </div>
-            {/if}
         </div>
 
 {#if macroState.zonesData[currentMacroLayerTab]?.data}
@@ -1246,23 +1270,27 @@
 </Modal>
 
 <style lang="scss" scoped>
-    #country-select {
-        opacity: 0;
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        cursor: pointer;
-    }
-    #country-select:hover ~ span {
-        color: #aeafaf;
-    }
-    .icon-add .nav-link {
-        pointer-events: none;
-    }
-    .add-country-label {
+    :global(.country-select-svelecte) {
+        --sv-min-height: 30px;
+        --sv-border: none;
+        --sv-control-bg: transparent;
+        --sv-placeholder-color: #6c757d;
+        --sv-icon-color: #6c757d;
+        --sv-dropdown-width: 16rem;
+        width: 12rem;
+        flex: 0 0 auto;
         font-size: 0.85rem;
-        white-space: nowrap;
+    }
+    :global(.country-select-svelecte .sv-control) {
+        cursor: pointer;
+        padding: 0 0.25rem;
+    }
+    :global(.country-select-svelecte:hover) {
+        --sv-placeholder-color: #aeafaf;
+    }
+    :global(.country-select-svelecte.is-open) {
+        --sv-control-bg: #fff;
+        --sv-border: 1px solid #ccc;
     }
     // Fixed width so the "Show water"/"Show roads" color pickers line up with each other
     // regardless of label text width. Wide enough to fit "Show water elements" without
@@ -1279,38 +1307,88 @@
         }
     }
 
-    .nav-tabs-wrapper {
-        min-width: 0;
+    .layers-list {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
     }
 
-    .tabs-scroll {
-        flex: 1 1 auto;
-        min-width: 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scrollbar-width: thin;
+    .layer-item {
+        border: 1px solid transparent;
+        border-radius: 4px;
 
-        > .nav-item {
-            flex-shrink: 0;
+        &.active {
+            background-color: rgba(80, 103, 132, 0.06);
+            border-color: rgba(80, 103, 132, 0.2);
         }
     }
 
-    :global(.is-dnd-hovering-right) {
-        border-right: 3px solid black;
-    }
-    :global(.is-dnd-hovering-left) {
-        border-left: 3px solid black;
-    }
-    .delete-tab {
-        position: absolute;
-        right: 2px;
-        top: 7px;
+    .layer-item-header {
+        padding: 0.35rem 0.5rem;
+        border-left: 3px solid transparent;
+        cursor: pointer;
+        transition:
+            background-color 0.1s ease,
+            border-color 0.15s ease;
+
         &:hover {
-            color: #67777a;
+            background-color: rgba(80, 103, 132, 0.08);
+        }
+
+        .layer-item.active & {
+            border-left-color: #506784;
         }
     }
-    .grabbable {
-        cursor: grab !important;
+
+    .layer-item-title {
+        margin-left: 0.5rem;
+        .layer-item.active & {
+            color: #506784;
+            font-weight: 600;
+        }
+    }
+
+    .layer-item-chevron {
+        transform: rotate(-90deg);
+        &.opened {
+            transform: rotate(0deg);
+        }
+    }
+
+    .layer-item-body {
+        border-top: 1px solid rgba(80, 103, 132, 0.15);
+    }
+
+    .field-column {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .layer-item-add {
+        margin: 0.25rem 0.25rem 0.5rem;
+        border: 1px dashed rgba(80, 103, 132, 0.4);
+        border-radius: 4px;
+        background-color: rgba(80, 103, 132, 0.04);
+        transition: border-color 0.15s ease, background-color 0.15s ease;
+
+        &:hover {
+            border-color: #506784;
+            background-color: rgba(80, 103, 132, 0.08);
+        }
+    }
+
+    .delete-tab {
+        display: inline-flex;
+        align-items: center;
+        margin-left: 0.5rem;
+        color: #c94a4a;
+        border-radius: 3px;
+        padding: 0.15rem;
+        transition: color 0.15s ease, background-color 0.15s ease;
+        &:hover {
+            color: #dc3545;
+            background-color: rgba(220, 53, 69, 0.1);
+        }
     }
 
     .layers {

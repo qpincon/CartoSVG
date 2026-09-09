@@ -10,8 +10,9 @@
         onPickShape: (shapeName: ShapeName) => void;
         onCustomImage: () => void;
         onAddLabel: () => void;
+        onCancelPlacement: () => void;
     }
-    let { activeTool, onDrawCurve, onDrawFreehand, onPickShape, onCustomImage, onAddLabel }: Props = $props();
+    let { activeTool, onDrawCurve, onDrawFreehand, onPickShape, onCustomImage, onAddLabel, onCancelPlacement }: Props = $props();
 
     let shapePickerOpen = $state(false);
     let pickerTop = $state(0);
@@ -19,10 +20,22 @@
 
     function openShapePicker(e: MouseEvent) {
         e.stopPropagation();
+        if (activeTool === 'point') {
+            onCancelPlacement();
+            return;
+        }
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
         pickerTop = rect.bottom + 4;
         pickerLeft = rect.left;
         shapePickerOpen = !shapePickerOpen;
+    }
+
+    function onLabelButtonClick(): void {
+        if (activeTool === 'label') {
+            onCancelPlacement();
+            return;
+        }
+        onAddLabel();
     }
 
     function pickShape(name: ShapeName) {
@@ -85,7 +98,7 @@
     <button
         class="tool-btn"
         class:active={activeTool === 'label'}
-        onclick={onAddLabel}
+        onclick={onLabelButtonClick}
         title="Add a text label. Click the map to place it."
     >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">

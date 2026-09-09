@@ -237,10 +237,10 @@
                             id="export-viewbox"
                             bind:checked={useViewBox}
                         />
-                        <label class="form-check-label" for="export-viewbox">Use viewBox</label>
+                        <label class="form-check-label" for="export-viewbox">Responsive sizing</label>
                     </div>
                     <small class="text-muted d-block ms-4">
-                        The map will fit its container instead of fixed width/height
+                        The map will resize to fit its container instead of using a fixed width and height
                     </small>
                 </div>
 

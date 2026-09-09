@@ -334,6 +334,10 @@
                     clearSelection();
                     return;
                 }
+                if (pendingPlacement) {
+                    cancelPlacement();
+                    return;
+                }
                 stopDrawFreeHand();
                 cancelDrawPath();
             } else if (e.code === "Enter") {
@@ -1096,11 +1100,15 @@
         attachListeners();
     }
 
+    function cancelPlacement(): void {
+        teardownPlacement();
+        pendingPlacement = null;
+        activeTool = null;
+    }
+
     function onPlacementEscape(e: KeyboardEvent): void {
         if (e.key === 'Escape') {
-            teardownPlacement();
-            pendingPlacement = null;
-            activeTool = null;
+            cancelPlacement();
         }
     }
 
@@ -1304,12 +1312,14 @@
         closeMenu();
         clearSelection();
         detachListeners();
+        document.addEventListener("mousemove", updateDrawingTooltip);
         freeHandDrawer.start(svg.node() as SVGSVGElement);
         addMapCursorListeners();
     }
 
     function stopDrawFreeHand(): void {
         if (!isDrawingFreeHand) return;
+        document.removeEventListener("mousemove", updateDrawingTooltip);
         removeMapCursorListeners();
         attachListeners();
         isDrawingFreeHand = false;
@@ -1733,6 +1743,10 @@
     <div id="drawing-tooltip" bind:this={drawingTooltip} class="drawing-tooltip">
         Left-click and hold to draw a curve
     </div>
+{:else if isDrawingFreeHand && isCursorInsideMap}
+    <div id="drawing-tooltip" bind:this={drawingTooltip} class="drawing-tooltip">
+        Click and drag to draw. Press Escape or Enter to finish.
+    </div>
 {/if}
 
 <div class="d-flex align-items-start h-100">
@@ -1799,6 +1813,7 @@
                         onPickShape={onToolPickShape}
                         onCustomImage={onToolCustomImage}
                         onAddLabel={onToolAddLabel}
+                        onCancelPlacement={cancelPlacement}
                     />
                 </div>
                 <!-- RIGHT: tools + user -->
