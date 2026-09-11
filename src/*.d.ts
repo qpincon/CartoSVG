@@ -28,6 +28,7 @@ declare module 'd3-geo-projection' {
 
   export function geoSatellite(): GeoProjection;
   export function geoBaker(): GeoProjection;
+  export function geoEckert4(): GeoProjection;
   export function geoClipCircle(angle: number): GeoStreamWrapper;
 }
 

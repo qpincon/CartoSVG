@@ -1076,7 +1076,17 @@
 
     // ==== Toolbar handlers ====
 
+    // Each drawing/placement tool arms its own map listeners independently, so switching
+    // tools mid-action must explicitly cancel whichever one is currently active first —
+    // otherwise the previous tool's listeners stay live and both fire on the next map click.
+    function cancelActiveTool(): void {
+        if (isDrawingPath) cancelDrawPath();
+        if (isDrawingFreeHand) stopDrawFreeHand();
+        if (pendingPlacement) cancelPlacement();
+    }
+
     function toolDrawCurve(): void {
+        cancelActiveTool();
         activeTool = 'curve';
         addPath();
     }
@@ -1086,6 +1096,7 @@
             stopDrawFreeHand();
             return;
         }
+        cancelActiveTool();
         activeTool = 'freehand';
         drawFreeHand();
     }
@@ -1153,6 +1164,7 @@
     }
 
     function armPlacement(p: NonNullable<PendingPlacement>): void {
+        cancelActiveTool();
         closeMenu();
         clearSelection();
         detachListeners();
@@ -1173,6 +1185,7 @@
 
     function onToolCustomImage(): void {
         if (!svg?.node() || !appState.projection?.invert) return;
+        cancelActiveTool();
         openContextMenuInfo = {
             event: new MouseEvent('click'),
             position: getViewportCenterPosition(),

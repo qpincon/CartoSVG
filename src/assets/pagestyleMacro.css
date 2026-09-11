@@ -34,6 +34,7 @@
 .text {
     paint-order: stroke;
     stroke-width: 0px;
+    fill: #000000;
 }
 
 .country {

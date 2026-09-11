@@ -101,6 +101,14 @@ export interface MacroPalette {
     countryHovered: CssDict;
     adm: CssDict;
     admHovered: CssDict;
+    /** Default color for newly-drawn curves (`#paths path`). */
+    curve: CssDict;
+    /** Default color for newly-placed points/icons (`.shape`). */
+    point: CssDict;
+    /** Default color for newly-added labels (`.text`). */
+    label: CssDict;
+    /** Default color for freehand drawings (`#freehand-drawings .freehand`). */
+    freehand: CssDict;
 }
 
 export type InlineStyles = { [elemId: string]: CssDict };

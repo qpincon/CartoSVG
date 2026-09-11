@@ -12,7 +12,7 @@ export interface GlowParams {
     outerColor: Color;
 }
 
-export type ProjectionName = 'satellite' | 'mercator';
+export type ProjectionName = 'satellite' | 'mercator' | 'equalEarth' | 'geoNaturalEarth' | 'geoAlbersUsa' | 'geoBaker' | 'geoEckert4';
 export interface MacroGeneralParams {
     width: number;
     height: number;
@@ -99,7 +99,7 @@ export const paramDefs: ParamDefinitions = {
     borderRadius: { type: 'range', min: 0, max: 50, step: 0.5 },
     borderWidth: { type: 'range', min: 0, max: 10, step: 0.2 },
     borderPadding: { type: 'range', min: 0, max: 30 },
-    projection: { type: 'select', choices: ['satellite', 'mercator', 'equalEarth', 'geoNaturalEarth', 'geoAlbersUsa', 'geoBaker'] }
+    projection: { type: 'select', choices: ['satellite', 'mercator', 'equalEarth', 'geoNaturalEarth', 'geoAlbersUsa', 'geoBaker', 'geoEckert4'] }
 };
 
 export type OtherParams = {

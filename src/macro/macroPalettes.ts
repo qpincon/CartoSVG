@@ -29,6 +29,10 @@ export const atlas: MacroPalette = {
     countryHovered: { fill: "#f9f2eb" },
     adm: { fill: "#ffffffd0", stroke: "#c4b8a3ff", "stroke-width": "1px" },
     admHovered: { fill: "#ecd6b6ff", stroke: "#d29d52ff", "stroke-width": "2px" },
+    curve: { stroke: "#7c490ea0" },
+    point: { fill: "#000000" },
+    label: { fill: "#000000" },
+    freehand: { fill: "#7c490ea0" },
 };
 
 // --- CARTO-Positron-inspired: flat, minimal, no glow ---
@@ -50,6 +54,10 @@ export const positron: MacroPalette = {
     countryHovered: { fill: "#e4e6e0ff" },
     adm: { fill: "#f7f8f5ff", stroke: "#d3d3ccff", "stroke-width": "0.6px" },
     admHovered: { fill: "#e4e6e0ff", stroke: "#b8b8b0ff", "stroke-width": "1px" },
+    curve: { stroke: "#5b7a8ca0" },
+    point: { fill: "#33414a" },
+    label: { fill: "#33414a" },
+    freehand: { fill: "#5b7a8ca0" },
 };
 
 // --- Antique engraved atlas: sepia, outer-glow-only coastal halo ---
@@ -78,6 +86,10 @@ export const parchment: MacroPalette = {
     countryHovered: { fill: "#f3e9cdff" },
     adm: { fill: "#f5ecd6ff", stroke: "#ab8f61ff", "stroke-width": "1px" },
     admHovered: { fill: "#e8d5a8ff", stroke: "#8a6a3eff", "stroke-width": "2px" },
+    curve: { stroke: "#6b4a28a0" },
+    point: { fill: "#4a3520" },
+    label: { fill: "#4a3520" },
+    freehand: { fill: "#6b4a28a0" },
 };
 
 // --- Near-black navy, cyan coastline ---
@@ -106,6 +118,10 @@ export const midnight: MacroPalette = {
     countryHovered: { fill: "#1c2f3fff" },
     adm: { fill: "#182838ff", stroke: "#3c5a75ff", "stroke-width": "1px" },
     admHovered: { fill: "#274a63ff", stroke: "#5fa8d0ff", "stroke-width": "2px" },
+    curve: { stroke: "#4a90a8a0" },
+    point: { fill: "#eaf6ff" },
+    label: { fill: "#eaf6ff" },
+    freehand: { fill: "#4a90a8a0" },
 };
 
 // --- National-Geographic-style expedition atlas: tan land, muted teal sea, brown borders ---
@@ -134,6 +150,10 @@ export const expedition: MacroPalette = {
     countryHovered: { fill: "#e6d8b0ff" },
     adm: { fill: "#f5eeddff", stroke: "#8a7550ff", "stroke-width": "1px" },
     admHovered: { fill: "#ddc994ff", stroke: "#5c4a30ff", "stroke-width": "1.5px" },
+    curve: { stroke: "#8a7550a0" },
+    point: { fill: "#3a2f1f" },
+    label: { fill: "#3a2f1f" },
+    freehand: { fill: "#8a7550a0" },
 };
 
 // --- Classic textbook physical/political map: blue sea, green land, square frame, no glow ---
@@ -155,6 +175,10 @@ export const meridian: MacroPalette = {
     countryHovered: { fill: "#dcefe0ff" },
     adm: { fill: "#f2f7ecff", stroke: "#7a9a72ff", "stroke-width": "0.8px" },
     admHovered: { fill: "#d3e8c8ff", stroke: "#4d4d4dff", "stroke-width": "1.5px" },
+    curve: { stroke: "#4d4d4da0" },
+    point: { fill: "#333333" },
+    label: { fill: "#333333" },
+    freehand: { fill: "#4d4d4da0" },
 };
 
 // --- Monochrome newsprint / print atlas: grayscale, square frame, no glow ---
@@ -176,12 +200,17 @@ export const newsprint: MacroPalette = {
     countryHovered: { fill: "#e0e0e0ff" },
     adm: { fill: "#fafafaff", stroke: "#777777ff", "stroke-width": "0.8px" },
     admHovered: { fill: "#d0d0d0ff", stroke: "#222222ff", "stroke-width": "1.5px" },
+    curve: { stroke: "#333333a0" },
+    point: { fill: "#1a1a1a" },
+    label: { fill: "#1a1a1a" },
+    freehand: { fill: "#333333a0" },
 };
 
 /**
  * Applies a macro palette to state: sea/graticule, border, land contour, glow on every layer
- * that currently has one, and the default .country/.adm CSS rules. Leaves everything else in
- * baseCss (fonts, .text, #paths, per-element inline styles) untouched.
+ * that currently has one, and the default .country/.adm/curve/point/label/freehand CSS rules.
+ * These CSS defaults only affect elements without an inline style override, so per-element
+ * inline styles (fonts, individually recolored elements, etc.) are left untouched.
  */
 export function applyMacroPalette(palette: MacroPalette): void {
     Object.assign(macroState.macroParams.Background, palette.background);
@@ -206,6 +235,10 @@ export function applyMacroPalette(palette: MacroPalette): void {
     updateStyleSheetOrGenerateCss(sheet, ".country.hovered", palette.countryHovered);
     updateStyleSheetOrGenerateCss(sheet, ".adm", palette.adm);
     updateStyleSheetOrGenerateCss(sheet, ".adm.hovered", palette.admHovered);
+    updateStyleSheetOrGenerateCss(sheet, "#paths path", palette.curve);
+    updateStyleSheetOrGenerateCss(sheet, ".shape", palette.point);
+    updateStyleSheetOrGenerateCss(sheet, ".text", palette.label);
+    updateStyleSheetOrGenerateCss(sheet, "#freehand-drawings .freehand", palette.freehand);
     macroState.baseCss = exportStyleSheet("#outline") ?? macroState.baseCss;
 }
 
@@ -252,6 +285,10 @@ const glowMatches = (actual: GlowParams | undefined, expected: Omit<GlowParams, 
 /** Returns the id of the palette matching current macro state, or "" ("Custom") if none does. */
 export function findMatchingPaletteId(palettes: Record<string, MacroPalette>): string {
     const country = extractRuleProps(macroState.baseCss, ".country");
+    const curve = extractRuleProps(macroState.baseCss, "#paths path");
+    const point = extractRuleProps(macroState.baseCss, ".shape");
+    const label = extractRuleProps(macroState.baseCss, ".text");
+    const freehand = extractRuleProps(macroState.baseCss, "#freehand-drawings .freehand");
     return (
         Object.keys(palettes).find((id) => {
             const p = palettes[id];
@@ -272,7 +309,11 @@ export function findMatchingPaletteId(palettes: Record<string, MacroPalette>): s
                 land.strokeDash === p.land.strokeDash &&
                 hex8(land.fillColor) === hex8(p.land.fillColor) &&
                 glowMatches(macroState.zonesGlow.land, p.glow) &&
-                cssDictMatches(country, p.country)
+                cssDictMatches(country, p.country) &&
+                cssDictMatches(curve, p.curve) &&
+                cssDictMatches(point, p.point) &&
+                cssDictMatches(label, p.label) &&
+                cssDictMatches(freehand, p.freehand)
             );
         }) ?? ""
     );

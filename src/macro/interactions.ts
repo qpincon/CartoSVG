@@ -104,11 +104,11 @@ export function updateVisibleAreaScale(): void {
         // Below scale 130 the world is narrower than most canvas widths, which is what the
         // translateX/Y clamp below relies on to always keep the map covering the canvas.
         appState.altMin = 130;
-        appState.altMax = 2000;
+        appState.altMax = 2800;
         threshScale = makeSimplificationScale(appState.altMax, 300, 0.0001, 0.03, 0.78);
     } else {
         appState.altMin = 90;
-        appState.altMax = 2000;
+        appState.altMax = 2800;
         // high scale (zoomed in) → small area, low scale (zoomed out) → large area
         // Simplification maxes out at scale 300, below that stays at 0.03
         threshScale = makeSimplificationScale(appState.altMax, 300, 0.0001, 0.03, 0.78);

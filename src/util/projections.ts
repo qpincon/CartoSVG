@@ -1,5 +1,5 @@
 import { geoMercator, geoEqualEarth, geoAlbersUsa, geoNaturalEarth1, geoTransform } from 'd3-geo';
-import { geoSatellite, geoBaker } from 'd3-geo-projection';
+import { geoSatellite, geoBaker, geoEckert4 } from 'd3-geo-projection';
 import { geoClipCircle, geoClipRectangle } from 'd3';
 import { LngLat, Point } from 'maplibre-gl';
 import type { Map } from 'maplibre-gl';
@@ -223,6 +223,7 @@ export const standardProjection: Record<string, ProjectionFunction> = {
     'equalEarth': geoEqualEarthProj,
     'geoNaturalEarth': geoNaturalEarthProj,
     'geoBaker': geoBakerProj,
+    'geoEckert4': geoEckert4Proj,
 };
 
 function standardProj(projFunc: () => any, params: ProjectionParams): any {
@@ -276,6 +277,10 @@ function geoNaturalEarthProj(params: ProjectionParams): any {
 
 function geoBakerProj(params: ProjectionParams): any {
     return standardProj(geoBaker, params);
+}
+
+function geoEckert4Proj(params: ProjectionParams): any {
+    return standardProj(geoEckert4, params);
 }
 
 
