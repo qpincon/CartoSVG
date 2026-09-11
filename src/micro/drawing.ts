@@ -30,6 +30,8 @@ import { transitionCssMicro } from 'src/svg/transition';
 import { removeNotRenderedElements } from './remove-not-rendered-canvas';
 import { appState, microState } from 'src/state.svelte';
 import { yieldToMain } from '../util/polyfills';
+import { distance } from '@turf/distance';
+import { polygonizeWaterLines } from './waterPolygonize';
 
 
 // Interfaces for building grouping
@@ -198,7 +200,7 @@ export async function drawPrettyMap(
     svg.attr("width", `${width}`).attr("height", `${height}`);
     const use3d = layerDefinitions.buildings['3dBuildings'];
     logTime('getRenderedFeatures')
-    const geometries = (await getRenderedFeatures(maplibreMap, { layers: layersToQuery }, use3d!))
+    let geometries = (await getRenderedFeatures(maplibreMap, { layers: layersToQuery }, use3d!))
     ?.filter(geom => {
             if (geom.properties['kind_detail'] === 'corridor') return false;
             const layer = geom.properties['layer'];
@@ -214,6 +216,16 @@ export async function drawPrettyMap(
         const logicalLayer = STYLE_LAYER_TO_LOGICAL[geom.properties.mapLayerId!];
         if (logicalLayer) geom.properties.mapLayerId = logicalLayer;
     });
+
+    // 1px distance at the current view, in km — used to turn water_stream/water_river's
+    // pixel line-width into a buffer radius (see polygonizeWaterLines). Same technique as
+    // the 1px mapBounds buffer in geometryStitch.ts's stitch().
+    const p1 = maplibreMap.unproject([0, 0]);
+    const p2 = maplibreMap.unproject([1, 0]);
+    const kmPerPixel = distance([p1.lng, p1.lat], [p2.lng, p2.lat]);
+    logTime('polygonizeWaterLines');
+    geometries = polygonizeWaterLines(geometries, kmPerPixel);
+    logTimeEnd('polygonizeWaterLines');
 
     const presentLayers = new Set<MicroLayerId>(
         geometries.map(g => kebabCase(g.properties.mapLayerId) as MicroLayerId),

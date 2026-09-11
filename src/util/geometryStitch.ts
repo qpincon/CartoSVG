@@ -174,7 +174,7 @@ export function bboxIntersects(
   return xOverlaps && yOverlaps;
 }
 
-function computeFeatureUuid(feature: RenderedFeature): void {
+export function computeFeatureUuid(feature: RenderedFeature): void {
   if (feature.properties.center) return;
   const c = center(feature);
   const coords = c.geometry.coordinates as [number, number];
