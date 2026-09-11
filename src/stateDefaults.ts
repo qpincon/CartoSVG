@@ -54,6 +54,7 @@ const defaultInlinePropsMacro: InlinePropsMacro = {
     showRoads: false,
     showWater: false,
     showMountains: false,
+    landOnTop: true,
 };
 
 const defaultInlinePropsMicro: InlinePropsMicro = {

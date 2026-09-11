@@ -79,6 +79,7 @@ export type InlinePropsMacro = Prettify<Pick<ProjectionParams, 'longitude' | 'la
     showRoads: boolean;
     showWater: boolean;
     showMountains: boolean;
+    landOnTop: boolean;
 }>
 
 export type ParsedPathGroup = [string, number, number];

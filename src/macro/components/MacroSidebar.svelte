@@ -54,7 +54,7 @@
     import { interpolateRgbBasis } from "d3-interpolate";
 
     import dataExplanation from "../../assets/dataColor.svg";
-    import { applyInlineStyles, drawMacroBase, handleChangeProp, projectAndDraw } from "../drawing";
+    import { applyInlineStyles, drawMacroBase, handleChangeProp, projectAndDraw, visibleOrderedTabs } from "../drawing";
     import { appendCountryImageNew } from "src/svg/contourMethods";
     import { glowFilterId } from "src/svg/svgDefs";
     import { defaultGlowParams } from "src/stateDefaults";
@@ -105,18 +105,9 @@
         saveState();
     }
 
-    let computedOrderedTabs = $derived(
-        macroState.orderedTabs.filter((x) => {
-            if (x === "countries") return macroState.inlinePropsMacro.showCountries;
-            if (x === "land") return macroState.inlinePropsMacro.showLand;
-            return true;
-        }),
-    );
-    let landOnTop = $derived(macroState.orderedTabs.indexOf("land") === macroState.orderedTabs.length - 1);
-
+    let computedOrderedTabs = $derived(visibleOrderedTabs(macroState.orderedTabs));
     function setLandPlacement(onTop: boolean): void {
-        const rest = macroState.orderedTabs.filter((x) => x !== "land");
-        macroState.orderedTabs = onTop ? [...rest, "land"] : ["land", ...rest];
+        macroState.inlinePropsMacro.landOnTop = onTop;
         drawMacroTotal();
     }
 
@@ -264,11 +255,7 @@
     const saveDebounced = debounce(saveState, 200);
 
     function handleLayerToggle(): void {
-        const newTabs = macroState.orderedTabs.filter((x) => {
-            if (x === "countries") return macroState.inlinePropsMacro.showCountries;
-            if (x === "land") return macroState.inlinePropsMacro.showLand;
-            return true;
-        });
+        const newTabs = visibleOrderedTabs(macroState.orderedTabs);
         if (currentMacroLayerTab && newTabs.length > 0 && !newTabs.includes(currentMacroLayerTab)) {
             onTabChanged(newTabs[0]);
         }
@@ -826,7 +813,7 @@
                                     type="radio"
                                     name="landPlacement"
                                     id="landBelow"
-                                    checked={!landOnTop}
+                                    checked={!macroState.inlinePropsMacro.landOnTop}
                                     onclick={() => setLandPlacement(false)}
                                 />
                                 <label class="form-check-label" for="landBelow">Below other layers</label>
@@ -837,7 +824,7 @@
                                     type="radio"
                                     name="landPlacement"
                                     id="landAbove"
-                                    checked={landOnTop}
+                                    checked={macroState.inlinePropsMacro.landOnTop}
                                     onclick={() => setLandPlacement(true)}
                                 />
                                 <label class="form-check-label" for="landAbove">Above other layers</label>
@@ -877,7 +864,7 @@
                                 step={0.5}
                             ></RangeInput>
                         </div>
-                        {#if computedOrderedTabs.findIndex((x) => x === "land") === 0}
+                        {#if !macroState.inlinePropsMacro.landOnTop}
                             <ColorPickerPreview
                                 id="fillpicker"
                                 popup="right"

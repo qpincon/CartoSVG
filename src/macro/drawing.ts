@@ -19,15 +19,26 @@ import { updateMacroRoads } from "./roads";
 import { updateMacroWater } from "./water";
 import { updateMacroMountains } from "./mountains";
 
+/** Filters `orderedTabs` down to the layers currently toggled on ("land"/"countries" can be hidden). */
+export function visibleOrderedTabs(tabs: string[]): string[] {
+    return tabs.filter((x) => {
+        if (x === "countries") return macroState.inlinePropsMacro.showCountries;
+        if (x === "land") return macroState.inlinePropsMacro.showLand;
+        return true;
+    });
+}
+
 /**
- * Returns the persistent `<g id={id}>` placeholder for a macro vector-tile layer (roads,
- * water, mountains, …). Positioned immediately before #points-labels on EVERY call, not
- * just when first created — see the reasoning inline below. Callers control layer z-order
- * purely by the ORDER they call this in (bottom-most layer first), not by fetch timing: only
- * the group's contents change asynchronously once each layer's data has been fetched. Must
- * never get the `.macro-layer` class — drawMacro() wipes and rebuilds every `.macro-layer`
- * element on each redraw, which would remove these placeholders.
+ * Reinserts "land" at the front (bottom, filled) or back (top, contour-only) of the
+ * paint-order list based on `inlinePropsMacro.landOnTop`, independent of where "land" sits
+ * in `orderedTabs` — that array is only the sidebar's display order.
  */
+function orderTabsForPainting(tabs: string[]): string[] {
+    if (!tabs.includes("land")) return tabs;
+    const rest = tabs.filter((x) => x !== "land");
+    return macroState.inlinePropsMacro.landOnTop ? [...rest, "land"] : ["land", ...rest];
+}
+
 function macroFrameRect(width: number, height: number, borderWidth: number, borderRadius: number) {
     return {
         rx: Math.max(width, height) * (borderRadius / 100),
@@ -61,11 +72,7 @@ function ensureLayerGroup(svg: SvgSelection, id: string): SVGGElement {
 export async function drawMacroBase(svg: SvgSelection, simplified = false): Promise<void> {
     log("drawMacroBase", simplified);
     if (!svg || svg.empty()) return;
-    const computedOrderedTabs = macroState.orderedTabs.filter((x) => {
-        if (x === "countries") return macroState.inlinePropsMacro.showCountries;
-        if (x === "land") return macroState.inlinePropsMacro.showLand;
-        return true;
-    });
+    const computedOrderedTabs = orderTabsForPainting(visibleOrderedTabs(macroState.orderedTabs));
 
     const width = macroState.macroParams.General.width;
     const height = macroState.macroParams.General.height;
