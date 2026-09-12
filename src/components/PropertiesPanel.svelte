@@ -49,6 +49,8 @@
         onTogglePathImageRotate?: (value: boolean) => void;
         getPathMarker?: (id: string) => string | null;
         onChangePathMarker?: (markerName: string | "delete") => void;
+        getShapePosition?: (id: string) => { lat: number; lng: number } | null;
+        onChangeShapePosition?: (lat: number, lng: number) => void;
     }
 
     let {
@@ -62,6 +64,7 @@
         onChangePathImageDuration, onChangePathImageWidth,
         onChangePathImageHeight, onTogglePathImageRotate,
         getPathMarker, onChangePathMarker,
+        getShapePosition, onChangeShapePosition,
     }: Props = $props();
 
     const STROKE_WIDTHS = ["0.5", "1", "2", "3", "4", "6", "8", "12"];
@@ -115,6 +118,8 @@
     const resolvedLink = $derived(activeId ? (getLink?.(activeId) ?? null) : null);
     const resolvedPathImage = $derived(entityType === "path" && activeId ? (getPathImage?.(activeId) ?? null) : null);
     const resolvedPathMarker = $derived(entityType === "path" && activeId ? (getPathMarker?.(activeId) ?? null) : null);
+    const resolvedShapePos = $derived(entityType === "shape" && activeId ? (getShapePosition?.(activeId) ?? null) : null);
+    const roundCoord = (v: number) => Math.round(v * 1e6) / 1e6;
 
     let pathImageInputEl: HTMLInputElement | null = $state(null);
 
@@ -521,6 +526,37 @@
                 </div>
                 {/if}
 
+                <!-- ── POSITION (shapes/labels: lat/lng) ─────────────── -->
+                {#if resolvedShapePos}
+                <div class="sp-section-head">Position</div>
+                <div class="d-flex align-items-center px-3 border-bottom gap-2" style="min-height:34px">
+                    <span class="flex-grow-1 text-secondary" style="font-size:11px">Latitude</span>
+                    <input type="number" class="form-control form-control-sm sp-no-spinner" style="width:64px"
+                        step="any" min="-90" max="90"
+                        value={roundCoord(resolvedShapePos.lat)}
+                        onchange={(e) => {
+                            const input = e.target as HTMLInputElement;
+                            const v = parseFloat(input.value);
+                            if (Number.isFinite(v) && resolvedShapePos) onChangeShapePosition?.(v, resolvedShapePos.lng);
+                            const fresh = activeId ? getShapePosition?.(activeId) : null;
+                            if (fresh) input.value = String(roundCoord(fresh.lat));
+                        }} />
+                </div>
+                <div class="d-flex align-items-center px-3 border-bottom gap-2" style="min-height:34px">
+                    <span class="flex-grow-1 text-secondary" style="font-size:11px">Longitude</span>
+                    <input type="number" class="form-control form-control-sm sp-no-spinner" style="width:64px"
+                        step="any" min="-180" max="180"
+                        value={roundCoord(resolvedShapePos.lng)}
+                        onchange={(e) => {
+                            const input = e.target as HTMLInputElement;
+                            const v = parseFloat(input.value);
+                            if (Number.isFinite(v) && resolvedShapePos) onChangeShapePosition?.(resolvedShapePos.lat, v);
+                            const fresh = activeId ? getShapePosition?.(activeId) : null;
+                            if (fresh) input.value = String(roundCoord(fresh.lng));
+                        }} />
+                </div>
+                {/if}
+
                 <!-- ── PATH IMAGE ──────────────────────────────────── -->
                 {#if entityType === "path"}
                 <div class="sp-section-head">Image</div>
@@ -828,6 +864,16 @@
     .sp-delete-btn:hover { background: #fff5f5; border-color: #dc3545; }
 
     .sp-dimmed { opacity: 0.45; pointer-events: none; }
+
+    .sp-no-spinner::-webkit-outer-spin-button,
+    .sp-no-spinner::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    .sp-no-spinner {
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
 
     .sp-panel-title {
         font-size: 11px; font-weight: 600; letter-spacing: .05em;

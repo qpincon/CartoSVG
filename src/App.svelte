@@ -5,7 +5,7 @@
     import { drag } from "d3-drag";
     import { zoom } from "d3-zoom";
     import PropertiesPanel from "./components/PropertiesPanel.svelte";
-    import {  debounce } from "lodash-es";
+    import {  debounce, clamp } from "lodash-es";
     import { drawCustomPaths, parseAndUnprojectPath } from "./svg/paths";
     import PathEditor from "./svg/pathEditor";
     import Geocoding from "./components/Geocoding.svelte";
@@ -894,6 +894,32 @@
         if (markerName === "delete") delete commonState.providedPaths[entity.index].marker;
         else commonState.providedPaths[entity.index].marker = markerName;
         drawShapesAndSave();
+    }
+
+    function getPanelShapePosition(_id: string): { lat: number; lng: number } | null {
+        const entity = panelSelectedEntity;
+        if (!entity || entity.type !== "shape") return null;
+        const shapeDef = commonState.providedShapes[entity.index];
+        if (!shapeDef) return null;
+        return { lng: shapeDef.pos[0], lat: shapeDef.pos[1] };
+    }
+
+    function handlePanelChangeShapePosition(lat: number, lng: number): void {
+        const entity = panelSelectedEntity;
+        if (!entity || entity.type !== "shape") return;
+        const shapeDef = commonState.providedShapes[entity.index];
+        if (!shapeDef) return;
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        const clampedLat = clamp(lat, -90, 90);
+        const clampedLng = clamp(lng, -180, 180);
+        commonState.providedShapes[entity.index] = { ...shapeDef, pos: [clampedLng, clampedLat] };
+        drawAndSetupShapes(); // rebuilds #points-labels from scratch
+        // DOM nodes were recreated — re-point the overlay, the panel, and label callbacks
+        refreshOverlay();
+        const el = document.getElementById(shapeDef.id);
+        if (el) propertiesPanel?.open(el);
+        if (shapeDef.text !== undefined) setupLabelOverlayCallbacks(shapeDef.id, entity.index);
+        saveState();
     }
 
     function handlePanelDelete(): void {
@@ -2028,6 +2054,8 @@
         onTogglePathImageRotate={handlePanelTogglePathImageRotate}
         getPathMarker={getPanelPathMarker}
         onChangePathMarker={handlePanelChangePathMarker}
+        getShapePosition={getPanelShapePosition}
+        onChangeShapePosition={handlePanelChangeShapePosition}
         onSaveLink={handlePanelSaveLink}
         onAddTooltip={handlePanelAddTooltip}
         onRemoveTooltip={handlePanelRemoveTooltip}

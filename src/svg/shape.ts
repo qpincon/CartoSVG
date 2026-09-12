@@ -16,7 +16,8 @@ export function drawShapes(
 
     shapeDefinitions.forEach((shapeDef: ShapeDefinition) => {
         // shape is a symbol
-        const projectedPos: Coords = projection(shapeDef.pos)!;
+        const projectedPos: Coords | null = projection(shapeDef.pos);
+        if (!projectedPos) return; // e.g. geoAlbersUsa outside the US
         let svgShape: SVGElement;
 
         if (shapeDef.customImage) {
