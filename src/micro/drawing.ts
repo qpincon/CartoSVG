@@ -860,9 +860,6 @@ export function generateCssFromState(state: MicroPalette): string | null {
     #freehand-drawings g path {
         fill: inherit;
     }
-    .text {
-        paint-order: stroke;
-    }
     `;
 
     const layerEntries = Object.entries(state).filter(
@@ -934,7 +931,7 @@ export function generateCssFromState(state: MicroPalette): string | null {
     }
 
     css += updateStyleSheetOrGenerateCss(sheet, '.shape', state.point ?? { fill: 'black' });
-    css += updateStyleSheetOrGenerateCss(sheet, '.text', { 'stroke-width': '1px', ...(state.label ?? { fill: 'black' }) });
+    css += updateStyleSheetOrGenerateCss(sheet, '.text', { 'paint-order': 'stroke', 'stroke-width': '1px', ...(state.label ?? { fill: 'black' }) });
 
     if (sheet) return null;
     return css;

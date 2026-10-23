@@ -375,9 +375,11 @@
         attachListeners();
         // maplibreMap.showTileBoundaries = true;
         document.addEventListener("mousedown", onDocumentMousedownCancelTool);
+        document.addEventListener("mousedown", onDocumentMousedownCommitLabel, true);
         window.addEventListener("keydown", (e) => {
             if (e.code === "Escape") {
                 if (contextualMenu?.opened) {
+                    typedText = "";
                     closeMenu();
                     return;
                 }
@@ -500,7 +502,6 @@
             })
             .on("start", () => {
                 didDrag = false;
-                if (addingLabel) validateLabel();
                 propertiesPanel?.close();
                 closeMenu();
             })
@@ -1284,6 +1285,14 @@
         if (t.closest('.shape-picker')) return; // the Point shape dropdown
         if (contextualMenu?.opened) return; // label entry menu (portalled to document.body)
         cancelActiveTool();
+    }
+
+    // Clicking anywhere outside the label-entry textarea commits the typed label, like Enter.
+    // Capture phase so it runs before handlers that stopPropagation or call closeMenu().
+    function onDocumentMousedownCommitLabel(e: MouseEvent): void {
+        if (!addingLabel || !contextualMenu?.opened) return;
+        if ((e.target as Element | null)?.closest('#label-entry')) return;
+        validateLabel();
     }
 
     function toolDrawCurve(): void {
