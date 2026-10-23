@@ -18,6 +18,7 @@
     } from "./svg/svg";
     import { drawShapes } from "./svg/shape";
     import { freeHandDrawPath, cancelFreeHandDrawPath } from "./svg/freeHandPath";
+    import { penDrawPath, finishPenDrawPath, removeLastPenPoint } from "./svg/penPath";
     import Modal from "./components/Modal.svelte";
     import LabelEditor from "./components/LabelEditor.svelte";
     import FontPicker from "./components/FontPicker.svelte";
@@ -226,6 +227,17 @@
     let panelEntityDuringEdit = $state<SelectedEntity | null>(null);
     let isDrawingFreeHand = $state(false);
     let isDrawingPath = $state(false);
+    const CURVE_MODE_KEY = "mapello.curveMode";
+    function loadCurveMode(): "pen" | "freehand" {
+        try {
+            return localStorage.getItem(CURVE_MODE_KEY) === "freehand" ? "freehand" : "pen";
+        } catch {
+            return "pen";
+        }
+    }
+    // "pen": click to place points (default); "freehand": drag a stroke that gets fitted to Béziers
+    let curveMode = $state<"pen" | "freehand">(loadCurveMode());
+    let drawPathSession = 0; // invalidates the deferred reset of a finished drawing if a new one started
     let isCursorInsideMap = $state(false);
     let isActivelyDrawingPath = $state(false);
 
@@ -383,6 +395,11 @@
                     closeMenu();
                     return;
                 }
+                if (isDrawingPath && curveMode === "pen") {
+                    // Keep what has been drawn so far (like Figma); a single point leaves nothing behind
+                    finishPenDrawPath();
+                    return;
+                }
                 if (editingPath) {
                     // Exit editing rather than closing the panel — same as the "Exit editing"
                     // button and the panel's own close button (see PropertiesPanel's onClose).
@@ -427,7 +444,10 @@
                 const target = e.target as HTMLElement;
                 if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) return;
                 e.preventDefault();
-                if (currentPathEditor) {
+                if (isDrawingPath && curveMode === "pen") {
+                    // While drawing with the pen, undo removes the last point
+                    if (!e.shiftKey) removeLastPenPoint();
+                } else if (currentPathEditor) {
                     // Path-editing undo/redo takes priority over the global history while a path is being edited.
                     if (e.shiftKey) {
                         currentPathEditor.redo();
@@ -1305,6 +1325,18 @@
         addPath();
     }
 
+    function pickCurveMode(mode: "pen" | "freehand"): void {
+        cancelActiveTool(); // must run before the mode changes: pen keeps its path, freehand discards it
+        curveMode = mode;
+        try {
+            localStorage.setItem(CURVE_MODE_KEY, mode);
+        } catch {
+            // storage unavailable: the choice just won't be remembered
+        }
+        activeTool = "curve";
+        addPath();
+    }
+
     function toolDrawFreehand(): void {
         if (isDrawingFreeHand) {
             stopDrawFreeHand();
@@ -1444,17 +1476,21 @@
     // ==== End toolbar handlers ====
 
     function addPath(): void {
-        track('element_add', { type: 'path' });
+        track('element_add', { type: 'path', mode: curveMode });
         closeMenu();
         clearSelection();
         detachListeners();
         isDrawingPath = true;
         isCursorInsideMap = true; // Assume cursor is inside since menu was just clicked
+        const session = ++drawPathSession;
         document.addEventListener("mousemove", updateDrawingTooltip);
-        document.addEventListener("mousedown", onPathDrawMouseDown);
-        document.addEventListener("mouseup", onPathDrawMouseUp);
+        if (curveMode === "freehand") {
+            document.addEventListener("mousedown", onPathDrawMouseDown);
+            document.addEventListener("mouseup", onPathDrawMouseUp);
+        }
         addMapCursorListeners();
-        freeHandDrawPath(svg.node() as SVGSVGElement, (finishedElem) => {
+        const startDrawing = curveMode === "pen" ? penDrawPath : freeHandDrawPath;
+        startDrawing(svg.node() as SVGSVGElement, (finishedElem) => {
             log("finishedElem", finishedElem);
             const d = finishedElem.getAttribute("d");
             cleanupPathDrawListeners();
@@ -1479,6 +1515,7 @@
             noteAnnotationAdded();
             saveDebounced();
             setTimeout(() => {
+                if (session !== drawPathSession) return; // another drawing was armed in the meantime
                 isDrawingPath = false;
                 isActivelyDrawingPath = false;
                 activeTool = null;
@@ -1502,6 +1539,11 @@
 
     function cancelDrawPath(): void {
         if (!isDrawingPath) return;
+        if (curveMode === "pen") {
+            // Leaving the tool keeps the path drawn so far; the end callback does the cleanup
+            finishPenDrawPath();
+            return;
+        }
         cancelFreeHandDrawPath();
         cleanupPathDrawListeners();
         removeMapCursorListeners();
@@ -2002,9 +2044,13 @@
     {/snippet}
 </Modal>
 
-{#if (isDrawingPath && !isActivelyDrawingPath) && isCursorInsideMap}
+{#if isDrawingPath && (curveMode === "pen" || !isActivelyDrawingPath) && isCursorInsideMap}
     <div id="drawing-tooltip" bind:this={drawingTooltip} class="drawing-tooltip">
-        Left-click and hold to draw a curve
+        {#if curveMode === "pen"}
+            Click to add points, drag to curve · Enter or double-click to finish
+        {:else}
+            Left-click and hold to draw a curve
+        {/if}
     </div>
 {:else if isDrawingFreeHand && isCursorInsideMap}
     <div id="drawing-tooltip" bind:this={drawingTooltip} class="drawing-tooltip">
@@ -2081,7 +2127,9 @@
                     <SettingsStrip {draw} />
                     <ToolStrip
                         {activeTool}
+                        curveMode={curveMode}
                         onDrawCurve={toolDrawCurve}
+                        onPickCurveMode={pickCurveMode}
                         onDrawFreehand={toolDrawFreehand}
                         onPickShape={onToolPickShape}
                         onCustomImage={onToolCustomImage}

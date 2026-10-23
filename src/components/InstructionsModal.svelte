@@ -176,9 +176,24 @@
         <h6 class="section-title">Toolbar</h6>
         <ul class="tip-list">
           <li>
-            <strong>Curve</strong> — click the button, then click and drag on the
-            map to add anchor points; double-click to finish. Creates an editable
-            SVG <code>&lt;path&gt;</code>.
+            <strong>Curve</strong> — has two modes, chosen with the arrow next to
+            the button (your choice is remembered). Both create an editable SVG
+            <code>&lt;path&gt;</code>.
+            <ul>
+              <li>
+                <strong>Pen</strong> (default) — click to place a point, click and
+                drag to pull out its handles and make a smooth point. Hold
+                <kbd>Alt</kbd> while dragging to move only one handle (sharp
+                corner) and <kbd>Shift</kbd> to snap the handle to 45°.
+                <kbd>Backspace</kbd> (or <kbd>Ctrl</kbd> + <kbd>Z</kbd>) removes the
+                last point. Press <kbd>Enter</kbd>, <kbd>Esc</kbd>, double-click or
+                click the last point to finish.
+              </li>
+              <li>
+                <strong>Freehand</strong> — hold and drag to draw a stroke, which
+                is smoothed into a curve.
+              </li>
+            </ul>
           </li>
           <li>
             <strong>Freehand</strong> — click the button, then hold and drag to
@@ -196,15 +211,44 @@
 
         <h6 class="section-title mt-3">Editing a curve</h6>
         <ul class="tip-list">
-          <li>Click and drag anywhere on the curve to move the whole curve</li>
           <li>
-            <kbd>Ctrl</kbd> + click anywhere on the curve to <strong>add</strong>
-            a point
+            Select a curve, then click <strong>Edit curve</strong> in the
+            properties panel
           </li>
           <li>
-            <kbd>Ctrl</kbd> + click on an existing point to
-            <strong>remove</strong> it (removing the second-to-last point deletes
-            the curve)
+            Click on the curve to <strong>add</strong> a point (a dot previews
+            where it will go)
+          </li>
+          <li>Click and drag on the curve to move the whole curve</li>
+          <li>
+            Click a point to select it: its two <strong>handles</strong> appear.
+            Drag the point or its handles to reshape the curve
+          </li>
+          <li>
+            Handles of a smooth point stay aligned: hold <kbd>Alt</kbd> while
+            dragging a handle to move it independently and make a sharp corner
+          </li>
+          <li>
+            Double-click a point to switch it between a sharp
+            <strong>corner</strong> and a <strong>smooth</strong> point
+          </li>
+          <li>
+            <kbd>Delete</kbd> / <kbd>Backspace</kbd> (or <kbd>Ctrl</kbd> + click
+            on a point) <strong>removes</strong> the selected point. Removing the
+            second-to-last point deletes the curve
+          </li>
+          <li>
+            Arrow keys nudge the selected point by 1px (<kbd>Shift</kbd> for
+            10px)
+          </li>
+          <li>
+            <kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Ctrl</kbd> +
+            <kbd>Shift</kbd> + <kbd>Z</kbd> undo and redo point changes while
+            editing
+          </li>
+          <li>
+            <kbd>Enter</kbd> or <kbd>Esc</kbd>, or click
+            <strong>Exit editing</strong>, to finish
           </li>
         </ul>
 

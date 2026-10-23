@@ -125,7 +125,7 @@ The `exportMicro` function is responsible for exporting the map as an SVG file. 
 Some common features exist between the two modes, which are handled in `App.svelte`. The main drawing function is the `draw` function in `App.svelte`, which will call all drawing functions (macro or micro + common drawing).
 
 `src/components/ToolStrip.svelte`, docked in the top navbar, exposes the map's drawing tools:
-- Draw / edit SVG `<path>` elements (see `src/svg/freeHandPath.ts` and `src/svg/pathEditor.ts`)
+- Draw / edit SVG `<path>` elements. The Curve button is a split button with two modes, stored in `curveMode` in `App.svelte` (localStorage key `mapello.curveMode`, default `pen`): **Pen** (`src/svg/penPath.ts`: click = corner anchor, click+drag = smooth anchor with handles, Alt = move one handle only, Shift = snap to 45°, Backspace/Ctrl+Z = remove last point, Enter/Esc/double-click/click on last point = finish and keep the path, switching tool also keeps it) and **Freehand** (`src/svg/freeHandPath.ts`: dragged stroke fitted to Béziers with `fit-curve`). Both output `M` + `C` commands only; editing is done by `src/svg/pathEditor.ts`
 - Draw freehand on the map (`src/svg/freeHandDraw.ts`)
 - Add labels on the map. It is possible to provide a font to the app. On export, we will give the choice to the user to embed or not the font as base64 in the final SVG, convert the `<text>` elements to `<path>` using `text-to-svg`, or the smallest file size of the 2 possibilities
 - Add icons on the map (points / squares and more), stored as `ShapeDefinition` in `commonState.providedShapes`
@@ -137,12 +137,39 @@ Curve-specific options (image along a curve, curve end markers) live in the Prop
 - **Style editing**: fill, stroke colour, stroke width, stroke dash, font family. Edits CSS rules (shared selectors) or inline styles depending on which rule tab is selected. When editing inline styles, no overlay is shown on the map since the marching-ants ring already indicates the target. Style changes are dispatched via the `onStyleChanged` prop to `MacroSidebar.onStyleChanged` / `MicroSidebar.onStyleChanged`, which persist inline changes in `commonState.inlineStyles` via `handleInlineStyleChange` in `src/svg/svg.ts`. `applyStyles(commonState.inlineStyles)` re-applies them after every redraw.
 - **Interactions**: link (URL on click), tooltip and popover annotations (opens the QuillEditor modal).
 - **Path editing**: "Edit path" / "Exit editing" buttons for `path` entities.
+- **Path editing** is implemented by `PathEditor` in `src/svg/pathEditor.ts` (see "Path editor" below).
 - **Image along path** (path entities only): import an image, set duration/width/height, toggle "Rotate with curve". Backed by `PathDef.image`/`duration`/`width`/`height`/`imageRotate` in `commonState.providedPaths`.
 - **Marker** (path entities only): pick an end-of-curve marker from `src/svg/markerDefs.ts`, or "None" to remove it. Backed by `PathDef.marker` (`MarkerName`) in `commonState.providedPaths`.
 - **Delete**: removes the selected user entity.
 - **Bring to front** (macro mode only, for `.country` and `.adm` elements): moves the element to the end of its parent group so it renders on top of siblings. Persisted via `commonState.inlineStyles[id].bringtofront`. Only one element per parent group can be on top; promoting a new one clears the flag from its siblings. The button is disabled when the element already has the flag set. The tooltip hover behaviour in `src/tooltip.ts` temporarily raises hovered regions, so on-top detection must use `inlineStyles` rather than DOM position.
 
 The panel is opened programmatically via `propertiesPanel.open(el)` from SVG click handlers in `App.svelte`. `MacroSidebar` also opens it for legend sample clicks via the `openPropertiesPanel` prop.
+
+### Path editor
+`PathEditor` (`src/svg/pathEditor.ts`) edits a path made only of cubic Béziers (`M` then `C` commands). Created by `startPathEditing` in `App.svelte`; `finish()` / `undo()` / `redo()` are called from there, and `onFinish(null)` means the path was deleted.
+
+How it works:
+- `pathData` (`[anchor, handle, handle, anchor, ...]`) is the single source of truth; `render()` pushes it to the real path, the blue overlay and every visible point. Handle/anchor relations are derived from the index (anchor `i` owns handles `i-1` and `i+1`; the opposite of handle `h` is `2*anchor - h`).
+- Only anchors are drawn. Selecting an anchor shows its two handles and tangent lines.
+- A handle drag rotates the opposite handle (keeping its length) only if the two were collinear when the drag started (`isSmooth`), so cusps are preserved.
+- The overlay copies the path's `transform`, and pointer positions are computed in that local space.
+- Local undo/redo history (50 snapshots) is independent from the app-wide history; while editing, Ctrl+Z / Ctrl+Shift+Z in `App.svelte` is routed to the editor.
+- Drags start after a 3px threshold: a mousedown+mouseup on the curve without movement inserts a point, with movement it translates the whole path.
+
+Interactions and shortcuts (also summarised in the PropertiesPanel hint while editing):
+| Action | Result |
+|---|---|
+| Click on the curve (or Ctrl+click) | Insert an anchor (a ghost dot previews the position on hover) |
+| Drag the curve | Move the whole path |
+| Click an anchor | Select it and show its handles |
+| Click on the empty map | Deselect |
+| Drag an anchor / handle | Move it (an anchor carries its handles; the opposite handle mirrors if the point is smooth) |
+| Alt + drag a handle | Move it independently (creates a corner) |
+| Double-click an anchor or handle | Toggle corner (handles collapsed) / smooth (handles re-created along the neighbours) |
+| Delete / Backspace (or Ctrl+click an anchor) | Remove the anchor; removing one of the last 2 anchors deletes the path |
+| Arrow keys (Shift = 10px) | Nudge the selected anchor |
+| Ctrl+Z / Ctrl+Shift+Z | Undo / redo within the editor |
+| Enter / Esc | Exit editing (Esc is handled in `App.svelte`) |
 
 ### Selection system
 Shapes, paths, and freehand drawings can be selected, multi-selected, copied, pasted, and deleted. The selection state and operations are in `src/selection.svelte.ts`. A bounding box overlay is rendered by `src/svg/selectionOverlay.ts`.

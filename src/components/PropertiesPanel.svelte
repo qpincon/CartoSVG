@@ -429,11 +429,19 @@
 {/snippet}
 
 <!-- Cascade indicator for color fields (dashed swatch + italic hex) -->
-{#snippet cascadeColor(prop: string)}
+{#snippet cascadeColor(prop: string, openPicker?: (el: HTMLElement) => void)}
     {@const ic = inheritedColor(prop)}
     <span class="flex-grow-1"></span>
     <span class="sp-cascade" use:bsTooltip={TOOLTIP_CASCADE}>
-        {#if ic}<span class="sp-inherited-swatch" style="background:{ic}"></span>{/if}
+        {#if ic}
+            {#if openPicker}
+                <button type="button" class="sp-inherited-swatch sp-inherited-swatch-btn p-0" style="background:{ic}"
+                    aria-label="Set color"
+                    onclick={(e) => openPicker(e.currentTarget as HTMLElement)}></button>
+            {:else}
+                <span class="sp-inherited-swatch" style="background:{ic}"></span>
+            {/if}
+        {/if}
         <em class="font-monospace text-muted" style="font-size:10px">{ic || "—"}</em>
     </span>
 {/snippet}
@@ -460,7 +468,7 @@
         {#if currentVal}
             <span class="font-monospace text-secondary text-truncate flex-grow-1" style="font-size:11px">{displayColor(currentVal)}</span>
         {:else}
-            {@render cascadeColor(prop)}
+            {@render cascadeColor(prop, openPicker)}
         {/if}
     </div>
     {@render resetBtn(prop, currentVal)}
@@ -507,7 +515,13 @@
             <div class="px-3 py-2 border-bottom">
                 {#if isEditingPath}
                 <div class="d-flex flex-column gap-1">
-                    <span class="text-secondary" style="font-size:10px">Ctrl+click curve to add point · Ctrl+click node to delete</span>
+                    <span class="text-secondary" style="font-size:10px; line-height:1.4">
+                        Click the curve to add a point · drag it to move the whole curve<br>
+                        Click a point to show its handles · Alt+drag a handle to break symmetry<br>
+                        Double-click a point: corner / smooth<br>
+                        Delete (or Ctrl+click) removes a point · arrows nudge it (Shift = 10px)<br>
+                        Ctrl+Z undo · Enter / Esc exit
+                    </span>
                     <button type="button" class="btn btn-sm btn-primary w-100"
                         onclick={() => onExitEditPath?.()}>Exit editing</button>
                 </div>
@@ -846,6 +860,8 @@
         width: 13px; height: 13px; border-radius: 2px;
         border: 1.5px dashed #adb5bd; flex-shrink: 0;
     }
+
+    .sp-inherited-swatch-btn { cursor: pointer; }
 
     .sp-tip {
         position: fixed; pointer-events: none; z-index: 99999;
