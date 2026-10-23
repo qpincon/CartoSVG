@@ -155,11 +155,11 @@
                     role="switch"
                     class="form-check-input"
                     disabled={def.disabled}
-                    id={title}
+                    id={`layer-active-${title}`}
                     bind:checked={def.active}
                     onchange={() => updated(title as MicroLayerId, ["active"], def.active!)}
                 />
-                <label for={title} class="form-check-label d-flex align-items-center gap-2">
+                <label for={`layer-active-${title}`} class="form-check-label d-flex align-items-center gap-2">
                     {pascalCaseToSentence(title)}
                     {#if swatchColor(def)}
                         <span class="layer-swatch" style="background-color: {swatchColor(def)};"></span>

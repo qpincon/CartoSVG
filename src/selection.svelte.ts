@@ -62,7 +62,7 @@ export function identifyClickedEntity(target: Element): SelectedEntity | null {
     }
 
     // Check if clicked on a path in #paths (use closestDistance for thin paths)
-    const pathsElement = document.getElementById("paths");
+    const pathsElement = document.querySelector("#static-svg-map #paths");
     if (pathsElement) {
         // Direct hit: check if target is inside #paths
         if (target.closest("#paths") && target.tagName === "path") {
@@ -79,17 +79,24 @@ export function identifyClickedEntity(target: Element): SelectedEntity | null {
     return null;
 }
 
+const PATH_HIT_TOLERANCE_PX = 7;
+
 /** Hit-test paths with a proximity threshold (for thin strokes) */
 export function identifyClickedPath(e: MouseEvent): SelectedEntity | null {
-    const pathsElement = document.getElementById("paths");
-    if (!pathsElement) return null;
     const svgElem = document.getElementById("static-svg-map") as unknown as SVGSVGElement;
     if (!svgElem) return null;
+    // Scoped to the map SVG: a bare document-level id lookup can hit a same-id sidebar element
+    const pathsElement = svgElem.querySelector("#paths");
+    if (!pathsElement) return null;
 
     const pt = svgElem.createSVGPoint();
     pt.x = e.clientX;
     pt.y = e.clientY;
-    const svgPt = pt.matrixTransform(svgElem.getScreenCTM()?.inverse());
+    const ctm = svgElem.getScreenCTM();
+    const svgPt = pt.matrixTransform(ctm?.inverse());
+    // Tolerance is in screen pixels; convert to SVG user units so it holds when the map is scaled.
+    const scale = ctm ? Math.hypot(ctm.a, ctm.b) || 1 : 1;
+    const maxDist = PATH_HIT_TOLERANCE_PX / scale;
     const point = { x: svgPt.x, y: svgPt.y };
 
     const paths = Array.from(pathsElement.querySelectorAll('path')) as SVGPathElement[];
@@ -104,7 +111,7 @@ export function identifyClickedPath(e: MouseEvent): SelectedEntity | null {
             bestElem = pathElem;
         }
     }
-    if (bestElem && bestDist < 6) {
+    if (bestElem && bestDist < maxDist) {
         const id = bestElem.getAttribute("id")!;
         const bestMatch = id.match(/\d+$/);
         if (!bestMatch) return null;
