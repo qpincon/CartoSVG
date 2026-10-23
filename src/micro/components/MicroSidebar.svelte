@@ -100,9 +100,17 @@
         /** Not passed, we just need to access it from the parent*/
         maplibreMap?: Map | null;
         onMapMoveStart?: () => void;
+        /**
+         * Bound up to App.svelte so it can disable the "Map" mode-switch button until this is
+         * true. Starts false on every (re)mount; App.svelte resets it before mounting a fresh
+         * instance. Becomes true once the map's first "idle" fires (or "error", or teardown —
+         * see createMaplibreMap/onDestroy — so a failed load can't leave the button disabled
+         * forever).
+         */
+        mapReady?: boolean;
     }
 
-    let { svg, draw, maplibreMap, onMapMoveStart }: Props = $props();
+    let { svg, draw, maplibreMap, onMapMoveStart, mapReady = $bindable(false) }: Props = $props();
 
     let additionalCss = $derived(computeCss(microState.microParams));
 
@@ -117,6 +125,11 @@
      */
     // let maplibreMap: Map | null = $props(null);
     let mapLoadedPromise: Promise<unknown> | null = $state(null);
+    // Resolver for mapLoadedPromise, kept so onDestroy can force it to settle even if the map's
+    // first "idle" never fires (e.g. removed while still loading) — without this, drawMicroTotal
+    // below stays suspended forever, which (absent App.svelte's try/finally) would permanently
+    // wedge the isDrawing flag.
+    let mapLoadedResolve: (() => void) | null = null;
     let styleSheetElem: HTMLStyleElement;
     export async function drawMicroTotal() {
         if (!maplibreMap) return;
@@ -245,13 +258,25 @@
             selectAll("#static-svg-map g, #static-svg-map rect").remove();
         });
 
-        mapLoadedPromise = new Promise((resolve) => {
-            maplibreMap!.once("idle", resolve);
+        mapLoadedPromise = new Promise<void>((resolve) => {
+            mapLoadedResolve = () => {
+                resolve();
+                mapReady = true;
+            };
+            maplibreMap!.once("idle", () => mapLoadedResolve!());
+            // A style/tile load failure must not leave drawMicroTotal parked forever, nor the
+            // mode-switch button (gated on mapReady) disabled forever.
+            maplibreMap!.once("error", () => mapLoadedResolve!());
         });
         return mapLoadedPromise;
     }
 
     onDestroy(() => {
+        // Force mapLoadedPromise to settle even though the map's first "idle" may never fire
+        // now that we're about to remove() it — otherwise anything still awaiting it
+        // (drawMicroTotal) stays suspended forever.
+        mapLoadedResolve?.();
+        mapLoadedResolve = null;
         styleSheetElem.remove();
         maplibreMap?.remove();
     });

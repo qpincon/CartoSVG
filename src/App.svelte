@@ -106,6 +106,12 @@
     let fontPicker: FontPicker | null = $state(null);
     let svg: SvgSelection = $state(select("#map-container") as unknown as SvgSelection);
     let isDrawing = $state(false);
+    // True once the micro-mode MapLibre map has fired its first "idle" (or failed to load, or
+    // been torn down — see MicroSidebar's createMaplibreMap/onDestroy). Gates the "Map" button
+    // below: switching away before this is true is what makes the map never come back (the
+    // MapLibre map gets destroyed mid-load, and drawing hangs waiting on a promise that will
+    // now never settle). Reset to false right before a fresh MicroSidebar mounts.
+    let microMapReady = $state(false);
 
     let cssFonts = $derived(fontsToCss(commonState.providedFonts));
 
@@ -531,6 +537,10 @@
             unlockView();
             resetViewLockSession();
         }
+        // Reset before the mode change below mounts a fresh MicroSidebar (a bound prop takes
+        // the parent's current value at mount time), so the "Map" button starts disabled again
+        // for the new map instance instead of inheriting the previous one's ready state.
+        if (newMode === "micro") microMapReady = false;
         commonState.currentMode = newMode;
         select("#map-container").html("");
         await tick();
@@ -555,95 +565,103 @@
     async function draw(simplified = false) {
         if (isDrawing) return;
         isDrawing = true;
-        hidePopover();
-        clearSelection();
-        log("draw", simplified);
-        const container = select("#map-container");
-        container.html("");
-        svg = container.select("svg") as unknown as SvgSelection;
-        if (svg.empty())
-            svg = container
-                .append("svg")
-                .attr("xmlns", "http://www.w3.org/2000/svg")
-                .attr("xmlns:xlink", "http://www.w3.org/1999/xlink")
-                .attr("id", "static-svg-map") as unknown as SvgSelection;
+        // Guarantees isDrawing is released even if something below throws (e.g. a MapLibre call
+        // hitting a map that got removed mid-draw) — without this, a single unhandled error
+        // permanently disables every future redraw and the app needs a page refresh.
+        try {
+            hidePopover();
+            clearSelection();
+            log("draw", simplified);
+            const container = select("#map-container");
+            container.html("");
+            svg = container.select("svg") as unknown as SvgSelection;
+            if (svg.empty())
+                svg = container
+                    .append("svg")
+                    .attr("xmlns", "http://www.w3.org/2000/svg")
+                    .attr("xmlns:xlink", "http://www.w3.org/1999/xlink")
+                    .attr("id", "static-svg-map") as unknown as SvgSelection;
 
-        svg.append("defs");
-        svg.on("click", onSvgClick);
-        svg.on("mousedown", onSvgMouseDown);
-        svg.node()?.addEventListener(
-            "wheel",
-            (e: WheelEvent) => {
-                if (commonState.currentMode !== "micro" || isDrawingFreeHand || isDrawingPath || editingPath) return;
-                if (isViewGestureBlocked()) {
-                    noteBlockedGesture();
-                    return;
-                }
-                const canvas = document.querySelector("#maplibre-map canvas") as HTMLCanvasElement | null;
-                if (!canvas) return;
-                e.preventDefault();
-                canvas.dispatchEvent(
-                    new WheelEvent("wheel", {
-                        bubbles: true,
-                        cancelable: true,
-                        clientX: e.clientX,
-                        clientY: e.clientY,
-                        deltaX: e.deltaX,
-                        deltaY: e.deltaY,
-                        deltaZ: e.deltaZ,
-                        deltaMode: e.deltaMode,
-                        ctrlKey: e.ctrlKey,
-                        shiftKey: e.shiftKey,
-                        altKey: e.altKey,
-                        metaKey: e.metaKey,
-                    }),
-                );
-            },
-            { passive: false },
-        );
-        // Without this, right-click (and Ctrl+click on Mac, where the OS/browser treats
-        // Ctrl+click as a secondary click) opens the native context menu over the SVG,
-        // interrupting Ctrl/right-click drags before they register: the micro-mode
-        // MapLibre tilt/rotate gesture, the macro-mode satellite tilt/rotate drag
-        // (src/macro/interactions.ts), and path editing's Ctrl+click add/delete point
-        // (src/svg/pathEditor.ts). None of these modes have a legitimate use for the
-        // native context menu, so it's suppressed unconditionally here.
-        svg.node()?.addEventListener("contextmenu", (e: MouseEvent) => e.preventDefault());
+            svg.append("defs");
+            svg.on("click", onSvgClick);
+            svg.on("mousedown", onSvgMouseDown);
+            svg.node()?.addEventListener(
+                "wheel",
+                (e: WheelEvent) => {
+                    if (commonState.currentMode !== "micro" || isDrawingFreeHand || isDrawingPath || editingPath) return;
+                    if (isViewGestureBlocked()) {
+                        noteBlockedGesture();
+                        return;
+                    }
+                    const canvas = document.querySelector("#maplibre-map canvas") as HTMLCanvasElement | null;
+                    if (!canvas) return;
+                    e.preventDefault();
+                    canvas.dispatchEvent(
+                        new WheelEvent("wheel", {
+                            bubbles: true,
+                            cancelable: true,
+                            clientX: e.clientX,
+                            clientY: e.clientY,
+                            deltaX: e.deltaX,
+                            deltaY: e.deltaY,
+                            deltaZ: e.deltaZ,
+                            deltaMode: e.deltaMode,
+                            ctrlKey: e.ctrlKey,
+                            shiftKey: e.shiftKey,
+                            altKey: e.altKey,
+                            metaKey: e.metaKey,
+                        }),
+                    );
+                },
+                { passive: false },
+            );
+            // Without this, right-click (and Ctrl+click on Mac, where the OS/browser treats
+            // Ctrl+click as a secondary click) opens the native context menu over the SVG,
+            // interrupting Ctrl/right-click drags before they register: the micro-mode
+            // MapLibre tilt/rotate gesture, the macro-mode satellite tilt/rotate drag
+            // (src/macro/interactions.ts), and path editing's Ctrl+click add/delete point
+            // (src/svg/pathEditor.ts). None of these modes have a legitimate use for the
+            // native context menu, so it's suppressed unconditionally here.
+            svg.node()?.addEventListener("contextmenu", (e: MouseEvent) => e.preventDefault());
 
-        if (commonState.currentMode === "macro") {
-            await macroSidebar!.drawMacroTotal(simplified);
-        } else if (commonState.currentMode === "micro") {
-            await microSidebar?.drawMicroTotal();
-        }
-
-        svg.append("g").attr("id", "points-labels");
-        svg.append("g").attr("id", "paths");
-        drawAndSetupShapes();
-        drawCustomPaths(
-            commonState.providedPaths,
-            svg,
-            appState.projection!,
-            commonState.inlineStyles,
-            commonState.elementLinks ?? {},
-        );
-        drawFreeHandShapes(svg, commonState.providedFreeHand, commonState.elementLinks ?? {});
-        if (!simplified) {
-            applyStyles(commonState.inlineStyles);
-            applyGenericLinks();
-            if (commonState.elementAnnotations) {
-                setupPopoverCursors(svg.node() as SVGSVGElement, commonState.elementAnnotations);
+            if (commonState.currentMode === "macro") {
+                await macroSidebar!.drawMacroTotal(simplified);
+            } else if (commonState.currentMode === "micro") {
+                await microSidebar?.drawMicroTotal();
             }
-            saveState();
+
+            svg.append("g").attr("id", "points-labels");
+            svg.append("g").attr("id", "paths");
+            drawAndSetupShapes();
+            drawCustomPaths(
+                commonState.providedPaths,
+                svg,
+                appState.projection!,
+                commonState.inlineStyles,
+                commonState.elementLinks ?? {},
+            );
+            drawFreeHandShapes(svg, commonState.providedFreeHand, commonState.elementLinks ?? {});
+            if (!simplified) {
+                applyStyles(commonState.inlineStyles);
+                applyGenericLinks();
+                if (commonState.elementAnnotations) {
+                    setupPopoverCursors(svg.node() as SVGSVGElement, commonState.elementAnnotations);
+                }
+                saveState();
+            }
+            if (!simplified && commonState.currentMode !== "macro") {
+                setTimeout(() => {
+                    addElementAnnotationListener(svg.node() as SVGSVGElement, commonState.elementAnnotations ?? {});
+                }, 600);
+            }
+            if (!simplified) {
+                setTimeout(() => postClipSimple(), 100);
+            }
+        } catch (e) {
+            console.error("draw failed", e);
+        } finally {
+            isDrawing = false;
         }
-        if (!simplified && commonState.currentMode !== "macro") {
-            setTimeout(() => {
-                addElementAnnotationListener(svg.node() as SVGSVGElement, commonState.elementAnnotations ?? {});
-            }, 600);
-        }
-        if (!simplified) {
-            setTimeout(() => postClipSimple(), 100);
-        }
-        isDrawing = false;
     }
 
     function onSvgResize(w: number, h: number) {
@@ -1997,9 +2015,16 @@
                     onchange={(e) => switchMode(e.currentTarget.value as Mode)}
                     value="macro"
                     checked={commonState.currentMode === "macro"}
+                    disabled={commonState.currentMode === "micro" && !microMapReady}
                     autocomplete="off"
                 />
-                <label class="mode-btn" for="switchMacro" class:active={commonState.currentMode === "macro"}>
+                <label
+                    class="mode-btn"
+                    for="switchMacro"
+                    class:active={commonState.currentMode === "macro"}
+                    class:disabled={commonState.currentMode === "micro" && !microMapReady}
+                    title={commonState.currentMode === "micro" && !microMapReady ? "Waiting for the detailed map to finish loading…" : undefined}
+                >
                     <img src={macroImg} width="22" height="22" />
                     Macro
                 </label>
@@ -2025,6 +2050,7 @@
                 {:else}
                     <MicroSidebar
                         bind:this={microSidebar}
+                        bind:mapReady={microMapReady}
                         {draw}
                         {svg}
                         onMapMoveStart={() => {
@@ -2453,6 +2479,11 @@
                 img {
                     opacity: 1;
                 }
+            }
+
+            &.disabled {
+                cursor: not-allowed;
+                opacity: 0.5;
             }
         }
     }
